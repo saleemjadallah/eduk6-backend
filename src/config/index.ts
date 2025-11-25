@@ -67,7 +67,7 @@ export const config = {
   // Email (Resend)
   email: {
     apiKey: process.env.RESEND_API_KEY,
-    fromEmail: process.env.RESEND_FROM_EMAIL || 'noreply@mydscvr.ai',
+    fromEmail: process.env.RESEND_FROM_EMAIL || 'support@orbitlearn.app',
     skipEmails: process.env.SKIP_EMAILS === 'true',
   },
 

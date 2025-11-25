@@ -12,21 +12,21 @@ const templates = {
    * Welcome email for new parents
    */
   welcome: (parentName: string) => ({
-    subject: 'Welcome to NanoBanana! Your Learning Adventure Begins',
+    subject: 'Welcome to OrbitLearn! Your Learning Adventure Begins',
     html: `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome to NanoBanana!</title>
+  <title>Welcome to OrbitLearn!</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
     <tr>
-      <td style="background: linear-gradient(135deg, #FFD93D 0%, #FF6B6B 100%); border-radius: 20px 20px 0 0; padding: 40px; text-align: center;">
-        <h1 style="color: #1a1a2e; margin: 0; font-size: 32px;">Welcome to NanoBanana!</h1>
-        <p style="color: #1a1a2e; margin-top: 10px; font-size: 18px;">Where Learning is an Adventure!</p>
+      <td style="background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%); border-radius: 20px 20px 0 0; padding: 40px; text-align: center;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 32px;">Welcome to OrbitLearn!</h1>
+        <p style="color: rgba(255,255,255,0.9); margin-top: 10px; font-size: 18px;">Where Learning is an Adventure!</p>
       </td>
     </tr>
     <tr>
@@ -34,11 +34,11 @@ const templates = {
         <h2 style="color: #1a1a2e; margin-top: 0;">Hi ${parentName}!</h2>
 
         <p style="color: #4a4a4a; line-height: 1.6; font-size: 16px;">
-          Thank you for joining NanoBanana! We're thrilled to have you and your family as part of our learning community.
+          Thank you for joining OrbitLearn! We're thrilled to have you and your family as part of our learning community.
         </p>
 
-        <div style="background-color: #f0f9ff; border-left: 4px solid #3b82f6; padding: 20px; margin: 24px 0; border-radius: 8px;">
-          <h3 style="color: #1e40af; margin-top: 0;">Meet Jeffrey, Your Child's AI Tutor!</h3>
+        <div style="background-color: #f0f9ff; border-left: 4px solid #6366F1; padding: 20px; margin: 24px 0; border-radius: 8px;">
+          <h3 style="color: #4338CA; margin-top: 0;">Meet Jeffrey, Your Child's AI Tutor!</h3>
           <p style="color: #4a4a4a; margin-bottom: 0;">
             Jeffrey is a friendly, patient AI tutor who adapts to each child's learning style. He makes education fun with interactive lessons, games, and personalized encouragement!
           </p>
@@ -52,14 +52,14 @@ const templates = {
         </ol>
 
         <div style="text-align: center; margin: 32px 0;">
-          <a href="${config.frontendUrl}/dashboard" style="background: linear-gradient(135deg, #FFD93D 0%, #FF6B6B 100%); color: #1a1a2e; text-decoration: none; padding: 14px 32px; border-radius: 30px; font-weight: bold; font-size: 16px; display: inline-block;">
+          <a href="${config.frontendUrl}/dashboard" style="background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 30px; font-weight: bold; font-size: 16px; display: inline-block;">
             Start Learning Now
           </a>
         </div>
 
         <p style="color: #4a4a4a; font-size: 14px; border-top: 1px solid #e5e7eb; padding-top: 20px; margin-bottom: 0;">
           Questions? Reply to this email - we're here to help!<br>
-          <span style="color: #9ca3af;">- The NanoBanana Team</span>
+          <span style="color: #9ca3af;">- The OrbitLearn Team</span>
         </p>
       </td>
     </tr>
@@ -68,11 +68,11 @@ const templates = {
 </html>
     `,
     text: `
-Welcome to NanoBanana!
+Welcome to OrbitLearn!
 
 Hi ${parentName}!
 
-Thank you for joining NanoBanana! We're thrilled to have you and your family as part of our learning community.
+Thank you for joining OrbitLearn! We're thrilled to have you and your family as part of our learning community.
 
 Meet Jeffrey, Your Child's AI Tutor!
 Jeffrey is a friendly, patient AI tutor who adapts to each child's learning style. He makes education fun with interactive lessons, games, and personalized encouragement!
@@ -85,7 +85,7 @@ Getting Started:
 Start learning at: ${config.frontendUrl}/dashboard
 
 Questions? Reply to this email - we're here to help!
-- The NanoBanana Team
+- The OrbitLearn Team
     `,
   }),
 
@@ -114,7 +114,7 @@ Questions? Reply to this email - we're here to help!
     const { title, message, action } = purposes[purpose];
 
     return {
-      subject: `${title} - NanoBanana`,
+      subject: `${title} - OrbitLearn`,
       html: `
 <!DOCTYPE html>
 <html>
@@ -149,7 +149,7 @@ Questions? Reply to this email - we're here to help!
 
         <div style="background-color: #fef3c7; border-radius: 8px; padding: 16px; margin-top: 24px;">
           <p style="color: #92400e; margin: 0; font-size: 14px;">
-            <strong>Security tip:</strong> Never share this code with anyone. NanoBanana will never ask for your code via phone or text.
+            <strong>Security tip:</strong> Never share this code with anyone. OrbitLearn will never ask for your code via phone or text.
           </p>
         </div>
 
@@ -171,7 +171,7 @@ Your verification code: ${otp}
 
 This code expires in 10 minutes.
 
-Security tip: Never share this code with anyone. NanoBanana will never ask for your code via phone or text.
+Security tip: Never share this code with anyone. OrbitLearn will never ask for your code via phone or text.
 
 If you didn't request this ${action}, please ignore this email or contact support if you have concerns.
       `,
@@ -182,7 +182,7 @@ If you didn't request this ${action}, please ignore this email or contact suppor
    * Child added notification email
    */
   childAdded: (parentName: string, childName: string) => ({
-    subject: `${childName}'s Profile is Ready! - NanoBanana`,
+    subject: `${childName}'s Profile is Ready! - OrbitLearn`,
     html: `
 <!DOCTYPE html>
 <html>
@@ -264,7 +264,7 @@ View profile at: ${config.frontendUrl}/dashboard/children
       badgesEarned: string[];
     }
   ) => ({
-    subject: `${childName}'s Weekly Learning Report - NanoBanana`,
+    subject: `${childName}'s Weekly Learning Report - OrbitLearn`,
     html: `
 <!DOCTYPE html>
 <html>
@@ -375,7 +375,7 @@ export const emailService = {
       const template = templates.welcome(parentName);
 
       const { error } = await resend.emails.send({
-        from: `NanoBanana <${config.email.fromEmail}>`,
+        from: `OrbitLearn <${config.email.fromEmail}>`,
         to: email,
         subject: template.subject,
         html: template.html,
@@ -412,7 +412,7 @@ export const emailService = {
       const template = templates.otp(otp, purpose);
 
       const { error } = await resend.emails.send({
-        from: `NanoBanana <${config.email.fromEmail}>`,
+        from: `OrbitLearn <${config.email.fromEmail}>`,
         to: email,
         subject: template.subject,
         html: template.html,
@@ -449,7 +449,7 @@ export const emailService = {
       const template = templates.childAdded(parentName, childName);
 
       const { error } = await resend.emails.send({
-        from: `NanoBanana <${config.email.fromEmail}>`,
+        from: `OrbitLearn <${config.email.fromEmail}>`,
         to: email,
         subject: template.subject,
         html: template.html,
@@ -493,7 +493,7 @@ export const emailService = {
       const template = templates.weeklyProgress(parentName, childName, stats);
 
       const { error } = await resend.emails.send({
-        from: `NanoBanana <${config.email.fromEmail}>`,
+        from: `OrbitLearn <${config.email.fromEmail}>`,
         to: email,
         subject: template.subject,
         html: template.html,
