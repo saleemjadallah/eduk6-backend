@@ -1,0 +1,97 @@
+// Environment configuration loader
+import 'dotenv/config';
+
+export const config = {
+  // Server
+  port: parseInt(process.env.PORT || '3000'),
+  nodeEnv: process.env.NODE_ENV || 'development',
+  isProduction: process.env.NODE_ENV === 'production',
+
+  // Frontend (for CORS)
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+  allowedOrigins: (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:3000').split(','),
+
+  // Database
+  databaseUrl: process.env.DATABASE_URL!,
+
+  // Redis
+  redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
+
+  // Session & Auth
+  sessionSecret: process.env.SESSION_SECRET!,
+  jwtSecret: process.env.JWT_SECRET || process.env.SESSION_SECRET!,
+  jwtAccessExpiry: '15m',
+  jwtRefreshExpiry: '7d',
+
+  // Cloudflare R2
+  cloudflare: {
+    accountId: process.env.CLOUDFLARE_ACCOUNT_ID!,
+    r2: {
+      endpoint: process.env.R2_ENDPOINT!,
+      accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY!,
+      buckets: {
+        uploads: process.env.R2_BUCKET_UPLOADS!,
+        aiContent: process.env.R2_BUCKET_AI_CONTENT!,
+        static: process.env.R2_BUCKET_STATIC!,
+      },
+    },
+    cdnBaseUrl: process.env.CDN_BASE_URL!,
+  },
+
+  // Upload limits
+  upload: {
+    maxSizeMB: parseInt(process.env.MAX_UPLOAD_SIZE_MB || '10'),
+    allowedTypes: (process.env.ALLOWED_UPLOAD_TYPES || 'application/pdf,image/png,image/jpeg,image/webp').split(','),
+    presignedUrlExpiry: {
+      upload: parseInt(process.env.PRESIGNED_URL_EXPIRY_UPLOAD || '300'),
+      download: parseInt(process.env.PRESIGNED_URL_EXPIRY_DOWNLOAD || '3600'),
+    },
+  },
+
+  // AI Services
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY!,
+    models: {
+      flash: 'gemini-1.5-flash',
+      pro: 'gemini-1.5-pro',
+    },
+  },
+
+  // Firebase
+  firebase: {
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    serviceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
+  },
+
+  // Email (Resend)
+  email: {
+    apiKey: process.env.RESEND_API_KEY,
+    fromEmail: process.env.RESEND_FROM_EMAIL || 'noreply@mydscvr.ai',
+    skipEmails: process.env.SKIP_EMAILS === 'true',
+  },
+
+  // Stripe
+  stripe: {
+    secretKey: process.env.STRIPE_SECRET_KEY,
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+  },
+
+  // Logging
+  logLevel: process.env.LOG_LEVEL || 'info',
+  debug: process.env.DEBUG === 'true',
+} as const;
+
+// Validate required environment variables
+export function validateEnv(): void {
+  const required = [
+    'DATABASE_URL',
+    'SESSION_SECRET',
+  ];
+
+  const missing = required.filter(key => !process.env[key]);
+
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+}

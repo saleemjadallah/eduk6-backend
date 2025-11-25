@@ -1,0 +1,643 @@
+// NanoBanana K-6 AI Learning Platform - Database Schema
+// Prisma Schema for PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// AUTHENTICATION & USERS
+// ============================================
+
+model Parent {
+  id               String   @id @default(uuid())
+  email            String   @unique
+  passwordHash     String
+  firstName        String?
+  lastName         String?
+  phone            String?
+  country          String   @default("AE")
+  timezone         String   @default("Asia/Dubai")
+
+  // Email verification
+  emailVerified    Boolean  @default(false)
+  emailVerifiedAt  DateTime?
+
+  // Consent tracking
+  consents         Consent[]
+
+  // Subscription
+  subscriptionTier   SubscriptionTier   @default(FREE)
+  subscriptionStatus SubscriptionStatus @default(ACTIVE)
+  stripeCustomerId   String?
+  subscriptionExpiresAt DateTime?
+
+  // Relationships
+  children         Child[]
+
+  // Timestamps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  lastLoginAt      DateTime?
+
+  @@index([email])
+}
+
+model Child {
+  id               String   @id @default(uuid())
+  parentId         String
+  parent           Parent   @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  // Profile
+  displayName      String   // "Banana Explorer", etc. (no real name required)
+  avatarUrl        String?
+  pin              String   @db.Char(4) // 4-digit PIN for profile switching
+  dateOfBirth      DateTime // For age calculation, never exposed
+  ageGroup         AgeGroup // Calculated: YOUNG (4-7) or OLDER (8-12)
+
+  // Learning preferences
+  gradeLevel       Int?     // 1-6
+  curriculumType   CurriculumType?
+  preferredLanguage String  @default("en")
+  learningStyle    LearningStyle?
+
+  // Privacy settings
+  voiceEnabled     Boolean  @default(true)
+  avatarVisible    Boolean  @default(true)
+
+  // Relationships
+  lessons          Lesson[]
+  chatMessages     ChatMessage[]
+  flashcardDecks   FlashcardDeck[]
+  progress         UserProgress?
+  xpTransactions   XPTransaction[]
+  earnedBadges     EarnedBadge[]
+  streak           Streak?
+  safetyLogs       SafetyLog[]
+  textSelections   TextSelection[]
+
+  // Timestamps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  lastActiveAt     DateTime?
+
+  @@index([parentId])
+}
+
+model Consent {
+  id               String   @id @default(uuid())
+  parentId         String
+  parent           Parent   @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  // Verification method
+  method           ConsentMethod
+  status           ConsentStatus
+
+  // Verification details (encrypted)
+  verificationData Json?    // Encrypted transaction ID, etc.
+  ipAddress        String?
+  userAgent        String?
+
+  // Timestamps
+  consentGivenAt   DateTime?
+  expiresAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([parentId, status])
+}
+
+// ============================================
+// LEARNING CONTENT
+// ============================================
+
+model Lesson {
+  id               String   @id @default(uuid())
+  childId          String
+  child            Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  // Content metadata
+  title            String
+  summary          String?  @db.Text
+  subject          Subject?
+  gradeLevel       String?
+  sourceType       SourceType
+
+  // Original content reference
+  originalFileUrl  String?  // R2 URL
+  originalFileName String?
+  originalFileSize Int?
+  youtubeUrl       String?
+  youtubeVideoId   String?
+
+  // AI-processed content
+  extractedText    String?  @db.Text
+  chapters         Json?    // Array of chapter objects
+  keyConcepts      String[] // For chat context
+  vocabulary       Json?    // Array of {term, definition, example}
+  suggestedQuestions String[]
+
+  // Processing status
+  processingStatus ProcessingStatus @default(PENDING)
+  processingError  String?
+  aiConfidence     Float?   // 0-1 confidence score
+
+  // Safety review
+  safetyReviewed   Boolean  @default(false)
+  safetyFlags      String[] // Any flagged content
+
+  // Relationships
+  chatMessages     ChatMessage[]
+  flashcardDecks   FlashcardDeck[]
+  quizzes          Quiz[]
+  textSelections   TextSelection[]
+
+  // Progress
+  percentComplete  Float    @default(0)
+  lastAccessedAt   DateTime?
+  timeSpentSeconds Int      @default(0)
+
+  // Timestamps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([childId, createdAt])
+  @@index([processingStatus])
+}
+
+model ChatMessage {
+  id               String   @id @default(uuid())
+  childId          String
+  child            Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  lessonId         String?
+  lesson           Lesson?  @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+
+  // Message content
+  role             MessageRole
+  content          String   @db.Text
+
+  // AI metadata (for assistant messages)
+  modelUsed        String?  // gemini-1.5-flash, etc.
+  tokensUsed       Int?
+  responseTimeMs   Int?
+
+  // Safety tracking
+  safetyRatings    Json?    // Gemini safety ratings
+  wasFiltered      Boolean  @default(false)
+  filterReason     String?
+
+  // Voice integration
+  audioUrl         String?  // TTS audio URL
+
+  // Timestamps
+  createdAt        DateTime @default(now())
+
+  @@index([childId, createdAt])
+  @@index([lessonId])
+}
+
+// ============================================
+// FLASHCARDS & QUIZZES
+// ============================================
+
+model FlashcardDeck {
+  id               String   @id @default(uuid())
+  childId          String
+  child            Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  lessonId         String?
+  lesson           Lesson?  @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+
+  title            String
+  description      String?
+  subject          Subject?
+  isAIGenerated    Boolean  @default(false)
+
+  // Relationships
+  flashcards       Flashcard[]
+
+  // Progress
+  masteryLevel     Float    @default(0) // 0-100%
+  lastStudiedAt    DateTime?
+
+  // Timestamps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([childId])
+}
+
+model Flashcard {
+  id               String   @id @default(uuid())
+  deckId           String
+  deck             FlashcardDeck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+
+  front            String   @db.Text
+  back             String   @db.Text
+  imageUrl         String?
+  audioUrl         String?  // TTS pronunciation
+
+  // Spaced repetition (SM-2 algorithm)
+  easeFactor       Float    @default(2.5)
+  interval         Int      @default(1)  // Days
+  repetitions      Int      @default(0)
+  nextReviewAt     DateTime @default(now())
+
+  // Statistics
+  timesReviewed    Int      @default(0)
+  timesCorrect     Int      @default(0)
+
+  // Order
+  orderIndex       Int      @default(0)
+
+  // Timestamps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([deckId, nextReviewAt])
+}
+
+model Quiz {
+  id               String   @id @default(uuid())
+  lessonId         String
+  lesson           Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  title            String
+  type             QuizType
+  questions        Json     // Array of question objects
+
+  // Attempts
+  attempts         QuizAttempt[]
+
+  // Timestamps
+  createdAt        DateTime @default(now())
+
+  @@index([lessonId])
+}
+
+model QuizAttempt {
+  id               String   @id @default(uuid())
+  quizId           String
+  quiz             Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  answers          Json     // User's answers
+  score            Float    // 0-100
+  timeSpentSeconds Int
+
+  // XP awarded
+  xpEarned         Int      @default(0)
+
+  // Timestamps
+  completedAt      DateTime @default(now())
+
+  @@index([quizId])
+}
+
+// ============================================
+// GAMIFICATION
+// ============================================
+
+model UserProgress {
+  id               String   @id @default(uuid())
+  childId          String   @unique
+  child            Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  // XP & Level
+  currentXP        Int      @default(0)
+  totalXP          Int      @default(0)
+  level            Int      @default(1)
+
+  // Subject-specific progress
+  subjectProgress  Json?    // {math: {xp, level}, science: {xp, level}, ...}
+
+  // Statistics
+  lessonsCompleted Int      @default(0)
+  questionsAnswered Int     @default(0)
+  flashcardsReviewed Int    @default(0)
+  perfectScores    Int      @default(0)
+  totalStudyTimeSeconds Int @default(0)
+
+  // Timestamps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model XPTransaction {
+  id               String   @id @default(uuid())
+  childId          String
+  child            Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  amount           Int
+  reason           XPReason
+  sourceType       String?  // "lesson", "flashcard", "quiz", etc.
+  sourceId         String?  // ID of the source entity
+
+  // Bonus info
+  wasBonus         Boolean  @default(false)
+  bonusMultiplier  Float?
+  bonusReason      String?  // "streak_bonus", "first_of_day", etc.
+
+  createdAt        DateTime @default(now())
+
+  @@index([childId, createdAt])
+}
+
+model Streak {
+  id               String   @id @default(uuid())
+  childId          String   @unique
+  child            Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  current          Int      @default(0)
+  longest          Int      @default(0)
+  lastActivityDate DateTime @db.Date
+  freezeAvailable  Boolean  @default(false)
+  freezeUsedAt     DateTime?
+
+  updatedAt        DateTime @updatedAt
+}
+
+model Badge {
+  id               String   @id @default(uuid())
+
+  // Badge definition
+  code             String   @unique // "first_lesson", "streak_7", etc.
+  name             String
+  description      String
+  icon             String   // Emoji or icon name
+  category         BadgeCategory
+  rarity           BadgeRarity
+
+  // Requirements
+  requirements     Json     // Criteria for unlocking
+  xpReward         Int      @default(0)
+
+  // Earned instances
+  earnedBy         EarnedBadge[]
+
+  createdAt        DateTime @default(now())
+}
+
+model EarnedBadge {
+  id               String   @id @default(uuid())
+  childId          String
+  child            Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  badgeId          String
+  badge            Badge    @relation(fields: [badgeId], references: [id])
+
+  earnedAt         DateTime @default(now())
+
+  @@unique([childId, badgeId])
+  @@index([childId])
+}
+
+model DailyChallenge {
+  id               String   @id @default(uuid())
+
+  date             DateTime @db.Date @unique
+  type             ChallengeType
+  target           Int
+  description      String
+  xpReward         Int
+
+  // Completions
+  completions      ChallengeCompletion[]
+
+  createdAt        DateTime @default(now())
+
+  @@index([date])
+}
+
+model ChallengeCompletion {
+  id               String   @id @default(uuid())
+  challengeId      String
+  challenge        DailyChallenge @relation(fields: [challengeId], references: [id])
+  childId          String
+
+  progress         Int      @default(0)
+  completed        Boolean  @default(false)
+  completedAt      DateTime?
+
+  @@unique([challengeId, childId])
+}
+
+// ============================================
+// TEXT SELECTION & INTERACTIONS
+// ============================================
+
+model TextSelection {
+  id               String   @id @default(uuid())
+  childId          String
+  child            Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  lessonId         String
+  lesson           Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  selectedText     String   @db.Text
+  beforeContext    String?  @db.Text
+  afterContext     String?  @db.Text
+  pageNumber       Int?
+
+  actionType       SelectionAction
+  userQuestion     String?
+  resultData       Json     // Action-specific result
+
+  xpAwarded        Int      @default(0)
+
+  createdAt        DateTime @default(now())
+
+  @@index([childId, createdAt])
+  @@index([lessonId])
+}
+
+// ============================================
+// SAFETY & MONITORING
+// ============================================
+
+model SafetyLog {
+  id               String   @id @default(uuid())
+  childId          String
+  child            Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  incidentType     SafetyIncidentType
+  severity         SafetySeverity
+
+  // Context
+  inputText        String?  @db.Text
+  outputText       String?  @db.Text
+  lessonId         String?
+
+  // AI safety ratings
+  geminiSafetyRatings Json?
+
+  // Flags
+  flags            String[]
+
+  // Resolution
+  wasBlocked       Boolean  @default(false)
+  parentNotified   Boolean  @default(false)
+  parentNotifiedAt DateTime?
+  parentAction     String?  // "acknowledged", "restricted", etc.
+
+  createdAt        DateTime @default(now())
+
+  @@index([childId, createdAt])
+  @@index([severity])
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum SubscriptionTier {
+  FREE
+  FAMILY
+  FAMILY_PLUS
+  ANNUAL
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  PAST_DUE
+}
+
+enum AgeGroup {
+  YOUNG  // 4-7
+  OLDER  // 8-12
+}
+
+enum CurriculumType {
+  BRITISH
+  AMERICAN
+  INDIAN_CBSE
+  INDIAN_ICSE
+  IB
+  ARABIC
+}
+
+enum LearningStyle {
+  VISUAL
+  AUDITORY
+  READING
+  KINESTHETIC
+}
+
+enum ConsentMethod {
+  CREDIT_CARD
+  KBQ        // Knowledge-based questions
+  MANUAL_REVIEW
+}
+
+enum ConsentStatus {
+  PENDING
+  VERIFIED
+  FAILED
+  EXPIRED
+}
+
+enum Subject {
+  MATH
+  SCIENCE
+  ENGLISH
+  ARABIC
+  ISLAMIC_STUDIES
+  SOCIAL_STUDIES
+  ART
+  MUSIC
+  OTHER
+}
+
+enum SourceType {
+  PDF
+  IMAGE
+  YOUTUBE
+  TEXT
+  CAMERA
+}
+
+enum ProcessingStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum QuizType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  FILL_BLANK
+  MATCHING
+}
+
+enum XPReason {
+  LESSON_COMPLETE
+  LESSON_PROGRESS
+  FLASHCARD_REVIEW
+  FLASHCARD_CORRECT
+  QUIZ_COMPLETE
+  QUIZ_PERFECT
+  CHAT_QUESTION
+  DAILY_CHALLENGE
+  STREAK_BONUS
+  BADGE_EARNED
+  FIRST_OF_DAY
+  TEXT_SELECTION
+}
+
+enum BadgeCategory {
+  LEARNING
+  STREAK
+  MASTERY
+  SOCIAL
+  SPECIAL
+}
+
+enum BadgeRarity {
+  COMMON
+  RARE
+  EPIC
+  LEGENDARY
+}
+
+enum ChallengeType {
+  LESSONS
+  QUESTIONS
+  FLASHCARDS
+  TIME
+  STREAK
+}
+
+enum SelectionAction {
+  ASK
+  FLASHCARD
+  QUIZ
+  SAVE
+  READ
+}
+
+enum SafetyIncidentType {
+  PROFANITY
+  PII_DETECTED
+  INAPPROPRIATE_TOPIC
+  JAILBREAK_ATTEMPT
+  HARMFUL_CONTENT
+  BLOCKED_BY_GEMINI
+  PARENT_OVERRIDE
+}
+
+enum SafetySeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}

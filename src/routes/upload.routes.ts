@@ -1,3 +1,4 @@
+// Upload routes for file handling
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import {
@@ -6,8 +7,11 @@ import {
   deleteFile,
   deleteAllChildContent,
   listChildContent,
-} from '../services/storageService.js';
-import { getCdnUrl } from '../lib/r2Client.js';
+} from '../services/storage/storageService.js';
+import { getCdnUrl } from '../config/r2.js';
+import { authenticate, requireParent, authorizeChildAccess } from '../middleware/auth.js';
+import { validateInput } from '../middleware/validateInput.js';
+import { uploadRateLimit } from '../middleware/rateLimit.js';
 
 const router = Router();
 
@@ -29,34 +33,10 @@ const presignedUploadSchema = z.object({
   lessonId: z.string().optional(),
 });
 
-// ============================================
-// MIDDLEWARE (Placeholder - implement real auth later)
-// ============================================
-
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    familyId: string;
-  };
-}
-
-// Placeholder auth middleware - replace with real Firebase auth
-const authenticateParent = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-  // TODO: Implement Firebase authentication
-  // For now, use test values - REPLACE WITH REAL AUTH
-  req.user = {
-    id: 'test-user-id',
-    familyId: 'test-family-id',
-  };
-  next();
-};
-
-// Placeholder child access auth - verify parent owns child
-const authorizeChildAccess = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-  // TODO: Implement real child access verification
-  // Should verify that the child belongs to the authenticated parent's family
-  next();
-};
+const confirmUploadSchema = z.object({
+  storagePath: z.string().min(1),
+  childId: z.string().min(1),
+});
 
 // ============================================
 // ROUTES
@@ -68,13 +48,15 @@ const authorizeChildAccess = (req: AuthenticatedRequest, res: Response, next: Ne
  */
 router.post(
   '/presigned',
-  authenticateParent,
-  authorizeChildAccess,
-  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  authenticate,
+  requireParent,
+  uploadRateLimit,
+  validateInput(presignedUploadSchema),
+  authorizeChildAccess(),
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const validatedBody = presignedUploadSchema.parse(req.body);
-      const { childId, contentType, filename, mimeType, fileSize, lessonId } = validatedBody;
-      const familyId = req.user!.familyId;
+      const { childId, contentType, filename, mimeType, fileSize, lessonId } = req.body;
+      const familyId = req.parent!.id;
 
       const result = await getPresignedUploadUrl({
         familyId,
@@ -91,31 +73,24 @@ router.post(
         data: result,
       });
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({
-          success: false,
-          error: 'Validation error',
-          details: error.errors,
-        });
-        return;
-      }
       next(error);
     }
   }
 );
 
 /**
- * GET /api/upload/download/:storagePath
+ * GET /api/upload/download/*
  * Get a presigned URL for viewing/downloading content
  */
 router.get(
   '/download/*',
-  authenticateParent,
-  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  authenticate,
+  requireParent,
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Extract storagePath from wildcard param
       const storagePath = req.params[0];
-      const familyId = req.user!.familyId;
+      const familyId = req.parent!.id;
 
       if (!storagePath) {
         res.status(400).json({
@@ -147,16 +122,17 @@ router.get(
 );
 
 /**
- * DELETE /api/upload/:storagePath
+ * DELETE /api/upload/file/*
  * Delete a specific file
  */
 router.delete(
   '/file/*',
-  authenticateParent,
-  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  authenticate,
+  requireParent,
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const storagePath = req.params[0];
-      const familyId = req.user!.familyId;
+      const familyId = req.parent!.id;
 
       if (!storagePath) {
         res.status(400).json({
@@ -193,12 +169,13 @@ router.delete(
  */
 router.delete(
   '/child/:childId',
-  authenticateParent,
-  authorizeChildAccess,
-  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  authenticate,
+  requireParent,
+  authorizeChildAccess(),
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { childId } = req.params;
-      const familyId = req.user!.familyId;
+      const familyId = req.parent!.id;
 
       const result = await deleteAllChildContent(familyId, childId);
 
@@ -219,12 +196,13 @@ router.delete(
  */
 router.get(
   '/child/:childId',
-  authenticateParent,
-  authorizeChildAccess,
-  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  authenticate,
+  requireParent,
+  authorizeChildAccess(),
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { childId } = req.params;
-      const familyId = req.user!.familyId;
+      const familyId = req.parent!.id;
 
       const files = await listChildContent(familyId, childId);
 
@@ -244,19 +222,13 @@ router.get(
  */
 router.post(
   '/confirm',
-  authenticateParent,
-  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  authenticate,
+  requireParent,
+  validateInput(confirmUploadSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storagePath, childId } = req.body;
-      const familyId = req.user!.familyId;
-
-      if (!storagePath || !childId) {
-        res.status(400).json({
-          success: false,
-          error: 'storagePath and childId required',
-        });
-        return;
-      }
+      const familyId = req.parent!.id;
 
       // Verify ownership
       if (!storagePath.includes(`/${familyId}/`)) {

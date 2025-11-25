@@ -8,18 +8,18 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { lookup } from 'mime-types';
 import { v4 as uuidv4 } from 'uuid';
-import { r2Client, BUCKETS, BucketName, getCdnUrl } from '../lib/r2Client.js';
-import { generateStoragePath, StoragePathParams } from '../utils/storagePaths.js';
+import { r2Client, BUCKETS, BucketName, getCdnUrl } from '../../config/r2.js';
+import { config } from '../../config/index.js';
+import { generateStoragePath, StoragePathParams } from '../../utils/storagePaths.js';
 
 // ============================================
 // CONFIGURATION
 // ============================================
 
-const MAX_FILE_SIZE = parseInt(process.env.MAX_UPLOAD_SIZE_MB || '10') * 1024 * 1024;
-const ALLOWED_TYPES = (process.env.ALLOWED_UPLOAD_TYPES || 'application/pdf,image/png,image/jpeg,image/webp').split(',');
-
-const UPLOAD_URL_EXPIRY = parseInt(process.env.PRESIGNED_URL_EXPIRY_UPLOAD || '300');
-const DOWNLOAD_URL_EXPIRY = parseInt(process.env.PRESIGNED_URL_EXPIRY_DOWNLOAD || '3600');
+const MAX_FILE_SIZE = config.upload.maxSizeMB * 1024 * 1024;
+const ALLOWED_TYPES = config.upload.allowedTypes;
+const UPLOAD_URL_EXPIRY = config.upload.presignedUrlExpiry.upload;
+const DOWNLOAD_URL_EXPIRY = config.upload.presignedUrlExpiry.download;
 
 // ============================================
 // TYPES

@@ -1,48 +1,193 @@
+// NanoBanana K-6 AI Learning Platform - Backend Entry Point
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+
+import { config, validateEnv } from './config/index.js';
+import { prisma } from './config/database.js';
+import { redis } from './config/redis.js';
+import { logger } from './utils/logger.js';
+import {
+  errorHandler,
+  notFoundHandler,
+  standardRateLimit,
+} from './middleware/index.js';
+import { attachRequestId, requestLogger } from './middleware/requestLogger.js';
+
+// Routes
+import authRoutes from './routes/auth.routes.js';
 import uploadRoutes from './routes/upload.routes.js';
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+// Services initialization
+import { initializeContentProcessor, shutdownContentProcessor } from './services/learning/contentProcessor.js';
+import { badgeService } from './services/gamification/badgeService.js';
 
-// Security middleware
-app.use(helmet());
+// Validate environment
+try {
+  validateEnv();
+} catch (error) {
+  logger.error('Environment validation failed', { error });
+  process.exit(1);
+}
+
+const app = express();
+
+// ============================================
+// MIDDLEWARE SETUP
+// ============================================
+
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'https:'],
+    },
+  },
+}));
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: config.allowedOrigins,
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// Body parsing
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Request ID and logging
+app.use(attachRequestId);
+app.use(requestLogger);
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Body parsing
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Rate limiting (global)
+app.use(standardRateLimit);
+
+// ============================================
+// ROUTES
+// ============================================
+
+// Health check (no auth required)
+app.get('/health', async (_req, res) => {
+  try {
+    // Check database connection
+    await prisma.$queryRaw`SELECT 1`;
+
+    // Check Redis connection
+    await redis.ping();
+
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      version: process.env.npm_package_version || '1.0.0',
+      environment: config.nodeEnv,
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      error: 'Service dependencies unavailable',
+    });
+  }
 });
 
-// Routes
+// API routes
+app.use('/api/auth', authRoutes);
 app.use('/api/upload', uploadRoutes);
 
-// Error handling middleware
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Error:', err.message);
-  console.error('Stack:', err.stack);
+// TODO: Add remaining routes as they're implemented
+// app.use('/api/children', childRoutes);
+// app.use('/api/lessons', lessonRoutes);
+// app.use('/api/chat', chatRoutes);
+// app.use('/api/flashcards', flashcardRoutes);
+// app.use('/api/quizzes', quizRoutes);
+// app.use('/api/gamification', gamificationRoutes);
+// app.use('/api/parent', parentRoutes);
 
-  res.status(500).json({
-    success: false,
-    error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message,
-  });
-});
+// ============================================
+// ERROR HANDLING
+// ============================================
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`MyDscvr EduK-6 Backend running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-});
+// 404 handler
+app.use(notFoundHandler);
+
+// Global error handler
+app.use(errorHandler);
+
+// ============================================
+// SERVER STARTUP
+// ============================================
+
+async function startServer(): Promise<void> {
+  try {
+    // Connect to database
+    await prisma.$connect();
+    logger.info('Database connected');
+
+    // Connect to Redis
+    await redis.ping();
+    logger.info('Redis connected');
+
+    // Initialize content processing queue
+    try {
+      initializeContentProcessor();
+    } catch (error) {
+      logger.warn('Content processor initialization skipped (Redis may not be available)');
+    }
+
+    // Initialize badges
+    try {
+      await badgeService.initializeBadges();
+      logger.info('Badges initialized');
+    } catch (error) {
+      logger.warn('Badge initialization skipped');
+    }
+
+    // Start server
+    const server = app.listen(config.port, () => {
+      logger.info(`NanoBanana K-6 Backend running on port ${config.port}`);
+      logger.info(`Environment: ${config.nodeEnv}`);
+      logger.info(`Frontend URL: ${config.frontendUrl}`);
+    });
+
+    // Graceful shutdown
+    const shutdown = async (signal: string) => {
+      logger.info(`${signal} received, shutting down gracefully...`);
+
+      server.close(async () => {
+        try {
+          await shutdownContentProcessor();
+          await prisma.$disconnect();
+          await redis.quit();
+          logger.info('Server shut down successfully');
+          process.exit(0);
+        } catch (error) {
+          logger.error('Error during shutdown', { error });
+          process.exit(1);
+        }
+      });
+
+      // Force shutdown after 30 seconds
+      setTimeout(() => {
+        logger.error('Forced shutdown after timeout');
+        process.exit(1);
+      }, 30000);
+    };
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
+
+  } catch (error) {
+    logger.error('Failed to start server', { error });
+    process.exit(1);
+  }
+}
+
+startServer();
 
 export default app;
