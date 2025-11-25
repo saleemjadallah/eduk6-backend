@@ -3,8 +3,10 @@ import bcrypt from 'bcrypt';
 import { prisma } from '../../config/database.js';
 import { tokenService } from './tokenService.js';
 import { sessionService } from './sessionService.js';
+import { emailService, otpService } from '../email/index.js';
 import { UnauthorizedError, ConflictError, ValidationError, NotFoundError } from '../../middleware/errorHandler.js';
 import { AgeGroup, Child, Parent } from '@prisma/client';
+import { logger } from '../../utils/logger.js';
 
 const SALT_ROUNDS = 12;
 
@@ -69,7 +71,18 @@ export const authService = {
       },
     });
 
-    // TODO: Send verification email
+    // Send welcome email (async, don't block signup)
+    emailService.sendWelcomeEmail(
+      parent.email,
+      parent.firstName || 'there'
+    ).catch(err => {
+      logger.error('Failed to send welcome email', { error: err, parentId: parent.id });
+    });
+
+    // Send email verification OTP
+    otpService.createAndSend(parent.email, 'verify_email').catch(err => {
+      logger.error('Failed to send verification OTP', { error: err, parentId: parent.id });
+    });
 
     return { parentId: parent.id };
   },
@@ -258,47 +271,123 @@ export const authService = {
   },
 
   /**
-   * Verify email with code
+   * Send email verification OTP
    */
-  async verifyEmail(parentId: string, code: string): Promise<void> {
-    // TODO: Implement email verification with code
-    // For now, just mark as verified
-    await prisma.parent.update({
-      where: { id: parentId },
-      data: {
-        emailVerified: true,
-        emailVerifiedAt: new Date(),
-      },
-    });
-  },
-
-  /**
-   * Request password reset
-   */
-  async requestPasswordReset(email: string): Promise<void> {
+  async sendVerificationOtp(email: string): Promise<{ success: boolean; error?: string }> {
     const parent = await prisma.parent.findUnique({
       where: { email: email.toLowerCase() },
     });
 
     if (!parent) {
       // Don't reveal if email exists
-      return;
+      return { success: true };
     }
 
-    // TODO: Generate reset token and send email
+    if (parent.emailVerified) {
+      return { success: false, error: 'Email is already verified' };
+    }
+
+    return otpService.createAndSend(email, 'verify_email');
   },
 
   /**
-   * Reset password with token
+   * Verify email with OTP code
    */
-  async resetPassword(token: string, newPassword: string): Promise<void> {
-    // TODO: Implement password reset
-    if (newPassword.length < 8) {
-      throw new ValidationError('Password must be at least 8 characters long');
+  async verifyEmail(email: string, code: string): Promise<{ success: boolean; error?: string }> {
+    // Verify OTP
+    const result = await otpService.verify(email, code, 'verify_email');
+
+    if (!result.valid) {
+      return { success: false, error: result.error };
     }
 
-    // const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-    // Find parent by reset token and update password
+    // Mark email as verified
+    await prisma.parent.update({
+      where: { email: email.toLowerCase() },
+      data: {
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
+      },
+    });
+
+    logger.info(`Email verified for ${email}`);
+
+    return { success: true };
+  },
+
+  /**
+   * Resend verification OTP (with cooldown)
+   */
+  async resendVerificationOtp(email: string): Promise<{ success: boolean; error?: string; waitSeconds?: number }> {
+    const parent = await prisma.parent.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+
+    if (!parent) {
+      // Don't reveal if email exists
+      return { success: true };
+    }
+
+    if (parent.emailVerified) {
+      return { success: false, error: 'Email is already verified' };
+    }
+
+    return otpService.resend(email, 'verify_email', 60);
+  },
+
+  /**
+   * Request password reset - sends OTP to email
+   */
+  async requestPasswordReset(email: string): Promise<{ success: boolean; error?: string }> {
+    const parent = await prisma.parent.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+
+    if (!parent) {
+      // Don't reveal if email exists - still return success
+      return { success: true };
+    }
+
+    return otpService.createAndSend(email, 'reset_password');
+  },
+
+  /**
+   * Verify password reset OTP
+   */
+  async verifyPasswordResetOtp(email: string, code: string): Promise<{ valid: boolean; error?: string }> {
+    return otpService.verify(email, code, 'reset_password');
+  },
+
+  /**
+   * Reset password with verified OTP (call verifyPasswordResetOtp first)
+   */
+  async resetPassword(email: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
+    if (newPassword.length < 8) {
+      return { success: false, error: 'Password must be at least 8 characters long' };
+    }
+
+    const parent = await prisma.parent.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+
+    if (!parent) {
+      return { success: false, error: 'Account not found' };
+    }
+
+    // Hash and update password
+    const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+    await prisma.parent.update({
+      where: { id: parent.id },
+      data: { passwordHash },
+    });
+
+    // Invalidate all sessions (force re-login)
+    await sessionService.invalidateAllSessions(parent.id);
+
+    logger.info(`Password reset for ${email}`);
+
+    return { success: true };
   },
 
   /**

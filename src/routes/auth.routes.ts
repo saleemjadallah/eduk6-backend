@@ -151,17 +151,24 @@ router.post(
 
 /**
  * POST /api/auth/verify-email
- * Verify email with code
+ * Verify email with OTP code
  */
 router.post(
   '/verify-email',
-  authenticate,
-  requireParent,
+  authRateLimit,
   validateInput(verifyEmailSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { code } = req.body;
-      await authService.verifyEmail(req.parent!.id, code);
+      const { email, code } = req.body;
+      const result = await authService.verifyEmail(email, code);
+
+      if (!result.success) {
+        res.status(400).json({
+          success: false,
+          error: result.error,
+        });
+        return;
+      }
 
       res.json({
         success: true,
@@ -174,8 +181,48 @@ router.post(
 );
 
 /**
+ * POST /api/auth/resend-verification
+ * Resend email verification OTP
+ */
+router.post(
+  '/resend-verification',
+  emailRateLimit,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        res.status(400).json({
+          success: false,
+          error: 'Email is required',
+        });
+        return;
+      }
+
+      const result = await authService.resendVerificationOtp(email);
+
+      if (!result.success) {
+        res.status(400).json({
+          success: false,
+          error: result.error,
+          waitSeconds: result.waitSeconds,
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        message: 'Verification code sent',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * POST /api/auth/forgot-password
- * Request password reset
+ * Request password reset OTP
  */
 router.post(
   '/forgot-password',
@@ -189,7 +236,46 @@ router.post(
       // Always return success to prevent email enumeration
       res.json({
         success: true,
-        message: 'If an account exists with this email, a reset link will be sent.',
+        message: 'If an account exists with this email, a reset code will be sent.',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /api/auth/verify-reset-code
+ * Verify password reset OTP
+ */
+router.post(
+  '/verify-reset-code',
+  authRateLimit,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email, code } = req.body;
+
+      if (!email || !code) {
+        res.status(400).json({
+          success: false,
+          error: 'Email and code are required',
+        });
+        return;
+      }
+
+      const result = await authService.verifyPasswordResetOtp(email, code);
+
+      if (!result.valid) {
+        res.status(400).json({
+          success: false,
+          error: result.error,
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        message: 'Code verified. You can now reset your password.',
       });
     } catch (error) {
       next(error);
@@ -199,7 +285,7 @@ router.post(
 
 /**
  * POST /api/auth/reset-password
- * Reset password with token
+ * Reset password (after verifying OTP)
  */
 router.post(
   '/reset-password',
@@ -207,12 +293,20 @@ router.post(
   validateInput(resetPasswordSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { token, newPassword } = req.body;
-      await authService.resetPassword(token, newPassword);
+      const { email, newPassword } = req.body;
+      const result = await authService.resetPassword(email, newPassword);
+
+      if (!result.success) {
+        res.status(400).json({
+          success: false,
+          error: result.error,
+        });
+        return;
+      }
 
       res.json({
         success: true,
-        message: 'Password reset successfully',
+        message: 'Password reset successfully. Please log in with your new password.',
       });
     } catch (error) {
       next(error);
