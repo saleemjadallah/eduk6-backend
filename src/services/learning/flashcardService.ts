@@ -203,21 +203,23 @@ export const flashcardService = {
       throw new Error('Lesson has no content to generate flashcards from');
     }
 
-    // Get child's age group
+    // Get child's profile (age group, curriculum, grade level)
     const child = await prisma.child.findUnique({
       where: { id: childId },
-      select: { ageGroup: true },
+      select: { ageGroup: true, curriculumType: true, gradeLevel: true },
     });
 
     if (!child) {
       throw new NotFoundError('Child not found');
     }
 
-    // Generate flashcards with AI
+    // Generate flashcards with AI (curriculum-aware)
     const generatedCards = await geminiService.generateFlashcards(
       lesson.extractedText,
       {
         ageGroup: child.ageGroup,
+        curriculumType: child.curriculumType,
+        gradeLevel: child.gradeLevel,
         subject: lesson.subject,
         count,
       }

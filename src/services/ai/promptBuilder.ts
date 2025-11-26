@@ -1,5 +1,11 @@
 // AI Prompt Builder for child-appropriate content
-import { AgeGroup, Subject } from '@prisma/client';
+import { AgeGroup, Subject, CurriculumType } from '@prisma/client';
+import {
+  getCurriculumGuidance,
+  getFlashcardCurriculumGuidance,
+  getQuizCurriculumGuidance,
+  getGradeLevelConfig,
+} from '../../config/curricula.js';
 
 export interface LessonContext {
   title: string;
@@ -8,14 +14,19 @@ export interface LessonContext {
   keyConcepts?: string[];
 }
 
+export interface PromptContext {
+  ageGroup: AgeGroup;
+  curriculumType?: CurriculumType | null;
+  gradeLevel?: number | null;
+  lessonContext?: LessonContext;
+}
+
 export class PromptBuilder {
   /**
    * Build system instructions for Jeffrey AI tutor
+   * Now includes curriculum-aware teaching approach
    */
-  buildSystemInstructions(context: {
-    ageGroup: AgeGroup;
-    lessonContext?: LessonContext;
-  }): string {
+  buildSystemInstructions(context: PromptContext): string {
     const instructions: string[] = [];
 
     // Core identity
@@ -26,6 +37,13 @@ export class PromptBuilder {
 
     // Age-appropriate communication
     instructions.push(this.getAgeGuidance(context.ageGroup));
+
+    // Curriculum-specific teaching approach (subtle adaptations)
+    instructions.push(getCurriculumGuidance(
+      context.curriculumType,
+      context.ageGroup,
+      context.gradeLevel
+    ));
 
     // Lesson context
     if (context.lessonContext) {
@@ -115,14 +133,23 @@ When answering questions:
 
   /**
    * Build prompt for generating flashcards from lesson content
+   * Now includes curriculum-aware style guidance
    */
   buildFlashcardPrompt(
     content: string,
-    context: { ageGroup: AgeGroup; count?: number }
+    context: {
+      ageGroup: AgeGroup;
+      curriculumType?: CurriculumType | null;
+      gradeLevel?: number | null;
+      count?: number;
+    }
   ): string {
     const ageDesc = context.ageGroup === 'YOUNG'
       ? 'young child (ages 4-7)'
       : 'child (ages 8-12)';
+
+    const gradeConfig = getGradeLevelConfig(context.gradeLevel ?? (context.ageGroup === 'YOUNG' ? 1 : 4));
+    const curriculumGuidance = getFlashcardCurriculumGuidance(context.curriculumType);
 
     return `Generate ${context.count || 10} flashcards from this educational content for a ${ageDesc}.
 
@@ -133,9 +160,10 @@ Requirements:
 - Each card should test ONE concept only
 - Questions should be clear and simple
 - Answers should be concise (1-2 sentences max)
-- Use age-appropriate language
+- Use age-appropriate language (max ${gradeConfig.maxSentenceLength} words per sentence)
 - Make it engaging and fun
 - Include helpful hints where appropriate
+${curriculumGuidance}
 
 Return as JSON array:
 [
@@ -149,17 +177,32 @@ Return as JSON array:
 
   /**
    * Build prompt for content analysis
+   * Now includes curriculum-aware content structuring
    */
   buildContentAnalysisPrompt(
     content: string,
-    context: { ageGroup: AgeGroup; subject?: Subject | null }
+    context: {
+      ageGroup: AgeGroup;
+      curriculumType?: CurriculumType | null;
+      gradeLevel?: number | null;
+      subject?: Subject | null;
+    }
   ): string {
+    const gradeConfig = getGradeLevelConfig(context.gradeLevel ?? (context.ageGroup === 'YOUNG' ? 1 : 4));
+    const curriculumGuidance = getCurriculumGuidance(context.curriculumType, context.ageGroup, context.gradeLevel);
+
     return `Analyze this educational content and extract key information for a ${context.ageGroup === 'YOUNG' ? 'young child (4-7)' : 'child (8-12)'}.
 
 Content:
 ${content}
 
 Subject hint: ${context.subject || 'Unknown'}
+
+Language requirements:
+- Maximum sentence length: ${gradeConfig.maxSentenceLength} words
+- Vocabulary level: ${gradeConfig.vocabularyTier.replace('_', ' ')}
+
+${curriculumGuidance}
 
 Extract and return as JSON:
 {
@@ -188,20 +231,35 @@ Extract and return as JSON:
 
   /**
    * Build prompt for quiz generation
+   * Now includes curriculum-aware assessment style
    */
   buildQuizPrompt(
     content: string,
-    context: { ageGroup: AgeGroup; type: string; count?: number }
+    context: {
+      ageGroup: AgeGroup;
+      curriculumType?: CurriculumType | null;
+      gradeLevel?: number | null;
+      type: string;
+      count?: number;
+    }
   ): string {
     const count = context.count || 5;
     const ageDesc = context.ageGroup === 'YOUNG'
       ? 'young child (4-7 years old)'
       : 'child (8-12 years old)';
 
+    const gradeConfig = getGradeLevelConfig(context.gradeLevel ?? (context.ageGroup === 'YOUNG' ? 1 : 4));
+    const curriculumGuidance = getQuizCurriculumGuidance(context.curriculumType);
+
     return `Create a ${context.type.toLowerCase()} quiz with ${count} questions from this content for a ${ageDesc}.
 
 Content:
 ${content}
+
+Language requirements:
+- Maximum sentence length: ${gradeConfig.maxSentenceLength} words
+- Vocabulary level: ${gradeConfig.vocabularyTier.replace('_', ' ')}
+${curriculumGuidance}
 
 Requirements:
 - Questions must be age-appropriate
@@ -228,15 +286,24 @@ Return as JSON:
 
   /**
    * Build prompt for answering questions about selected text
+   * Now includes curriculum-aware explanation style
    */
   buildTextSelectionAnswerPrompt(
     selectedText: string,
     userQuestion: string,
-    context: { ageGroup: AgeGroup; lessonContext?: LessonContext }
+    context: {
+      ageGroup: AgeGroup;
+      curriculumType?: CurriculumType | null;
+      gradeLevel?: number | null;
+      lessonContext?: LessonContext;
+    }
   ): string {
     const ageGuidance = context.ageGroup === 'YOUNG'
       ? 'Explain in very simple terms a 5-year-old would understand. Use short sentences.'
       : 'Explain clearly for a child aged 8-12. You can use slightly more complex vocabulary.';
+
+    const gradeConfig = getGradeLevelConfig(context.gradeLevel ?? (context.ageGroup === 'YOUNG' ? 1 : 4));
+    const curriculumGuidance = getCurriculumGuidance(context.curriculumType, context.ageGroup, context.gradeLevel);
 
     return `A child selected this text from their lesson:
 
@@ -245,6 +312,12 @@ Return as JSON:
 And asked: "${userQuestion || 'Can you explain this?'}"
 
 ${ageGuidance}
+
+Language requirements:
+- Maximum sentence length: ${gradeConfig.maxSentenceLength} words
+- Vocabulary level: ${gradeConfig.vocabularyTier.replace('_', ' ')}
+
+${curriculumGuidance}
 
 ${context.lessonContext ? `
 Lesson context:

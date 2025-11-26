@@ -8,8 +8,16 @@ import {
 import { config } from '../../config/index.js';
 import { promptBuilder, LessonContext } from './promptBuilder.js';
 import { safetyFilters, SafetyValidation } from './safetyFilters.js';
-import { AgeGroup, Subject, ChatMessage } from '@prisma/client';
+import { AgeGroup, Subject, ChatMessage, CurriculumType } from '@prisma/client';
 import { logger } from '../../utils/logger.js';
+
+// Common context interface for curriculum-aware AI operations
+export interface ChildContext {
+  childId: string;
+  ageGroup: AgeGroup;
+  curriculumType?: CurriculumType | null;
+  gradeLevel?: number | null;
+}
 
 export interface ChatResponse {
   content: string;
@@ -58,15 +66,19 @@ export interface GeneratedQuiz {
   }>;
 }
 
+export interface GeneratedImage {
+  imageData: string; // base64 encoded
+  mimeType: string;
+}
+
 export class GeminiService {
   /**
    * Chat with Jeffrey AI tutor
+   * Now supports curriculum-aware teaching style personalization
    */
   async chat(
     message: string,
-    context: {
-      childId: string;
-      ageGroup: AgeGroup;
+    context: ChildContext & {
       lessonContext?: LessonContext;
       conversationHistory?: ChatMessage[];
     }
@@ -88,9 +100,11 @@ export class GeminiService {
       );
     }
 
-    // 2. Build system prompt
+    // 2. Build system prompt with curriculum context
     const systemPrompt = promptBuilder.buildSystemInstructions({
       ageGroup: context.ageGroup,
+      curriculumType: context.curriculumType,
+      gradeLevel: context.gradeLevel,
       lessonContext: context.lessonContext,
     });
 
@@ -167,10 +181,16 @@ export class GeminiService {
 
   /**
    * Analyze content and extract structured lesson data
+   * Now supports curriculum-aware content structuring
    */
   async analyzeContent(
     content: string,
-    context: { ageGroup: AgeGroup; subject?: Subject | null }
+    context: {
+      ageGroup: AgeGroup;
+      curriculumType?: CurriculumType | null;
+      gradeLevel?: number | null;
+      subject?: Subject | null;
+    }
   ): Promise<LessonAnalysis> {
     const prompt = promptBuilder.buildContentAnalysisPrompt(content, context);
 
@@ -206,10 +226,17 @@ export class GeminiService {
 
   /**
    * Generate flashcards from lesson content
+   * Now supports curriculum-aware flashcard style
    */
   async generateFlashcards(
     lessonContent: string,
-    context: { ageGroup: AgeGroup; subject?: Subject | null; count?: number }
+    context: {
+      ageGroup: AgeGroup;
+      curriculumType?: CurriculumType | null;
+      gradeLevel?: number | null;
+      subject?: Subject | null;
+      count?: number;
+    }
   ): Promise<GeneratedFlashcard[]> {
     const prompt = promptBuilder.buildFlashcardPrompt(lessonContent, context);
 
@@ -236,10 +263,17 @@ export class GeminiService {
 
   /**
    * Generate a quiz from lesson content
+   * Now supports curriculum-aware assessment style
    */
   async generateQuiz(
     lessonContent: string,
-    context: { ageGroup: AgeGroup; type: string; count?: number }
+    context: {
+      ageGroup: AgeGroup;
+      curriculumType?: CurriculumType | null;
+      gradeLevel?: number | null;
+      type: string;
+      count?: number;
+    }
   ): Promise<GeneratedQuiz> {
     const prompt = promptBuilder.buildQuizPrompt(lessonContent, context);
 
@@ -266,13 +300,12 @@ export class GeminiService {
 
   /**
    * Answer a question about selected text
+   * Now supports curriculum-aware explanation style
    */
   async answerTextSelection(
     selectedText: string,
     userQuestion: string,
-    context: {
-      childId: string;
-      ageGroup: AgeGroup;
+    context: ChildContext & {
       lessonContext?: LessonContext;
     }
   ): Promise<ChatResponse> {
@@ -296,7 +329,12 @@ export class GeminiService {
     const prompt = promptBuilder.buildTextSelectionAnswerPrompt(
       selectedText,
       userQuestion,
-      context
+      {
+        ageGroup: context.ageGroup,
+        curriculumType: context.curriculumType,
+        gradeLevel: context.gradeLevel,
+        lessonContext: context.lessonContext,
+      }
     );
 
     const generationConfig =
@@ -331,6 +369,52 @@ export class GeminiService {
       responseTimeMs: Date.now() - startTime,
       wasFiltered: false,
     };
+  }
+
+  /**
+   * Generate an image using Gemini's native image generation
+   */
+  async generateImage(prompt: string): Promise<GeneratedImage> {
+    const model = genAI.getGenerativeModel({
+      model: config.gemini.models.image,
+      generationConfig: {
+        temperature: 1,
+        topP: 0.95,
+        topK: 40,
+        maxOutputTokens: 8192,
+      },
+    });
+
+    const result = await model.generateContent({
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: prompt }],
+        },
+      ],
+      generationConfig: {
+        responseModalities: ['image', 'text'],
+      },
+    } as any);
+
+    const response = result.response;
+    const parts = response.candidates?.[0]?.content?.parts;
+
+    if (!parts) {
+      throw new Error('No response parts from image generation');
+    }
+
+    for (const part of parts) {
+      if ((part as any).inlineData) {
+        const inlineData = (part as any).inlineData;
+        return {
+          imageData: inlineData.data,
+          mimeType: inlineData.mimeType || 'image/png',
+        };
+      }
+    }
+
+    throw new Error('No image data in response');
   }
 
   /**

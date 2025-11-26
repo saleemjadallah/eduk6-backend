@@ -7,6 +7,8 @@ import { lessonService } from './lessonService.js';
 import { AgeGroup, SourceType } from '@prisma/client';
 import { logger } from '../../utils/logger.js';
 
+import { CurriculumType } from '@prisma/client';
+
 // Job data types
 export interface ContentProcessingJobData {
   lessonId: string;
@@ -15,6 +17,8 @@ export interface ContentProcessingJobData {
   sourceType: SourceType;
   childId: string;
   ageGroup: AgeGroup;
+  curriculumType?: CurriculumType | null;
+  gradeLevel?: number | null;
 }
 
 // Processing queue
@@ -78,7 +82,7 @@ export async function queueContentProcessing(
  * Process a content job
  */
 async function processContentJob(job: Job<ContentProcessingJobData>): Promise<void> {
-  const { lessonId, fileUrl, youtubeUrl, sourceType, childId, ageGroup } = job.data;
+  const { lessonId, fileUrl, youtubeUrl, sourceType, childId, ageGroup, curriculumType, gradeLevel } = job.data;
 
   try {
     // 1. Extract text based on source type
@@ -110,9 +114,11 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
     // 2. Get lesson to check subject
     const lesson = await lessonService.getById(lessonId);
 
-    // 3. Analyze content with AI
+    // 3. Analyze content with AI (curriculum-aware)
     const analysis = await geminiService.analyzeContent(extractedText, {
       ageGroup,
+      curriculumType,
+      gradeLevel,
       subject: lesson?.subject,
     });
 
