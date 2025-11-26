@@ -354,9 +354,16 @@ export const authService = {
   },
 
   /**
-   * Verify email with OTP code
+   * Verify email with OTP code and return tokens to log user in
    */
-  async verifyEmail(email: string, code: string): Promise<{ success: boolean; error?: string }> {
+  async verifyEmail(email: string, code: string): Promise<{
+    success: boolean;
+    error?: string;
+    accessToken?: string;
+    refreshToken?: string;
+    parent?: any;
+    children?: any[];
+  }> {
     // Verify OTP
     const result = await otpService.verify(email, code, 'verify_email');
 
@@ -364,18 +371,59 @@ export const authService = {
       return { success: false, error: result.error };
     }
 
-    // Mark email as verified
-    await prisma.parent.update({
+    // Mark email as verified and get parent data
+    const parent = await prisma.parent.update({
       where: { email: email.toLowerCase() },
       data: {
         emailVerified: true,
         emailVerifiedAt: new Date(),
       },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        emailVerified: true,
+        consentStatus: true,
+        subscriptionTier: true,
+        createdAt: true,
+      },
     });
 
-    logger.info(`Email verified for ${email}`);
+    // Get children
+    const children = await prisma.child.findMany({
+      where: { parentId: parent.id },
+      select: {
+        id: true,
+        displayName: true,
+        avatarUrl: true,
+        gradeLevel: true,
+        createdAt: true,
+      },
+    });
 
-    return { success: true };
+    // Generate tokens to log user in
+    const accessToken = this.generateAccessToken(parent.id);
+    const refreshToken = this.generateRefreshToken();
+
+    // Store refresh token
+    await prisma.refreshToken.create({
+      data: {
+        token: refreshToken,
+        parentId: parent.id,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      },
+    });
+
+    logger.info(`Email verified and logged in for ${email}`);
+
+    return {
+      success: true,
+      accessToken,
+      refreshToken,
+      parent,
+      children,
+    };
   },
 
   /**

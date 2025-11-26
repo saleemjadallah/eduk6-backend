@@ -151,7 +151,7 @@ router.post(
 
 /**
  * POST /api/auth/verify-email
- * Verify email with OTP code
+ * Verify email with OTP code and return tokens to log user in
  */
 router.post(
   '/verify-email',
@@ -173,6 +173,10 @@ router.post(
       res.json({
         success: true,
         message: 'Email verified successfully',
+        token: result.accessToken,
+        refreshToken: result.refreshToken,
+        parent: result.parent,
+        children: result.children,
       });
     } catch (error) {
       next(error);
