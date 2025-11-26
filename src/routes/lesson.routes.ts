@@ -16,12 +16,18 @@ const router = Router();
 // SCHEMAS
 // ============================================
 
+// Helper to normalize subject to uppercase enum value
+const subjectEnum = z.enum(['MATH', 'READING', 'SCIENCE', 'SOCIAL_STUDIES', 'ART', 'MUSIC', 'LANGUAGE', 'OTHER']);
+const normalizeSubject = z.string().transform((val) => val.toUpperCase()).pipe(subjectEnum).optional();
+
 const analyzeContentSchema = z.object({
   content: z.string().min(50, 'Content must be at least 50 characters'),
-  childId: z.string().min(1),
-  sourceType: z.enum(['PDF', 'IMAGE', 'YOUTUBE', 'TEXT']).default('TEXT'),
-  subject: z.enum(['MATH', 'READING', 'SCIENCE', 'SOCIAL_STUDIES', 'ART', 'MUSIC', 'LANGUAGE', 'OTHER']).optional(),
-  title: z.string().max(255).optional(),
+  childId: z.string().min(1).nullable().optional(), // Allow null, will use default child
+  sourceType: z.enum(['PDF', 'IMAGE', 'YOUTUBE', 'TEXT', 'pdf', 'image', 'youtube', 'text'])
+    .transform((val) => val.toUpperCase() as 'PDF' | 'IMAGE' | 'YOUTUBE' | 'TEXT')
+    .default('TEXT'),
+  subject: z.string().transform((val) => val.toUpperCase()).pipe(subjectEnum).optional().nullable(),
+  title: z.string().max(255).optional().nullable(),
 });
 
 const createLessonSchema = z.object({
@@ -62,16 +68,47 @@ router.post(
   '/analyze',
   authenticate,
   validateInput(analyzeContentSchema),
-  authorizeChildAccess(),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { content, childId, sourceType, subject, title } = req.body;
+      const { content, sourceType, subject, title } = req.body;
+      let { childId } = req.body;
+
+      // If childId is null/undefined, get the first child for this parent
+      if (!childId) {
+        if (req.child) {
+          // Child session - use their own ID
+          childId = req.child.id;
+        } else if (req.parent) {
+          // Parent session - get their first child
+          const firstChild = await prisma.child.findFirst({
+            where: { parentId: req.parent.id },
+            select: { id: true },
+            orderBy: { createdAt: 'asc' },
+          });
+
+          if (!firstChild) {
+            res.status(400).json({
+              success: false,
+              error: 'No child profile found. Please create a child profile first.',
+            });
+            return;
+          }
+          childId = firstChild.id;
+        } else {
+          res.status(401).json({
+            success: false,
+            error: 'Authentication required',
+          });
+          return;
+        }
+      }
 
       // Get child info for age-appropriate analysis
       const child = await prisma.child.findUnique({
         where: { id: childId },
         select: {
           id: true,
+          parentId: true,
           ageGroup: true,
           gradeLevel: true,
           curriculumType: true,
@@ -82,6 +119,23 @@ router.post(
         res.status(404).json({
           success: false,
           error: 'Child not found',
+        });
+        return;
+      }
+
+      // Verify access to this child
+      if (req.parent && child.parentId !== req.parent.id) {
+        res.status(403).json({
+          success: false,
+          error: 'Access denied to this child profile',
+        });
+        return;
+      }
+
+      if (req.child && req.child.id !== childId) {
+        res.status(403).json({
+          success: false,
+          error: 'Access denied to this child profile',
         });
         return;
       }
