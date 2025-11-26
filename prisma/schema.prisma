@@ -28,6 +28,9 @@ model Parent {
   emailVerified    Boolean  @default(false)
   emailVerifiedAt  DateTime?
 
+  // KBQ Security Answers (hashed for verification)
+  kbqAnswers       Json?    // Hashed answers: { questionId: hashedAnswer }
+
   // Consent tracking
   consents         Consent[]
 
@@ -59,6 +62,10 @@ model Child {
   pin              String   @db.Char(4) // 4-digit PIN for profile switching
   dateOfBirth      DateTime // For age calculation, never exposed
   ageGroup         AgeGroup // Calculated: YOUNG (4-7) or OLDER (8-12)
+
+  // PIN Security (brute force protection)
+  pinAttempts      Int      @default(0)  // Failed PIN attempts
+  pinLockedUntil   DateTime?             // Lockout time if too many failures
 
   // Learning preferences
   gradeLevel       Int?     // 1-6

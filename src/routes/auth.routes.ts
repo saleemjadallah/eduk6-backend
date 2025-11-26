@@ -338,6 +338,79 @@ router.post(
   }
 );
 
+/**
+ * GET /api/auth/me
+ * Get current user data with children
+ */
+router.get(
+  '/me',
+  authenticate,
+  requireParent,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await authService.getCurrentUser(req.parent!.id);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * PATCH /api/auth/profile
+ * Update parent profile
+ */
+router.patch(
+  '/profile',
+  authenticate,
+  requireParent,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { firstName, lastName, phone, country, timezone } = req.body;
+      const result = await authService.updateParentProfile(req.parent!.id, {
+        firstName,
+        lastName,
+        phone,
+        country,
+        timezone,
+      });
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * DELETE /api/auth/delete-account
+ * Delete account and all data (COPPA compliance)
+ */
+router.delete(
+  '/delete-account',
+  authenticate,
+  requireParent,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await authService.deleteAccount(req.parent!.id);
+
+      res.json({
+        success: true,
+        message: 'Account and all associated data deleted successfully.',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // ============================================
 // CHILD SESSION
 // ============================================
@@ -464,6 +537,7 @@ router.post(
 /**
  * GET /api/auth/consent/kbq/questions
  * Get knowledge-based questions
+ * Returns isSetup=true if user needs to set up security questions first
  */
 router.get(
   '/consent/kbq/questions',
@@ -471,11 +545,49 @@ router.get(
   requireParent,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const questions = await consentService.getKBQQuestions();
+      const result = await consentService.getKBQQuestions(req.parent!.id);
 
       res.json({
         success: true,
-        data: { questions },
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /api/auth/consent/kbq/setup
+ * Setup KBQ security questions (first-time only)
+ */
+router.post(
+  '/consent/kbq/setup',
+  authenticate,
+  requireParent,
+  validateInput(verifyKBQConsentSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { answers } = req.body;
+
+      // Setup answers
+      await consentService.setupKBQAnswers(req.parent!.id, answers);
+
+      // After setup, automatically verify consent
+      const result = await consentService.verifyKBQConsent(
+        req.parent!.id,
+        answers,
+        req.ip,
+        req.headers['user-agent']
+      );
+
+      res.json({
+        success: true,
+        data: {
+          passed: result.success,
+          consentId: result.consentId,
+        },
+        message: 'Security questions set up and consent verified.',
       });
     } catch (error) {
       next(error);
@@ -485,7 +597,7 @@ router.get(
 
 /**
  * POST /api/auth/consent/kbq/verify
- * Verify KBQ answers
+ * Verify KBQ answers (for existing security questions)
  */
 router.post(
   '/consent/kbq/verify',

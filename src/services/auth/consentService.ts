@@ -1,7 +1,11 @@
 // COPPA Parental Consent Service
+import bcrypt from 'bcrypt';
 import { prisma } from '../../config/database.js';
 import { ConsentMethod, ConsentStatus } from '@prisma/client';
 import { ValidationError, ForbiddenError } from '../../middleware/errorHandler.js';
+import { logger } from '../../utils/logger.js';
+
+const KBQ_SALT_ROUNDS = 10;
 
 export interface ConsentVerificationResult {
   success: boolean;
@@ -13,34 +17,46 @@ export interface ConsentVerificationResult {
 // Knowledge-based questions for consent verification
 const KBQ_QUESTIONS = [
   {
-    id: 'last_4_ssn',
-    question: 'What are the last 4 digits of your Social Security Number?',
-    type: 'text',
-    validation: /^\d{4}$/,
-  },
-  {
     id: 'birth_year',
     question: 'What year were you born?',
     type: 'text',
     validation: /^(19|20)\d{2}$/,
+    hint: 'Enter a 4-digit year (e.g., 1985)',
   },
   {
     id: 'mother_maiden',
     question: "What is your mother's maiden name?",
     type: 'text',
-    validation: /^[a-zA-Z]{2,}$/,
+    validation: /^[a-zA-Z\s]{2,}$/,
+    hint: 'Letters only, at least 2 characters',
   },
   {
     id: 'street_lived',
     question: 'What street did you grow up on?',
     type: 'text',
     validation: /^.{3,}$/,
+    hint: 'At least 3 characters',
   },
   {
     id: 'first_car',
     question: 'What was the make of your first car?',
     type: 'text',
     validation: /^.{2,}$/,
+    hint: 'e.g., Toyota, Honda, Ford',
+  },
+  {
+    id: 'pet_name',
+    question: 'What was the name of your first pet?',
+    type: 'text',
+    validation: /^.{2,}$/,
+    hint: 'At least 2 characters',
+  },
+  {
+    id: 'birth_city',
+    question: 'In what city were you born?',
+    type: 'text',
+    validation: /^.{2,}$/,
+    hint: 'At least 2 characters',
   },
 ];
 
@@ -147,18 +163,88 @@ export const consentService = {
 
   /**
    * Get knowledge-based questions for consent
+   * If parent already has stored answers, return the same questions for verification
+   * Otherwise return questions for initial setup
    */
-  async getKBQQuestions(): Promise<Array<{
-    id: string;
-    question: string;
-    options?: string[];
-  }>> {
-    // Return a random selection of 3 questions
-    const shuffled = KBQ_QUESTIONS.sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, 3).map(q => ({
-      id: q.id,
-      question: q.question,
-    }));
+  async getKBQQuestions(parentId: string): Promise<{
+    questions: Array<{
+      id: string;
+      question: string;
+      hint?: string;
+    }>;
+    isSetup: boolean;
+  }> {
+    // Check if parent already has KBQ answers stored
+    const parent = await prisma.parent.findUnique({
+      where: { id: parentId },
+      select: { kbqAnswers: true },
+    });
+
+    if (parent?.kbqAnswers && typeof parent.kbqAnswers === 'object') {
+      // Parent has stored answers - return those specific questions for verification
+      const storedAnswers = parent.kbqAnswers as Record<string, string>;
+      const questionIds = Object.keys(storedAnswers);
+      const questions = KBQ_QUESTIONS.filter(q => questionIds.includes(q.id));
+
+      return {
+        questions: questions.map(q => ({
+          id: q.id,
+          question: q.question,
+        })),
+        isSetup: false, // Verification mode
+      };
+    }
+
+    // No stored answers - return random selection for initial setup
+    const shuffled = [...KBQ_QUESTIONS].sort(() => Math.random() - 0.5);
+    return {
+      questions: shuffled.slice(0, 3).map(q => ({
+        id: q.id,
+        question: q.question,
+        hint: q.hint,
+      })),
+      isSetup: true, // Setup mode
+    };
+  },
+
+  /**
+   * Setup KBQ answers for a parent (first-time setup)
+   */
+  async setupKBQAnswers(
+    parentId: string,
+    answers: Array<{ questionId: string; answer: string }>
+  ): Promise<{ success: boolean }> {
+    // Validate answers
+    if (answers.length < 3) {
+      throw new ValidationError('At least 3 security questions are required');
+    }
+
+    const hashedAnswers: Record<string, string> = {};
+
+    for (const { questionId, answer } of answers) {
+      const question = KBQ_QUESTIONS.find(q => q.id === questionId);
+      if (!question) {
+        throw new ValidationError(`Unknown question: ${questionId}`);
+      }
+
+      if (!question.validation.test(answer)) {
+        throw new ValidationError(`Invalid answer format for: ${question.question}`);
+      }
+
+      // Hash the answer (case-insensitive, trimmed)
+      const normalizedAnswer = answer.toLowerCase().trim();
+      hashedAnswers[questionId] = await bcrypt.hash(normalizedAnswer, KBQ_SALT_ROUNDS);
+    }
+
+    // Store hashed answers
+    await prisma.parent.update({
+      where: { id: parentId },
+      data: { kbqAnswers: hashedAnswers },
+    });
+
+    logger.info(`KBQ answers setup for parent ${parentId}`);
+
+    return { success: true };
   },
 
   /**
@@ -170,18 +256,43 @@ export const consentService = {
     ipAddress?: string,
     userAgent?: string
   ): Promise<ConsentVerificationResult> {
-    // In a real implementation, this would verify against a third-party
-    // identity verification service. For now, we just check format.
+    // Get stored answers
+    const parent = await prisma.parent.findUnique({
+      where: { id: parentId },
+      select: { kbqAnswers: true },
+    });
+
+    if (!parent?.kbqAnswers || typeof parent.kbqAnswers !== 'object') {
+      throw new ValidationError('Security questions not set up. Please set up your security questions first.');
+    }
+
+    const storedAnswers = parent.kbqAnswers as Record<string, string>;
+
+    // Verify each answer
+    let correctCount = 0;
+    const totalQuestions = Object.keys(storedAnswers).length;
 
     for (const { questionId, answer } of answers) {
-      const question = KBQ_QUESTIONS.find(q => q.id === questionId);
-      if (!question) {
-        throw new ValidationError(`Unknown question: ${questionId}`);
+      const hashedAnswer = storedAnswers[questionId];
+      if (!hashedAnswer) {
+        continue; // Skip unknown questions
       }
 
-      if (!question.validation.test(answer)) {
-        throw new ValidationError('Invalid answer format');
+      // Compare with stored hash (case-insensitive)
+      const normalizedAnswer = answer.toLowerCase().trim();
+      const isCorrect = await bcrypt.compare(normalizedAnswer, hashedAnswer);
+
+      if (isCorrect) {
+        correctCount++;
       }
+    }
+
+    // Require at least 2 out of 3 correct answers (or 66% for other amounts)
+    const requiredCorrect = Math.max(2, Math.ceil(totalQuestions * 0.66));
+
+    if (correctCount < requiredCorrect) {
+      logger.warn(`KBQ verification failed for parent ${parentId}: ${correctCount}/${totalQuestions} correct`);
+      throw new ValidationError(`Verification failed. Please check your answers and try again.`);
     }
 
     // Create verified consent
@@ -190,13 +301,19 @@ export const consentService = {
         parentId,
         method: 'KBQ',
         status: 'VERIFIED',
-        verificationData: { questionIds: answers.map(a => a.questionId) },
+        verificationData: {
+          questionIds: answers.map(a => a.questionId),
+          correctCount,
+          totalQuestions,
+        },
         ipAddress,
         userAgent,
         consentGivenAt: new Date(),
         expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
       },
     });
+
+    logger.info(`KBQ consent verified for parent ${parentId}`);
 
     return {
       success: true,
