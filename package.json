@@ -1,7 +1,7 @@
 {
-  "name": "mydscvr-eduk6-backend",
+  "name": "eduk6-backend",
   "version": "1.0.0",
-  "description": "MyDscvr EduK-6 AI Learning Platform Backend",
+  "description": "OrbitLearn K-6 AI Learning Platform Backend",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
