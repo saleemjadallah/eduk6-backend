@@ -53,8 +53,8 @@ export const config = {
   gemini: {
     apiKey: process.env.GEMINI_API_KEY!,
     models: {
-      // Gemini 2.5 Pro - Best reasoning (stable, widely available)
-      pro: 'gemini-2.5-pro',             // State-of-the-art reasoning
+      // Gemini 3 Pro - Most advanced model (November 2025)
+      pro: 'gemini-3-pro-preview',       // State-of-the-art reasoning with thinking
       // Gemini 2.5 models for different use cases
       flash: 'gemini-2.5-flash',         // Best price-performance, well-rounded
       flashLite: 'gemini-2.5-flash-lite', // Fastest, cost-efficient
