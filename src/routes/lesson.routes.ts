@@ -8,6 +8,8 @@ import { lessonService } from '../services/learning/lessonService.js';
 import { queueContentProcessing } from '../services/learning/contentProcessor.js';
 import { prisma } from '../config/database.js';
 import { logger } from '../utils/logger.js';
+import { genAI } from '../config/gemini.js';
+import { config } from '../config/index.js';
 import { AgeGroup, Subject, SourceType, CurriculumType } from '@prisma/client';
 
 const router = Router();
@@ -270,8 +272,8 @@ Content: ${content.substring(0, 3000)}`
 
 Content: ${content.substring(0, 4000)}`;
 
-  const model = (await import('../../config/gemini.js')).genAI.getGenerativeModel({
-    model: (await import('../../config/index.js')).config.gemini.models.flash,
+  const model = genAI.getGenerativeModel({
+    model: config.gemini.models.flash,
   });
 
   const result = await model.generateContent(prompt);
@@ -283,8 +285,8 @@ async function generateSummary(content: string, ageGroup: AgeGroup): Promise<str
     ? `Summarize this in 2-3 simple sentences that a young child can understand: ${content.substring(0, 2000)}`
     : `Summarize this content in a clear, educational way for a child: ${content.substring(0, 3000)}`;
 
-  const model = (await import('../../config/gemini.js')).genAI.getGenerativeModel({
-    model: (await import('../../config/index.js')).config.gemini.models.flash,
+  const model = genAI.getGenerativeModel({
+    model: config.gemini.models.flash,
   });
 
   const result = await model.generateContent(prompt);
@@ -296,8 +298,8 @@ async function simplifyContent(content: string, ageGroup: AgeGroup): Promise<str
     ? `Explain this in very simple words that a 5-year-old would understand: ${content.substring(0, 1500)}`
     : `Explain this in simple, clear language for a child: ${content.substring(0, 2500)}`;
 
-  const model = (await import('../../config/gemini.js')).genAI.getGenerativeModel({
-    model: (await import('../../config/index.js')).config.gemini.models.flash,
+  const model = genAI.getGenerativeModel({
+    model: config.gemini.models.flash,
   });
 
   const result = await model.generateContent(prompt);
