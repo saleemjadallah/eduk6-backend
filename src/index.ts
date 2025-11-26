@@ -37,6 +37,12 @@ const app = express();
 // MIDDLEWARE SETUP
 // ============================================
 
+// Trust proxy - required for Railway/reverse proxy deployments
+// This allows express-rate-limit to correctly identify users via X-Forwarded-For
+if (config.isProduction) {
+  app.set('trust proxy', 1);
+}
+
 // Security headers
 app.use(helmet({
   contentSecurityPolicy: {
