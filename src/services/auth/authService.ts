@@ -384,10 +384,15 @@ export const authService = {
         firstName: true,
         lastName: true,
         emailVerified: true,
-        consentStatus: true,
         subscriptionTier: true,
         createdAt: true,
       },
+    });
+
+    // Check consent status from Consent table
+    const latestConsent = await prisma.consent.findFirst({
+      where: { parentId: parent.id },
+      orderBy: { createdAt: 'desc' },
     });
 
     // Get children
@@ -402,26 +407,26 @@ export const authService = {
       },
     });
 
-    // Generate tokens to log user in
-    const accessToken = this.generateAccessToken(parent.id);
-    const refreshToken = this.generateRefreshToken();
+    // Generate tokens using tokenService
+    const tokens = tokenService.generateParentTokens(parent.id);
 
-    // Store refresh token
-    await prisma.refreshToken.create({
-      data: {
-        token: refreshToken,
-        parentId: parent.id,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-      },
+    // Store refresh token session
+    await sessionService.createSession({
+      userId: parent.id,
+      type: 'parent',
+      refreshTokenId: tokens.refreshTokenId,
     });
 
     logger.info(`Email verified and logged in for ${email}`);
 
     return {
       success: true,
-      accessToken,
-      refreshToken,
-      parent,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      parent: {
+        ...parent,
+        consentStatus: latestConsent?.status || 'none',
+      },
       children,
     };
   },
