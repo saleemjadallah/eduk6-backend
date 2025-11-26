@@ -55,6 +55,13 @@ const getLessonsQuerySchema = z.object({
   offset: z.string().transform(Number).pipe(z.number().min(0)).optional(),
 });
 
+const processContentSchema = z.object({
+  content: z.string().min(10, 'Content must be at least 10 characters'),
+  task: z.enum(['study_guide', 'summary', 'explain', 'simplify']),
+  childId: z.string().optional().nullable(),
+  ageGroup: z.enum(['YOUNG', 'OLDER']).optional(),
+});
+
 // ============================================
 // ROUTES
 // ============================================
@@ -192,6 +199,110 @@ router.post(
     }
   }
 );
+
+/**
+ * POST /api/lessons/process
+ * Process content with Gemini for various tasks (study guide, summary, etc.)
+ */
+router.post(
+  '/process',
+  authenticate,
+  validateInput(processContentSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { content, task, ageGroup } = req.body;
+
+      // Determine age group from child or default
+      let effectiveAgeGroup: AgeGroup = (ageGroup as AgeGroup) || 'OLDER';
+
+      if (req.child) {
+        effectiveAgeGroup = req.child.ageGroup;
+      }
+
+      logger.info(`Processing content with task: ${task}`, {
+        task,
+        contentLength: content.length,
+        ageGroup: effectiveAgeGroup,
+      });
+
+      let result: string;
+
+      switch (task) {
+        case 'study_guide':
+          result = await generateStudyGuide(content, effectiveAgeGroup);
+          break;
+        case 'summary':
+          result = await generateSummary(content, effectiveAgeGroup);
+          break;
+        case 'explain':
+        case 'simplify':
+          result = await simplifyContent(content, effectiveAgeGroup);
+          break;
+        default:
+          result = await generateStudyGuide(content, effectiveAgeGroup);
+      }
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      logger.error('Content processing error', { error });
+      next(error);
+    }
+  }
+);
+
+// Helper functions for content processing
+async function generateStudyGuide(content: string, ageGroup: AgeGroup): Promise<string> {
+  const prompt = ageGroup === 'YOUNG'
+    ? `Create a fun, simple study guide for a young child (ages 4-7) based on this content. Use simple words, short sentences, and make it engaging. Include:
+- 3-4 main ideas (as simple bullet points)
+- 2-3 fun facts
+- A simple activity or game to help remember
+
+Content: ${content.substring(0, 3000)}`
+    : `Create an educational study guide for a child (ages 8-12) based on this content. Include:
+- Key concepts and main ideas
+- Important vocabulary with definitions
+- Study tips
+- Practice questions
+
+Content: ${content.substring(0, 4000)}`;
+
+  const model = (await import('../../config/gemini.js')).genAI.getGenerativeModel({
+    model: (await import('../../config/index.js')).config.gemini.models.flash,
+  });
+
+  const result = await model.generateContent(prompt);
+  return result.response.text();
+}
+
+async function generateSummary(content: string, ageGroup: AgeGroup): Promise<string> {
+  const prompt = ageGroup === 'YOUNG'
+    ? `Summarize this in 2-3 simple sentences that a young child can understand: ${content.substring(0, 2000)}`
+    : `Summarize this content in a clear, educational way for a child: ${content.substring(0, 3000)}`;
+
+  const model = (await import('../../config/gemini.js')).genAI.getGenerativeModel({
+    model: (await import('../../config/index.js')).config.gemini.models.flash,
+  });
+
+  const result = await model.generateContent(prompt);
+  return result.response.text();
+}
+
+async function simplifyContent(content: string, ageGroup: AgeGroup): Promise<string> {
+  const prompt = ageGroup === 'YOUNG'
+    ? `Explain this in very simple words that a 5-year-old would understand: ${content.substring(0, 1500)}`
+    : `Explain this in simple, clear language for a child: ${content.substring(0, 2500)}`;
+
+  const model = (await import('../../config/gemini.js')).genAI.getGenerativeModel({
+    model: (await import('../../config/index.js')).config.gemini.models.flash,
+  });
+
+  const result = await model.generateContent(prompt);
+  return result.response.text();
+}
 
 /**
  * POST /api/lessons
