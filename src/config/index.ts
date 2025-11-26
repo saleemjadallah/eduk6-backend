@@ -55,6 +55,7 @@ export const config = {
     models: {
       flash: 'gemini-1.5-flash',
       pro: 'gemini-1.5-pro',
+      image: 'gemini-2.5-flash-preview-image-generation',
     },
   },
 
