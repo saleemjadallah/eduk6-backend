@@ -20,6 +20,7 @@ import authRoutes from './routes/auth.routes.js';
 import uploadRoutes from './routes/upload.routes.js';
 import childRoutes from './routes/child.routes.js';
 import profileRoutes from './routes/profile.routes.js';
+import parentRoutes from './routes/parent.routes.js';
 
 // Services initialization
 import { initializeContentProcessor, shutdownContentProcessor } from './services/learning/contentProcessor.js';
@@ -109,6 +110,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/children', childRoutes);
 app.use('/api/profiles', profileRoutes);
+app.use('/api/parent', parentRoutes);
 
 // TODO: Add remaining routes as they're implemented
 // app.use('/api/lessons', lessonRoutes);
@@ -116,7 +118,6 @@ app.use('/api/profiles', profileRoutes);
 // app.use('/api/flashcards', flashcardRoutes);
 // app.use('/api/quizzes', quizRoutes);
 // app.use('/api/gamification', gamificationRoutes);
-// app.use('/api/parent', parentRoutes);
 
 // ============================================
 // ERROR HANDLING
