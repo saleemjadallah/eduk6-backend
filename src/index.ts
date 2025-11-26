@@ -18,6 +18,7 @@ import { attachRequestId, requestLogger } from './middleware/requestLogger.js';
 // Routes
 import authRoutes from './routes/auth.routes.js';
 import uploadRoutes from './routes/upload.routes.js';
+import childRoutes from './routes/child.routes.js';
 
 // Services initialization
 import { initializeContentProcessor, shutdownContentProcessor } from './services/learning/contentProcessor.js';
@@ -105,9 +106,9 @@ app.get('/health', async (_req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/children', childRoutes);
 
 // TODO: Add remaining routes as they're implemented
-// app.use('/api/children', childRoutes);
 // app.use('/api/lessons', lessonRoutes);
 // app.use('/api/chat', chatRoutes);
 // app.use('/api/flashcards', flashcardRoutes);
