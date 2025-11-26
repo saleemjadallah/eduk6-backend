@@ -53,9 +53,11 @@ export const config = {
   gemini: {
     apiKey: process.env.GEMINI_API_KEY!,
     models: {
-      flash: 'gemini-1.5-flash',
-      pro: 'gemini-1.5-pro',
-      image: 'gemini-2.5-flash-preview-image-generation',
+      // Latest stable models as of November 2025
+      flash: 'gemini-2.5-flash',         // Best price-performance, well-rounded
+      pro: 'gemini-2.5-pro',             // State-of-the-art reasoning
+      flashLite: 'gemini-2.5-flash-lite', // Fastest, cost-efficient
+      image: 'gemini-2.0-flash',         // Image generation support
     },
   },
 

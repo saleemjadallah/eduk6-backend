@@ -21,6 +21,7 @@ import uploadRoutes from './routes/upload.routes.js';
 import childRoutes from './routes/child.routes.js';
 import profileRoutes from './routes/profile.routes.js';
 import parentRoutes from './routes/parent.routes.js';
+import lessonRoutes from './routes/lesson.routes.js';
 
 // Services initialization
 import { initializeContentProcessor, shutdownContentProcessor } from './services/learning/contentProcessor.js';
@@ -111,9 +112,9 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/children', childRoutes);
 app.use('/api/profiles', profileRoutes);
 app.use('/api/parent', parentRoutes);
+app.use('/api/lessons', lessonRoutes);
 
 // TODO: Add remaining routes as they're implemented
-// app.use('/api/lessons', lessonRoutes);
 // app.use('/api/chat', chatRoutes);
 // app.use('/api/flashcards', flashcardRoutes);
 // app.use('/api/quizzes', quizRoutes);
