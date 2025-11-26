@@ -1,9 +1,12 @@
 // Gemini AI Service for chat and content generation
+// Uses Gemini 3 Pro for advanced reasoning and Jeffrey AI tutor
 import {
   genAI,
   CHILD_SAFETY_SETTINGS,
   YOUNG_CHILD_CONFIG,
   OLDER_CHILD_CONFIG,
+  GEMINI_3_PRO_ANALYSIS_CONFIG,
+  GEMINI_3_PRO_CHAT_CONFIG,
 } from '../../config/gemini.js';
 import { config } from '../../config/index.js';
 import { promptBuilder, LessonContext } from './promptBuilder.js';
@@ -112,15 +115,24 @@ export class GeminiService {
     const history = this.formatConversationHistory(context.conversationHistory);
 
     // 4. Get appropriate config for age group
-    const generationConfig =
-      context.ageGroup === 'YOUNG' ? YOUNG_CHILD_CONFIG : OLDER_CHILD_CONFIG;
+    // Use Gemini 3 Pro for Jeffrey - best reasoning for educational content
+    const baseConfig = context.ageGroup === 'YOUNG' ? YOUNG_CHILD_CONFIG : OLDER_CHILD_CONFIG;
+    const generationConfig = {
+      ...GEMINI_3_PRO_CHAT_CONFIG,
+      maxOutputTokens: baseConfig.maxOutputTokens, // Age-appropriate length
+    };
 
-    // 5. Call Gemini
+    // 5. Call Gemini 3 Pro for Jeffrey AI tutor
     const model = genAI.getGenerativeModel({
-      model: config.gemini.models.flash,
+      model: config.gemini.models.pro, // gemini-3-pro-preview
       safetySettings: CHILD_SAFETY_SETTINGS,
       generationConfig,
       systemInstruction: systemPrompt,
+    });
+
+    logger.info(`Using Gemini 3 Pro for Jeffrey chat`, {
+      model: config.gemini.models.pro,
+      ageGroup: context.ageGroup,
     });
 
     const chat = model.startChat({ history });
@@ -181,7 +193,7 @@ export class GeminiService {
 
   /**
    * Analyze content and extract structured lesson data
-   * Now supports curriculum-aware content structuring
+   * Uses Gemini 3 Pro for advanced reasoning and curriculum-aware content structuring
    */
   async analyzeContent(
     content: string,
@@ -194,18 +206,26 @@ export class GeminiService {
   ): Promise<LessonAnalysis> {
     const prompt = promptBuilder.buildContentAnalysisPrompt(content, context);
 
+    logger.info(`Analyzing content with Gemini 3 Pro`, {
+      model: config.gemini.models.pro,
+      contentLength: content.length,
+      ageGroup: context.ageGroup,
+    });
+
+    // Use Gemini 3 Pro for best analysis quality
     const model = genAI.getGenerativeModel({
-      model: config.gemini.models.pro, // Use Pro for better analysis
+      model: config.gemini.models.pro, // gemini-3-pro-preview
       safetySettings: CHILD_SAFETY_SETTINGS,
-      generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 4000,
-        responseMimeType: 'application/json',
-      },
+      generationConfig: GEMINI_3_PRO_ANALYSIS_CONFIG,
     });
 
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
+
+    logger.info(`Gemini 3 Pro analysis completed`, {
+      responseLength: responseText.length,
+      tokensUsed: result.response.usageMetadata?.totalTokenCount,
+    });
 
     let analysis: LessonAnalysis;
     try {

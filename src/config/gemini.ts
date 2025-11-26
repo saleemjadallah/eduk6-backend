@@ -26,26 +26,45 @@ export const CHILD_SAFETY_SETTINGS = [
   },
 ];
 
+// Thinking levels for Gemini 3 Pro
+// Controls reasoning depth and latency tradeoffs
+export type ThinkingLevel = 'LOW' | 'HIGH';
+
 // Default generation config for child-appropriate responses
 export const DEFAULT_GENERATION_CONFIG = {
-  temperature: 0.7,
+  temperature: 1.0, // Gemini 3 recommends keeping at 1.0 to avoid looping
   topP: 0.8,
   topK: 40,
   maxOutputTokens: 400,
 };
 
-// Configuration for younger children (4-7)
+// Configuration for younger children (4-7) - uses LOW thinking for faster responses
 export const YOUNG_CHILD_CONFIG = {
   ...DEFAULT_GENERATION_CONFIG,
-  maxOutputTokens: 200, // Shorter responses
-  temperature: 0.7,
+  maxOutputTokens: 200, // Shorter responses for younger kids
+  temperature: 1.0,
 };
 
-// Configuration for older children (8-12)
+// Configuration for older children (8-12) - can use HIGH thinking for deeper explanations
 export const OLDER_CHILD_CONFIG = {
   ...DEFAULT_GENERATION_CONFIG,
-  maxOutputTokens: 400,
-  temperature: 0.7,
+  maxOutputTokens: 600, // Longer responses for older kids
+  temperature: 1.0,
+};
+
+// Gemini 3 Pro specific config for content analysis (uses HIGH thinking for better reasoning)
+export const GEMINI_3_PRO_ANALYSIS_CONFIG = {
+  temperature: 0.3, // Lower for more consistent analysis output
+  maxOutputTokens: 8000, // Large output for detailed analysis
+  responseMimeType: 'application/json',
+};
+
+// Gemini 3 Pro config for chat (Jeffrey) - balanced for conversational use
+export const GEMINI_3_PRO_CHAT_CONFIG = {
+  temperature: 1.0,
+  topP: 0.95,
+  topK: 40,
+  maxOutputTokens: 1000,
 };
 
 // Model instances
@@ -56,5 +75,11 @@ export const getFlashModel = () => genAI.getGenerativeModel({
 
 export const getProModel = () => genAI.getGenerativeModel({
   model: config.gemini.models.pro,
+  safetySettings: CHILD_SAFETY_SETTINGS,
+});
+
+// Gemini 3 Pro model for advanced reasoning tasks
+export const getGemini3ProModel = () => genAI.getGenerativeModel({
+  model: config.gemini.models.pro, // gemini-3-pro-preview
   safetySettings: CHILD_SAFETY_SETTINGS,
 });
