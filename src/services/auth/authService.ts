@@ -27,6 +27,7 @@ export interface LoginResult {
     firstName: string | null;
     lastName: string | null;
     emailVerified: boolean;
+    consentStatus: 'none' | 'pending' | 'verified';
   };
   children: Array<{
     id: string;
@@ -96,7 +97,7 @@ export const authService = {
     deviceInfo?: string,
     ipAddress?: string
   ): Promise<LoginResult> {
-    // Find parent
+    // Find parent with consent status
     const parent = await prisma.parent.findUnique({
       where: { email: email.toLowerCase() },
       include: {
@@ -107,6 +108,17 @@ export const authService = {
             avatarUrl: true,
             ageGroup: true,
           },
+        },
+        consents: {
+          where: {
+            status: 'VERIFIED',
+            OR: [
+              { expiresAt: null },
+              { expiresAt: { gt: new Date() } },
+            ],
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
         },
       },
     });
@@ -140,6 +152,10 @@ export const authService = {
       data: { lastLoginAt: new Date() },
     });
 
+    // Determine consent status
+    const hasVerifiedConsent = parent.consents && parent.consents.length > 0;
+    const consentStatus = hasVerifiedConsent ? 'verified' : 'none';
+
     return {
       accessToken,
       refreshToken,
@@ -149,6 +165,7 @@ export const authService = {
         firstName: parent.firstName,
         lastName: parent.lastName,
         emailVerified: parent.emailVerified,
+        consentStatus,
       },
       children: parent.children,
     };
@@ -576,9 +593,10 @@ export const authService = {
     }
 
     const hasVerifiedConsent = parent.consents.length > 0;
+    const consentStatus = hasVerifiedConsent ? 'verified' : 'none';
 
     return {
-      parent: {
+      user: {
         id: parent.id,
         email: parent.email,
         firstName: parent.firstName,
@@ -589,7 +607,7 @@ export const authService = {
         emailVerified: parent.emailVerified,
         subscriptionTier: parent.subscriptionTier,
         subscriptionStatus: parent.subscriptionStatus,
-        hasVerifiedConsent,
+        consentStatus,
       },
       children: parent.children,
     };
