@@ -9,6 +9,7 @@ import { prisma } from '../config/database.js';
 import { logger } from '../utils/logger.js';
 import { AgeGroup } from '@prisma/client';
 import { geminiService } from '../services/ai/geminiService.js';
+import { detectImageIntent } from '../services/ai/imageIntentDetector.js';
 
 const router = Router();
 
@@ -98,7 +99,44 @@ router.post(
         messageLength: message.length,
       });
 
-      // Build the prompt based on context
+      // Check if this is an image generation request
+      const imageIntent = await detectImageIntent(message, lessonContext);
+
+      if (imageIntent.isImageRequest && imageIntent.confidence !== 'low') {
+        logger.info('Image intent detected, switching to image generation', {
+          message,
+          confidence: imageIntent.confidence,
+          detectionMethod: imageIntent.detectionMethod,
+          imagePrompt: imageIntent.imagePrompt,
+        });
+
+        // Generate image using the image model
+        const imageResult = await generateChatImage(
+          imageIntent.imagePrompt || message,
+          lessonContext,
+          effectiveAgeGroup
+        );
+
+        // Generate a friendly Jeffrey response to accompany the image
+        const jeffreyResponse = generateJeffreyImageResponse(
+          imageIntent.imagePrompt || message,
+          effectiveAgeGroup
+        );
+
+        res.json({
+          success: true,
+          data: {
+            content: jeffreyResponse,
+            role: 'assistant',
+            type: 'image',
+            imageData: imageResult.imageData,
+            mimeType: imageResult.mimeType,
+          },
+        });
+        return;
+      }
+
+      // Regular text chat - Build the prompt based on context
       const systemPrompt = buildJeffreyPrompt(effectiveAgeGroup, lessonContext, selectedText);
 
       // Build conversation history for context
@@ -494,6 +532,109 @@ Guidelines:
   }
 
   return prompt;
+}
+
+/**
+ * Generate an image for chat using the image model
+ */
+async function generateChatImage(
+  imagePrompt: string,
+  lessonContext: { title?: string; subject?: string; content?: string } | null | undefined,
+  ageGroup: AgeGroup
+): Promise<{ imageData: string; mimeType: string }> {
+  const isYoung = ageGroup === 'YOUNG';
+
+  // Build context-aware prompt
+  let contextualPrompt = imagePrompt;
+  if (lessonContext?.title) {
+    contextualPrompt = `${imagePrompt} (from a lesson about ${lessonContext.title})`;
+  }
+
+  const fullPrompt = `Create a colorful, child-friendly educational illustration: ${contextualPrompt}
+
+Style requirements:
+- Bright, cheerful colors suitable for ${isYoung ? 'young children (ages 4-7)' : 'children (ages 8-12)'}
+- ${isYoung ? 'Very simple, cartoon-style, cute and friendly' : 'Clear, engaging, educational style'}
+- Fun and appealing to kids
+- NO text or words in the image
+- NO scary, violent, or inappropriate content
+- High quality, detailed artwork
+- Educational and age-appropriate`;
+
+  const model = genAI.getGenerativeModel({
+    model: config.gemini.models.image,
+    generationConfig: {
+      temperature: 1,
+      topP: 0.95,
+      topK: 40,
+      maxOutputTokens: 8192,
+    },
+  });
+
+  try {
+    const result = await model.generateContent({
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: fullPrompt }],
+        },
+      ],
+      generationConfig: {
+        responseModalities: ['image', 'text'],
+      },
+    } as any);
+
+    const response = result.response;
+    const parts = response.candidates?.[0]?.content?.parts;
+
+    if (!parts) {
+      throw new Error('No response parts from image generation');
+    }
+
+    let imageData = '';
+    let mimeType = 'image/png';
+
+    for (const part of parts) {
+      if ((part as any).inlineData) {
+        const inlineData = (part as any).inlineData;
+        imageData = inlineData.data;
+        mimeType = inlineData.mimeType || 'image/png';
+        break;
+      }
+    }
+
+    if (!imageData) {
+      throw new Error('No image data in response');
+    }
+
+    return { imageData, mimeType };
+  } catch (error) {
+    logger.error('Chat image generation failed', { error, imagePrompt });
+    throw new Error('Image generation is temporarily unavailable. Please try again later.');
+  }
+}
+
+/**
+ * Generate Jeffrey's friendly response to accompany an image
+ */
+function generateJeffreyImageResponse(imagePrompt: string, ageGroup: AgeGroup): string {
+  const isYoung = ageGroup === 'YOUNG';
+
+  const responses = isYoung
+    ? [
+        `Ta-da! 🎨 I drew ${imagePrompt} for you! Do you like it?`,
+        `Look what I made! 🖼️ Here's ${imagePrompt}! Pretty cool, right?`,
+        `Here you go! ✨ I created ${imagePrompt} just for you!`,
+        `Wow, that was fun to draw! 🌟 Here's ${imagePrompt}!`,
+      ]
+    : [
+        `Here's the image you asked for! I created ${imagePrompt} for you.`,
+        `I drew ${imagePrompt}! Let me know if you'd like me to make any changes or draw something else.`,
+        `Here you go! This is my illustration of ${imagePrompt}. What do you think?`,
+        `I created this image of ${imagePrompt} for you! Feel free to ask for more drawings!`,
+      ];
+
+  return responses[Math.floor(Math.random() * responses.length)];
 }
 
 export default router;
