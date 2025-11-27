@@ -209,6 +209,14 @@ Extract and return as JSON:
   "title": "A concise, engaging title",
   "summary": "A ${context.ageGroup === 'YOUNG' ? '2-3 sentence' : '3-5 sentence'} summary in simple language",
   "gradeLevel": "Estimated grade level (K-6)",
+  "formattedContent": "The FULL lesson content rewritten with proper HTML formatting. Use these tags:
+    - <h2> for main section titles/chapters
+    - <h3> for subsections
+    - <p> for paragraphs (wrap all text in paragraphs)
+    - <b> or <strong> for important terms and vocabulary words
+    - <ul> and <li> for bullet lists
+    - <ol> and <li> for numbered lists
+    Make it well-structured, readable, and engaging for children. Include ALL the content from the original, properly organized into clear sections.",
   "chapters": [
     {
       "title": "Chapter title",
