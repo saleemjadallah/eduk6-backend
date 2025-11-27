@@ -74,6 +74,14 @@ export interface GeneratedImage {
   mimeType: string;
 }
 
+export interface TranslationResult {
+  originalText: string;
+  translatedText: string;
+  targetLanguage: string;
+  pronunciation?: string; // For languages with different scripts
+  simpleExplanation?: string; // Kid-friendly explanation of the word/phrase
+}
+
 export class GeminiService {
   /**
    * Chat with Jeffrey AI tutor
@@ -435,6 +443,75 @@ export class GeminiService {
     }
 
     throw new Error('No image data in response');
+  }
+
+  /**
+   * Translate selected text to a target language
+   * Provides kid-friendly translations with optional pronunciation and explanation
+   */
+  async translateText(
+    text: string,
+    targetLanguage: string,
+    context: {
+      ageGroup: AgeGroup;
+      gradeLevel?: number | null;
+    }
+  ): Promise<TranslationResult> {
+    const isYoung = context.ageGroup === 'YOUNG';
+
+    const prompt = `Translate the following text to ${targetLanguage}.
+This translation is for a ${isYoung ? 'young child (ages 4-7)' : 'child (ages 8-12)'}.
+
+Text to translate: "${text}"
+
+Return ONLY a valid JSON object with this exact format, no other text:
+{
+  "originalText": "${text}",
+  "translatedText": "The translation in ${targetLanguage}",
+  "targetLanguage": "${targetLanguage}",
+  "pronunciation": "How to pronounce it (only if the target language uses a different script, like Arabic, Chinese, Japanese, Korean, Russian, Greek, Hebrew, Hindi, Thai - otherwise set to null)",
+  "simpleExplanation": "A ${isYoung ? 'very simple 1-sentence explanation for a 5-year-old' : 'brief kid-friendly explanation if helpful, otherwise null'}"
+}
+
+Requirements:
+- Keep the translation simple and natural
+- ${isYoung ? 'Use the simplest possible words' : 'Use clear age-appropriate language'}
+- If the text is a single word, provide a simple definition in simpleExplanation
+- If the text is a phrase or sentence, simpleExplanation can be null unless clarification helps
+- pronunciation should ONLY be included for non-Latin scripts`;
+
+    const model = genAI.getGenerativeModel({
+      model: config.gemini.models.flash,
+      safetySettings: CHILD_SAFETY_SETTINGS,
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 500,
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
+
+    logger.info('Translation completed', {
+      originalLength: text.length,
+      targetLanguage,
+      ageGroup: context.ageGroup,
+    });
+
+    try {
+      const parsed = JSON.parse(responseText);
+      return {
+        originalText: text,
+        translatedText: parsed.translatedText,
+        targetLanguage: targetLanguage,
+        pronunciation: parsed.pronunciation || undefined,
+        simpleExplanation: parsed.simpleExplanation || undefined,
+      };
+    } catch (error) {
+      logger.error('Failed to parse translation response', { responseText });
+      throw new Error('Failed to translate text');
+    }
   }
 
   /**

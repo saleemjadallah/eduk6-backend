@@ -8,6 +8,7 @@ import { config } from '../config/index.js';
 import { prisma } from '../config/database.js';
 import { logger } from '../utils/logger.js';
 import { AgeGroup } from '@prisma/client';
+import { geminiService } from '../services/ai/geminiService.js';
 
 const router = Router();
 
@@ -45,6 +46,13 @@ const infographicSchema = z.object({
   content: z.string().min(10, 'Content is required'),
   title: z.string().optional(),
   keyConcepts: z.array(z.string()).optional(),
+  childId: z.string().optional().nullable(),
+  ageGroup: z.enum(['YOUNG', 'OLDER']).optional(),
+});
+
+const translateSchema = z.object({
+  text: z.string().min(1, 'Text is required').max(500, 'Text too long (max 500 characters)'),
+  targetLanguage: z.string().min(2, 'Target language is required'),
   childId: z.string().optional().nullable(),
   ageGroup: z.enum(['YOUNG', 'OLDER']).optional(),
 });
@@ -223,6 +231,57 @@ router.post(
       });
     } catch (error) {
       logger.error('Infographic generation error', { error });
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /api/chat/translate
+ * Translate highlighted text to a target language
+ */
+router.post(
+  '/translate',
+  authenticate,
+  validateInput(translateSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { text, targetLanguage } = req.body;
+      let { childId, ageGroup } = req.body;
+
+      // Get age group from child if available
+      let effectiveAgeGroup: AgeGroup = (ageGroup as AgeGroup) || 'OLDER';
+
+      if (req.child) {
+        effectiveAgeGroup = req.child.ageGroup;
+        childId = req.child.id;
+      } else if (childId) {
+        const child = await prisma.child.findUnique({
+          where: { id: childId },
+          select: { ageGroup: true, gradeLevel: true },
+        });
+        if (child) {
+          effectiveAgeGroup = child.ageGroup;
+        }
+      }
+
+      logger.info('Translation request', {
+        childId,
+        ageGroup: effectiveAgeGroup,
+        targetLanguage,
+        textLength: text.length,
+      });
+
+      const translation = await geminiService.translateText(text, targetLanguage, {
+        ageGroup: effectiveAgeGroup,
+      });
+
+      res.json({
+        success: true,
+        data: translation,
+      });
+    } catch (error) {
+      logger.error('Translation error', { error });
       next(error);
     }
   }
