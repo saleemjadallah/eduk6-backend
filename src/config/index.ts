@@ -58,7 +58,7 @@ export const config = {
       // Gemini 2.5 models for different use cases
       flash: 'gemini-2.5-flash',         // Best price-performance, well-rounded
       flashLite: 'gemini-2.5-flash-lite', // Fastest, cost-efficient
-      image: 'gemini-2.0-flash-exp',     // Image generation support
+      image: 'gemini-3-pro-image-preview', // Image generation with better text rendering
     },
   },
 
