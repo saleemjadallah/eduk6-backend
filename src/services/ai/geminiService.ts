@@ -34,6 +34,7 @@ export interface ChatResponse {
 export interface LessonAnalysis {
   title: string;
   summary: string;
+  subject?: string; // Detected subject from content (MATH, SCIENCE, ENGLISH, etc.)
   gradeLevel: string;
   chapters?: Array<{
     title: string;

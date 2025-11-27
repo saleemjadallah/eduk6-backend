@@ -208,6 +208,7 @@ Extract and return as JSON:
 {
   "title": "A concise, engaging title",
   "summary": "A ${context.ageGroup === 'YOUNG' ? '2-3 sentence' : '3-5 sentence'} summary in simple language",
+  "subject": "MUST be exactly one of: MATH, SCIENCE, ENGLISH, ARABIC, ISLAMIC_STUDIES, SOCIAL_STUDIES, ART, MUSIC, OTHER (detect from content)",
   "gradeLevel": "Estimated grade level (K-6)",
   "formattedContent": "The FULL lesson content rewritten with proper HTML formatting. Use these tags:
     - <h2> for main section titles/chapters

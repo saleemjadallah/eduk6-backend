@@ -18,8 +18,8 @@ const router = Router();
 // SCHEMAS
 // ============================================
 
-// Helper to normalize subject to uppercase enum value
-const subjectEnum = z.enum(['MATH', 'READING', 'SCIENCE', 'SOCIAL_STUDIES', 'ART', 'MUSIC', 'LANGUAGE', 'OTHER']);
+// Helper to normalize subject to uppercase enum value (must match Prisma Subject enum)
+const subjectEnum = z.enum(['MATH', 'SCIENCE', 'ENGLISH', 'ARABIC', 'ISLAMIC_STUDIES', 'SOCIAL_STUDIES', 'ART', 'MUSIC', 'OTHER']);
 const normalizeSubject = z.string().transform((val) => val.toUpperCase()).pipe(subjectEnum).optional();
 
 const analyzeContentSchema = z.object({
@@ -36,7 +36,7 @@ const createLessonSchema = z.object({
   childId: z.string().min(1),
   title: z.string().min(1).max(255),
   sourceType: z.enum(['PDF', 'IMAGE', 'YOUTUBE', 'TEXT']),
-  subject: z.enum(['MATH', 'READING', 'SCIENCE', 'SOCIAL_STUDIES', 'ART', 'MUSIC', 'LANGUAGE', 'OTHER']).optional(),
+  subject: z.enum(['MATH', 'SCIENCE', 'ENGLISH', 'ARABIC', 'ISLAMIC_STUDIES', 'SOCIAL_STUDIES', 'ART', 'MUSIC', 'OTHER']).optional(),
   originalFileUrl: z.string().url().optional(),
   originalFileName: z.string().max(255).optional(),
   originalFileSize: z.number().positive().optional(),
@@ -51,7 +51,7 @@ const updateProgressSchema = z.object({
 });
 
 const getLessonsQuerySchema = z.object({
-  subject: z.enum(['MATH', 'READING', 'SCIENCE', 'SOCIAL_STUDIES', 'ART', 'MUSIC', 'LANGUAGE', 'OTHER']).optional(),
+  subject: z.enum(['MATH', 'SCIENCE', 'ENGLISH', 'ARABIC', 'ISLAMIC_STUDIES', 'SOCIAL_STUDIES', 'ART', 'MUSIC', 'OTHER']).optional(),
   status: z.enum(['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED']).optional(),
   limit: z.string().transform(Number).pipe(z.number().min(1).max(50)).optional(),
   offset: z.string().transform(Number).pipe(z.number().min(0)).optional(),
@@ -163,12 +163,19 @@ router.post(
         subject: subject as Subject | undefined,
       });
 
+      // Determine subject: use provided subject, or AI-detected subject from analysis
+      const validSubjects = ['MATH', 'SCIENCE', 'ENGLISH', 'ARABIC', 'ISLAMIC_STUDIES', 'SOCIAL_STUDIES', 'ART', 'MUSIC', 'OTHER'];
+      const detectedSubject = analysis.subject && validSubjects.includes(analysis.subject)
+        ? analysis.subject as Subject
+        : undefined;
+      const finalSubject = (subject as Subject | undefined) || detectedSubject;
+
       // Create lesson record with analyzed content
       const lesson = await lessonService.create({
         childId,
         title: title || analysis.title || 'Untitled Lesson',
         sourceType: sourceType as SourceType,
-        subject: subject as Subject | undefined,
+        subject: finalSubject,
       });
 
       // Update with analysis results
