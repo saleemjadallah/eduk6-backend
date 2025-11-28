@@ -97,6 +97,7 @@ router.get(
 /**
  * POST /api/exercises/:exerciseId/submit
  * Submit an answer for validation
+ * Works for both child sessions and parents viewing child lessons
  */
 router.post(
   '/:exerciseId/submit',
@@ -107,26 +108,47 @@ router.post(
       const { exerciseId } = req.params;
       const { submittedAnswer } = req.body;
 
-      if (!req.child) {
-        throw new ForbiddenError('Child authentication required');
+      // Get child context - either from child session or from exercise's lesson
+      let childId = req.child?.id;
+      let ageGroup = req.child?.ageGroup;
+
+      if (!childId) {
+        // Parent viewing - get child from exercise's lesson
+        const exerciseWithLesson = await exerciseService.getExerciseWithLesson(exerciseId);
+        if (!exerciseWithLesson) {
+          throw new NotFoundError('Exercise not found');
+        }
+
+        // Verify parent owns this child
+        if (req.parent) {
+          const child = await exerciseService.getChildForExercise(exerciseId, req.parent.id);
+          if (!child) {
+            throw new ForbiddenError('Access denied to this exercise');
+          }
+          childId = child.id;
+          ageGroup = child.ageGroup;
+        } else {
+          throw new ForbiddenError('Authentication required');
+        }
       }
 
       logger.info('Exercise answer submitted', {
         exerciseId,
-        childId: req.child.id,
+        childId,
         answerLength: submittedAnswer.length,
+        isParentSession: !req.child,
       });
 
       const result = await exerciseService.submitAnswer(
         exerciseId,
-        req.child.id,
+        childId,
         submittedAnswer,
-        req.child.ageGroup
+        ageGroup!
       );
 
       logger.info('Exercise answer result', {
         exerciseId,
-        childId: req.child.id,
+        childId,
         isCorrect: result.isCorrect,
         attemptNumber: result.attemptNumber,
         xpAwarded: result.xpAwarded,

@@ -215,6 +215,41 @@ export const exerciseService = {
   },
 
   /**
+   * Get exercise with its lesson (for parent access validation)
+   */
+  async getExerciseWithLesson(exerciseId: string) {
+    return prisma.interactiveExercise.findUnique({
+      where: { id: exerciseId },
+      include: { lesson: true },
+    });
+  },
+
+  /**
+   * Get child for an exercise, verifying parent ownership
+   */
+  async getChildForExercise(exerciseId: string, parentId: string) {
+    const exercise = await prisma.interactiveExercise.findUnique({
+      where: { id: exerciseId },
+      include: {
+        lesson: {
+          include: {
+            child: true,
+          },
+        },
+      },
+    });
+
+    if (!exercise) return null;
+
+    // Verify the parent owns this child
+    if (exercise.lesson.child.parentId !== parentId) {
+      return null;
+    }
+
+    return exercise.lesson.child;
+  },
+
+  /**
    * Submit an answer for validation
    */
   async submitAnswer(
