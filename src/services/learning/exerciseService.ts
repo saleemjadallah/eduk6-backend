@@ -110,40 +110,63 @@ export const exerciseService = {
 
   /**
    * Get all exercises for a lesson with completion status for a child
+   * If childId is null, returns exercises without completion tracking (parent preview)
    */
   async getExercisesForLesson(
     lessonId: string,
-    childId: string
+    childId: string | null
   ): Promise<ExerciseWithStatus[]> {
-    // Verify child has access to the lesson
-    const lesson = await prisma.lesson.findFirst({
-      where: { id: lessonId, childId },
+    // Verify lesson exists
+    const lesson = await prisma.lesson.findUnique({
+      where: { id: lessonId },
     });
 
     if (!lesson) {
+      throw new NotFoundError('Lesson not found');
+    }
+
+    // If childId provided, verify it matches the lesson owner
+    if (childId && lesson.childId !== childId) {
       throw new ForbiddenError('Access denied to this lesson');
     }
 
+    // Get exercises with attempts if childId provided
     const exercises = await prisma.interactiveExercise.findMany({
       where: { lessonId },
       orderBy: { orderIndex: 'asc' },
-      include: {
+      include: childId ? {
         attempts: {
           where: { childId },
           orderBy: { createdAt: 'desc' },
         },
-      },
+      } : undefined,
     });
 
     return exercises.map((exercise) => {
-      const correctAttempt = exercise.attempts.find((a) => a.isCorrect);
-      const lastAttempt = exercise.attempts[0] || null;
+      // For parent preview (no childId), return exercises without completion data
+      if (!childId) {
+        return {
+          ...exercise,
+          attempts: [],
+          isCompleted: false,
+          lastAttempt: null,
+          attemptCount: 0,
+          // Hide answers in preview mode
+          expectedAnswer: '',
+          acceptableAnswers: [],
+        };
+      }
+
+      // For child session, include completion status
+      const attempts = (exercise as any).attempts || [];
+      const correctAttempt = attempts.find((a: ExerciseAttempt) => a.isCorrect);
+      const lastAttempt = attempts[0] || null;
 
       return {
         ...exercise,
         isCompleted: !!correctAttempt,
         lastAttempt,
-        attemptCount: exercise.attempts.length,
+        attemptCount: attempts.length,
         // Hide the answer unless completed
         expectedAnswer: correctAttempt ? exercise.expectedAnswer : '',
         acceptableAnswers: correctAttempt ? exercise.acceptableAnswers : [],

@@ -29,6 +29,7 @@ const hintParamSchema = z.object({
 /**
  * GET /api/exercises/lesson/:lessonId
  * Get all exercises for a lesson with completion status
+ * Parents can view exercises, completion status requires child session
  */
 router.get(
   '/lesson/:lessonId',
@@ -37,21 +38,20 @@ router.get(
     try {
       const { lessonId } = req.params;
 
-      // Must be authenticated as a child
-      if (!req.child) {
-        throw new ForbiddenError('Child authentication required');
-      }
+      // If child session exists, get exercises with completion status
+      // Otherwise, return exercises without completion tracking (for parent preview)
+      const childId = req.child?.id || null;
 
       const exercises = await exerciseService.getExercisesForLesson(
         lessonId,
-        req.child.id
+        childId
       );
 
       logger.info('Fetched exercises for lesson', {
         lessonId,
-        childId: req.child.id,
+        childId: childId || 'parent-preview',
         exerciseCount: exercises.length,
-        completedCount: exercises.filter(e => e.isCompleted).length,
+        completedCount: childId ? exercises.filter(e => e.isCompleted).length : 'N/A',
       });
 
       res.json({
