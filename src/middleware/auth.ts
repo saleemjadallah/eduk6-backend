@@ -1,6 +1,7 @@
 // Authentication middleware
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { config } from '../config/index.js';
 import { UnauthorizedError, ForbiddenError } from './errorHandler.js';
 import { prisma } from '../config/database.js';
@@ -21,8 +22,16 @@ export interface RefreshTokenPayload {
   sub: string;
   type: 'parent' | 'child';
   jti: string;           // Unique token ID for revocation
+  fid: string;           // Token family ID for reuse detection
   iat: number;
   exp: number;
+}
+
+/**
+ * Hash a token for blacklist comparison
+ */
+function hashToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
 }
 
 /**
@@ -42,11 +51,12 @@ export async function authenticate(
 
     const token = authHeader.substring(7);
 
-    // Verify token
-    const payload = jwt.verify(token, config.jwtSecret) as AccessTokenPayload;
+    // Verify token with the access token secret
+    const payload = jwt.verify(token, config.jwtAccessSecret) as AccessTokenPayload;
 
-    // Check if token is blacklisted
-    const isBlacklisted = await redis.get(`blacklist:${token}`);
+    // Check if token is blacklisted (using hash for storage efficiency)
+    const tokenHash = hashToken(token);
+    const isBlacklisted = await redis.get(`blacklist:${tokenHash}`);
     if (isBlacklisted) {
       throw new UnauthorizedError('Token has been revoked');
     }

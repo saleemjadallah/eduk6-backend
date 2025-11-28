@@ -19,9 +19,16 @@ export const config = {
 
   // Session & Auth
   sessionSecret: process.env.SESSION_SECRET!,
+  // Separate secrets for access and refresh tokens
+  jwtAccessSecret: process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || process.env.SESSION_SECRET!,
+  jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || process.env.SESSION_SECRET!,
+  // Legacy - kept for backward compatibility, prefer specific secrets above
   jwtSecret: process.env.JWT_SECRET || process.env.SESSION_SECRET!,
   jwtAccessExpiry: '15m',
   jwtRefreshExpiry: '7d',
+  // Cookie settings
+  cookieDomain: process.env.COOKIE_DOMAIN || undefined,
+  cookieSecure: process.env.NODE_ENV === 'production',
 
   // Cloudflare R2
   cloudflare: {

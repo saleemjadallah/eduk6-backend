@@ -134,14 +134,20 @@ export const authService = {
       throw new UnauthorizedError('Invalid email or password');
     }
 
-    // Generate tokens
-    const { accessToken, refreshToken, refreshTokenId } = tokenService.generateParentTokens(parent.id);
+    // Generate tokens (includes token family ID for rotation tracking)
+    const { accessToken, refreshToken, refreshTokenId, refreshTokenHash } = tokenService.generateParentTokens(parent.id);
 
-    // Create session
+    // Get the token family ID from the generated token
+    const tokenPayload = tokenService.verifyRefreshToken(refreshToken);
+    const tokenFamilyId = tokenPayload.fid || tokenService.generateTokenFamilyId();
+
+    // Create session with hashed token
     await sessionService.createSession({
       userId: parent.id,
       type: 'parent',
       refreshTokenId,
+      refreshTokenHash,
+      tokenFamilyId,
       deviceInfo,
       ipAddress,
     });
@@ -173,6 +179,7 @@ export const authService = {
 
   /**
    * Refresh access token
+   * Implements token rotation with reuse detection
    */
   async refreshTokens(
     refreshToken: string
@@ -192,21 +199,36 @@ export const authService = {
       throw new UnauthorizedError('Session expired or revoked');
     }
 
-    // Invalidate old session
-    await sessionService.invalidateSession(payload.jti);
+    // Verify the refresh token hash matches (defense in depth)
+    const tokenHash = tokenService.hashRefreshToken(refreshToken);
+    if (session.refreshTokenHash && session.refreshTokenHash !== tokenHash) {
+      // Token tampering detected
+      logger.warn(`Refresh token hash mismatch for user ${session.userId}`);
+      await sessionService.invalidateTokenFamily(payload.fid || session.tokenFamilyId, session.userId);
+      throw new UnauthorizedError('Invalid refresh token');
+    }
 
-    // Generate new tokens
-    const tokens = tokenService.generateParentTokens(payload.sub);
+    // Get token family ID for rotation
+    const tokenFamilyId = payload.fid || session.tokenFamilyId;
 
-    // Create new session
-    await sessionService.createSession({
-      userId: session.userId,
-      type: session.type,
-      parentId: session.parentId,
-      refreshTokenId: tokens.refreshTokenId,
-      deviceInfo: session.deviceInfo,
-      ipAddress: session.ipAddress,
-    });
+    // Generate new tokens with same family ID (for rotation tracking)
+    const tokens = tokenService.generateParentTokens(payload.sub, tokenFamilyId);
+
+    // Rotate the session (this handles reuse detection)
+    const newSession = await sessionService.rotateSession(
+      payload.jti,
+      tokens.refreshTokenId,
+      tokens.refreshTokenHash,
+      tokenFamilyId
+    );
+
+    if (!newSession) {
+      // Rotation failed - likely due to token reuse detection
+      throw new UnauthorizedError('Session compromised. Please log in again.');
+    }
+
+    // Update session activity
+    await sessionService.updateSessionActivity(tokens.refreshTokenId);
 
     return {
       accessToken: tokens.accessToken,
@@ -427,11 +449,17 @@ export const authService = {
     // Generate tokens using tokenService
     const tokens = tokenService.generateParentTokens(parent.id);
 
-    // Store refresh token session
+    // Get the token family ID from the generated token
+    const tokenPayload = tokenService.verifyRefreshToken(tokens.refreshToken);
+    const tokenFamilyId = tokenPayload.fid || tokenService.generateTokenFamilyId();
+
+    // Store refresh token session with hashed token
     await sessionService.createSession({
       userId: parent.id,
       type: 'parent',
       refreshTokenId: tokens.refreshTokenId,
+      refreshTokenHash: tokens.refreshTokenHash,
+      tokenFamilyId,
     });
 
     logger.info(`Email verified and logged in for ${email}`);
