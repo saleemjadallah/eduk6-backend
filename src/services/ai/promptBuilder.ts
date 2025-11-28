@@ -219,57 +219,52 @@ Use sequential IDs: ex-1, ex-2, ex-3, etc.
 data-type must be one of: MATH_PROBLEM, FILL_IN_BLANK, SHORT_ANSWER, MULTIPLE_CHOICE, TRUE_FALSE
 data-answer contains the correct answer
 
-Extract and return as JSON:
+CRITICAL: You MUST return a valid JSON object with ALL of the following fields. Do NOT omit any field.
+
+Return this EXACT structure (all fields are REQUIRED):
 {
   "title": "A concise, engaging title",
   "summary": "A ${context.ageGroup === 'YOUNG' ? '2-3 sentence' : '3-5 sentence'} summary in simple language",
-  "subject": "MUST be exactly one of: MATH, SCIENCE, ENGLISH, ARABIC, ISLAMIC_STUDIES, SOCIAL_STUDIES, ART, MUSIC, OTHER (detect from content)",
+  "subject": "MUST be exactly one of: MATH, SCIENCE, ENGLISH, ARABIC, ISLAMIC_STUDIES, SOCIAL_STUDIES, ART, MUSIC, OTHER",
   "gradeLevel": "Estimated grade level (K-6)",
-  "formattedContent": "The FULL lesson content rewritten with proper HTML formatting. Use these tags:
-    - <h2> for main section titles/chapters
-    - <h3> for subsections
-    - <p> for paragraphs (wrap all text in paragraphs)
-    - <b> or <strong> for important terms and vocabulary words
-    - <ul> and <li> for bullet lists
-    - <ol> and <li> for numbered lists
-    - <span class='interactive-exercise' ...> for ANY practice problems/questions (CRITICAL!)
-    Make it well-structured, readable, and engaging for children. Include ALL the content from the original, properly organized into clear sections.
-    IMPORTANT: Wrap ALL practice questions/problems with the interactive-exercise span tags!",
-  "exercises": [
-    {
-      "id": "ex-1",
-      "type": "MATH_PROBLEM | FILL_IN_BLANK | SHORT_ANSWER | MULTIPLE_CHOICE | TRUE_FALSE",
-      "questionText": "The exact question/problem text as shown",
-      "expectedAnswer": "The correct answer",
-      "acceptableAnswers": ["alternative valid answers"],
-      "hint1": "A gentle hint",
-      "hint2": "A more specific hint",
-      "explanation": "Why this is the correct answer",
-      "difficulty": "EASY | MEDIUM | HARD"
-    }
-  ],
-  "chapters": [
-    {
-      "title": "Chapter title",
-      "content": "Chapter summary",
-      "keyPoints": ["point 1", "point 2"]
-    }
-  ],
-  "keyConcepts": ["concept1", "concept2", ...],
-  "vocabulary": [
-    {
-      "term": "word",
-      "definition": "simple definition",
-      "example": "example sentence"
-    }
-  ],
-  "suggestedQuestions": ["question1", "question2", ...],
-  "confidence": 0.0-1.0
+  "formattedContent": "REQUIRED! The FULL lesson content as HTML. Rules:
+    - Use <h2> for main sections, <h3> for subsections
+    - Use <p> for all paragraphs
+    - Use <strong> for vocabulary terms
+    - Use <ul>/<ol> and <li> for lists
+    - For ANY practice problems/questions, wrap them like this:
+      <span class='interactive-exercise' data-exercise-id='ex-1' data-type='MATH_PROBLEM' data-answer='THE_ANSWER'>Question text here</span>
+    - Use ex-1, ex-2, ex-3, etc. for data-exercise-id
+    This field MUST contain the full lesson content as formatted HTML!",
+  "exercises": [],
+  "chapters": [],
+  "keyConcepts": [],
+  "vocabulary": [],
+  "suggestedQuestions": [],
+  "confidence": 0.8
 }
 
-Remember: If the content has practice problems or questions, they MUST appear both:
-1. Wrapped with <span class="interactive-exercise"> in formattedContent
-2. Listed in the exercises array with full details`;
+EXERCISES ARRAY RULES:
+- If the content contains practice problems, questions, or fill-in-the-blanks, you MUST include them in the exercises array
+- Each exercise in the array MUST have this structure:
+  {
+    "id": "ex-1",
+    "type": "MATH_PROBLEM",
+    "questionText": "1/2 × 1/4 = ___",
+    "expectedAnswer": "1/8",
+    "acceptableAnswers": ["0.125", "one eighth"],
+    "hint1": "Multiply the numerators, then multiply the denominators",
+    "hint2": "What is 1×1 and 2×4?",
+    "explanation": "When multiplying fractions, multiply top numbers and bottom numbers",
+    "difficulty": "MEDIUM"
+  }
+- Valid types: MATH_PROBLEM, FILL_IN_BLANK, SHORT_ANSWER, MULTIPLE_CHOICE, TRUE_FALSE
+- Valid difficulties: EASY, MEDIUM, HARD
+- The "id" MUST match the data-exercise-id in formattedContent (ex-1, ex-2, etc.)
+
+If there are NO practice problems in the content, return an empty array: "exercises": []
+
+Remember: BOTH formattedContent AND exercises fields are REQUIRED in your response!`;
   }
 
   /**

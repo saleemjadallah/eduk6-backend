@@ -15,6 +15,7 @@ const router = Router();
 
 const submitAnswerSchema = z.object({
   submittedAnswer: z.string().min(1, 'Answer is required'),
+  lessonId: z.string().uuid().optional(), // Required when exerciseId is a marker like "ex-1"
 });
 
 const hintParamSchema = z.object({
@@ -98,6 +99,10 @@ router.get(
  * POST /api/exercises/:exerciseId/submit
  * Submit an answer for validation
  * Works for both child sessions and parents viewing child lessons
+ *
+ * The exerciseId can be either:
+ * - A UUID (database ID)
+ * - An HTML marker ID like "ex-1" (from formattedContent, requires lessonId in body)
  */
 router.post(
   '/:exerciseId/submit',
@@ -106,7 +111,45 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { exerciseId } = req.params;
-      const { submittedAnswer } = req.body;
+      const { submittedAnswer, lessonId } = req.body;
+
+      // Check if exerciseId is a UUID or a marker ID
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const isUUID = uuidPattern.test(exerciseId);
+
+      logger.info('Exercise submit request', {
+        exerciseId,
+        isUUID,
+        lessonId: lessonId || 'not provided',
+        hasChildSession: !!req.child,
+      });
+
+      // Find the exercise - supports both UUID and marker IDs
+      let exercise;
+      if (isUUID) {
+        exercise = await exerciseService.getExerciseWithLesson(exerciseId);
+      } else {
+        // Marker ID like "ex-1" - requires lessonId
+        if (!lessonId) {
+          throw new NotFoundError(
+            'Exercise not found. When using inline exercises, lessonId is required.'
+          );
+        }
+        exercise = await exerciseService.findByOriginalPosition(lessonId, exerciseId);
+        logger.info('Looking up exercise by marker', {
+          lessonId,
+          markerId: exerciseId,
+          found: !!exercise,
+        });
+      }
+
+      if (!exercise) {
+        logger.warn('Exercise not found', { exerciseId, lessonId, isUUID });
+        throw new NotFoundError('Exercise not found');
+      }
+
+      // Get the actual database ID for submitting
+      const actualExerciseId = exercise.id;
 
       // Get child context - either from child session or from exercise's lesson
       let childId = req.child?.id;
@@ -114,14 +157,9 @@ router.post(
 
       if (!childId) {
         // Parent viewing - get child from exercise's lesson
-        const exerciseWithLesson = await exerciseService.getExerciseWithLesson(exerciseId);
-        if (!exerciseWithLesson) {
-          throw new NotFoundError('Exercise not found');
-        }
-
         // Verify parent owns this child
         if (req.parent) {
-          const child = await exerciseService.getChildForExercise(exerciseId, req.parent.id);
+          const child = await exerciseService.getChildForExercise(actualExerciseId, req.parent.id);
           if (!child) {
             throw new ForbiddenError('Access denied to this exercise');
           }
@@ -133,21 +171,22 @@ router.post(
       }
 
       logger.info('Exercise answer submitted', {
-        exerciseId,
+        exerciseId: actualExerciseId,
+        originalId: exerciseId,
         childId,
         answerLength: submittedAnswer.length,
         isParentSession: !req.child,
       });
 
       const result = await exerciseService.submitAnswer(
-        exerciseId,
+        actualExerciseId,
         childId,
         submittedAnswer,
         ageGroup!
       );
 
       logger.info('Exercise answer result', {
-        exerciseId,
+        exerciseId: actualExerciseId,
         childId,
         isCorrect: result.isCorrect,
         attemptNumber: result.attemptNumber,

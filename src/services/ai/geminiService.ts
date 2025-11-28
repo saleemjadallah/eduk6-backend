@@ -305,9 +305,20 @@ export class GeminiService {
     try {
       const jsonText = this.extractJSON(responseText);
       analysis = JSON.parse(jsonText);
+
+      // Log what Gemini returned for debugging exercises issue
+      logger.info('Content analysis parsed successfully', {
+        hasFormattedContent: !!analysis.formattedContent,
+        formattedContentLength: analysis.formattedContent?.length || 0,
+        formattedContentPreview: analysis.formattedContent?.substring(0, 200) || 'NONE',
+        hasExercises: !!analysis.exercises,
+        exerciseCount: analysis.exercises?.length || 0,
+        exerciseIds: analysis.exercises?.map(e => e.id) || [],
+        exerciseTypes: analysis.exercises?.map(e => e.type) || [],
+      });
     } catch (error) {
       logger.error('Failed to parse content analysis response', {
-        responseText: responseText.substring(0, 500), // Log first 500 chars for debugging
+        responseText: responseText.substring(0, 1000), // Log more for debugging
         error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw new Error('Failed to analyze content');

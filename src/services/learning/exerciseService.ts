@@ -225,6 +225,59 @@ export const exerciseService = {
   },
 
   /**
+   * Find exercise by its HTML marker ID (originalPosition like "ex-1")
+   * This is needed when the frontend sends the marker ID instead of database UUID
+   */
+  async findByOriginalPosition(lessonId: string, originalPosition: string) {
+    return prisma.interactiveExercise.findFirst({
+      where: {
+        lessonId,
+        originalPosition,
+      },
+      include: {
+        lesson: true,
+        attempts: {
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+        },
+      },
+    });
+  },
+
+  /**
+   * Find exercise by ID or originalPosition
+   * Tries UUID first, falls back to originalPosition lookup
+   */
+  async findByIdOrMarker(exerciseId: string, lessonId?: string) {
+    // Check if exerciseId looks like a UUID
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const isUUID = uuidPattern.test(exerciseId);
+
+    if (isUUID) {
+      // Look up by UUID
+      return prisma.interactiveExercise.findUnique({
+        where: { id: exerciseId },
+        include: {
+          lesson: true,
+          attempts: {
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+          },
+        },
+      });
+    }
+
+    // Not a UUID - this is an HTML marker ID like "ex-1"
+    // Need lessonId to find the correct exercise
+    if (!lessonId) {
+      logger.warn('Exercise lookup with marker ID requires lessonId', { exerciseId });
+      return null;
+    }
+
+    return this.findByOriginalPosition(lessonId, exerciseId);
+  },
+
+  /**
    * Get child for an exercise, verifying parent ownership
    */
   async getChildForExercise(exerciseId: string, parentId: string) {
