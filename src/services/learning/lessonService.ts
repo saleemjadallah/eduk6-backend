@@ -20,6 +20,7 @@ export interface UpdateLessonParams {
   subject?: Subject;
   summary?: string;
   extractedText?: string;
+  formattedContent?: string; // HTML with embedded interactive exercise markers
   chapters?: Prisma.InputJsonValue;
   keyConcepts?: string[];
   vocabulary?: Prisma.InputJsonValue;
@@ -129,6 +130,7 @@ export const lessonService = {
     if (params.subject !== undefined) data.subject = params.subject;
     if (params.summary !== undefined) data.summary = params.summary;
     if (params.extractedText !== undefined) data.extractedText = params.extractedText;
+    if (params.formattedContent !== undefined) data.formattedContent = params.formattedContent;
     if (params.chapters !== undefined) data.chapters = params.chapters;
     if (params.keyConcepts !== undefined) data.keyConcepts = params.keyConcepts;
     if (params.vocabulary !== undefined) data.vocabulary = params.vocabulary;
