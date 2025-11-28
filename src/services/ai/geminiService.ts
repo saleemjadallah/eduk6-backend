@@ -36,6 +36,7 @@ export interface LessonAnalysis {
   summary: string;
   subject?: string; // Detected subject from content (MATH, SCIENCE, ENGLISH, etc.)
   gradeLevel: string;
+  formattedContent?: string; // HTML content with embedded interactive exercise markers
   chapters?: Array<{
     title: string;
     content: string;
@@ -46,6 +47,17 @@ export interface LessonAnalysis {
     term: string;
     definition: string;
     example?: string;
+  }>;
+  exercises?: Array<{
+    id: string;
+    type: 'MATH_PROBLEM' | 'FILL_IN_BLANK' | 'SHORT_ANSWER' | 'MULTIPLE_CHOICE' | 'TRUE_FALSE';
+    questionText: string;
+    expectedAnswer: string;
+    acceptableAnswers?: string[];
+    hint1?: string;
+    hint2?: string;
+    explanation?: string;
+    difficulty?: 'EASY' | 'MEDIUM' | 'HARD';
   }>;
   suggestedQuestions: string[];
   confidence: number;

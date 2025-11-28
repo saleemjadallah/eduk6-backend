@@ -190,8 +190,9 @@ Return as JSON array:
   ): string {
     const gradeConfig = getGradeLevelConfig(context.gradeLevel ?? (context.ageGroup === 'YOUNG' ? 1 : 4));
     const curriculumGuidance = getCurriculumGuidance(context.curriculumType, context.ageGroup, context.gradeLevel);
+    const ageDesc = context.ageGroup === 'YOUNG' ? 'young child (4-7)' : 'child (8-12)';
 
-    return `Analyze this educational content and extract key information for a ${context.ageGroup === 'YOUNG' ? 'young child (4-7)' : 'child (8-12)'}.
+    return `Analyze this educational content and extract key information for a ${ageDesc}.
 
 Content:
 ${content}
@@ -203,6 +204,20 @@ Language requirements:
 - Vocabulary level: ${gradeConfig.vocabularyTier.replace('_', ' ')}
 
 ${curriculumGuidance}
+
+IMPORTANT - INTERACTIVE EXERCISES:
+Look for ANY existing practice problems, fill-in-blanks, or questions that require student answers in the content:
+- Math problems like "1/2 × 1/3 = ___" or "Solve: 5 + 3 = ?"
+- Fill-in-the-blank questions like "The capital of France is ___"
+- Short answer questions asking students to provide answers
+- Multiple choice questions
+
+When you find these exercises, wrap them with this EXACT format in the formattedContent:
+<span class="interactive-exercise" data-exercise-id="ex-1" data-type="MATH_PROBLEM" data-answer="1/6">1/2 × 1/3 = ___</span>
+
+Use sequential IDs: ex-1, ex-2, ex-3, etc.
+data-type must be one of: MATH_PROBLEM, FILL_IN_BLANK, SHORT_ANSWER, MULTIPLE_CHOICE, TRUE_FALSE
+data-answer contains the correct answer
 
 Extract and return as JSON:
 {
@@ -217,7 +232,22 @@ Extract and return as JSON:
     - <b> or <strong> for important terms and vocabulary words
     - <ul> and <li> for bullet lists
     - <ol> and <li> for numbered lists
-    Make it well-structured, readable, and engaging for children. Include ALL the content from the original, properly organized into clear sections.",
+    - <span class='interactive-exercise' ...> for ANY practice problems/questions (CRITICAL!)
+    Make it well-structured, readable, and engaging for children. Include ALL the content from the original, properly organized into clear sections.
+    IMPORTANT: Wrap ALL practice questions/problems with the interactive-exercise span tags!",
+  "exercises": [
+    {
+      "id": "ex-1",
+      "type": "MATH_PROBLEM | FILL_IN_BLANK | SHORT_ANSWER | MULTIPLE_CHOICE | TRUE_FALSE",
+      "questionText": "The exact question/problem text as shown",
+      "expectedAnswer": "The correct answer",
+      "acceptableAnswers": ["alternative valid answers"],
+      "hint1": "A gentle hint",
+      "hint2": "A more specific hint",
+      "explanation": "Why this is the correct answer",
+      "difficulty": "EASY | MEDIUM | HARD"
+    }
+  ],
   "chapters": [
     {
       "title": "Chapter title",
@@ -235,7 +265,11 @@ Extract and return as JSON:
   ],
   "suggestedQuestions": ["question1", "question2", ...],
   "confidence": 0.0-1.0
-}`;
+}
+
+Remember: If the content has practice problems or questions, they MUST appear both:
+1. Wrapped with <span class="interactive-exercise"> in formattedContent
+2. Listed in the exercises array with full details`;
   }
 
   /**

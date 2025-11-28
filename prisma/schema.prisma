@@ -145,6 +145,7 @@ model Lesson {
 
   // AI-processed content
   extractedText    String?  @db.Text
+  formattedContent String?  @db.Text // HTML with embedded interactive exercise markers
   chapters         Json?    // Array of chapter objects
   keyConcepts      String[] // For chat context
   vocabulary       Json?    // Array of {term, definition, example}

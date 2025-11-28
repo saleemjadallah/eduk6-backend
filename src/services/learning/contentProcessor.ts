@@ -123,12 +123,13 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
       subject: lesson?.subject,
     });
 
-    // 4. Update lesson with processed content
+    // 4. Update lesson with processed content (including formattedContent with exercise markers)
     await lessonService.update(lessonId, {
       extractedText,
       title: analysis.title || lesson?.title,
       summary: analysis.summary,
       gradeLevel: analysis.gradeLevel,
+      formattedContent: analysis.formattedContent, // HTML with embedded exercise markers
       // Cast arrays to JSON-compatible format for Prisma
       chapters: analysis.chapters ? JSON.parse(JSON.stringify(analysis.chapters)) : undefined,
       keyConcepts: analysis.keyConcepts,
@@ -139,24 +140,31 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
       safetyReviewed: true,
     });
 
-    // 5. Detect and create interactive exercises from the content
+    // 5. Create interactive exercises from the analysis (exercises are now embedded in formattedContent)
     try {
-      const detectedExercises = await geminiService.detectExercises(extractedText, {
-        ageGroup,
-        curriculumType,
-        gradeLevel,
-        subject: lesson?.subject,
-      });
+      if (analysis.exercises && analysis.exercises.length > 0) {
+        // Convert analysis exercises to DetectedExercise format
+        const detectedExercises = analysis.exercises.map(ex => ({
+          type: ex.type as any,
+          questionText: ex.questionText,
+          expectedAnswer: ex.expectedAnswer,
+          acceptableAnswers: ex.acceptableAnswers,
+          hint1: ex.hint1,
+          hint2: ex.hint2,
+          explanation: ex.explanation,
+          difficulty: ex.difficulty as any,
+          // Store the exercise ID from the HTML markers for frontend matching
+          originalPosition: ex.id,
+        }));
 
-      if (detectedExercises.length > 0) {
         await exerciseService.createExercisesForLesson(lessonId, detectedExercises);
-        logger.info(`Created ${detectedExercises.length} interactive exercises for lesson ${lessonId}`);
+        logger.info(`Created ${detectedExercises.length} inline interactive exercises for lesson ${lessonId}`);
       } else {
-        logger.info(`No interactive exercises detected in lesson ${lessonId}`);
+        logger.info(`No interactive exercises found in lesson ${lessonId}`);
       }
     } catch (exerciseError) {
-      // Don't fail the whole processing if exercise detection fails
-      logger.error(`Failed to detect exercises for lesson ${lessonId}`, {
+      // Don't fail the whole processing if exercise creation fails
+      logger.error(`Failed to create exercises for lesson ${lessonId}`, {
         error: exerciseError instanceof Error ? exerciseError.message : 'Unknown error',
       });
     }
