@@ -87,6 +87,7 @@ model Child {
   streak           Streak?
   safetyLogs       SafetyLog[]
   textSelections   TextSelection[]
+  exerciseAttempts ExerciseAttempt[]
 
   // Timestamps
   createdAt        DateTime @default(now())
@@ -163,6 +164,7 @@ model Lesson {
   flashcardDecks   FlashcardDeck[]
   quizzes          Quiz[]
   textSelections   TextSelection[]
+  exercises        InteractiveExercise[]
 
   // Progress
   percentComplete  Float    @default(0)
@@ -460,6 +462,66 @@ model TextSelection {
 }
 
 // ============================================
+// INTERACTIVE EXERCISES
+// ============================================
+
+model InteractiveExercise {
+  id               String   @id @default(uuid())
+  lessonId         String
+  lesson           Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  // Exercise identification
+  type             ExerciseType
+  orderIndex       Int      @default(0)
+
+  // Content
+  questionText     String   @db.Text        // "1/2 × 1/4 = ___"
+  contextText      String?  @db.Text        // Surrounding text for context
+  originalPosition String?                   // Reference to position in source
+
+  // Answer data
+  expectedAnswer   String   @db.Text        // "1/8"
+  acceptableAnswers String[]                 // ["0.125", "one eighth"]
+  answerType       AnswerType @default(TEXT) // TEXT, NUMBER, SELECTION
+  options          Json?                     // For multiple choice: ["Option A", "Option B", ...]
+
+  // Hints and guidance
+  hint1            String?  @db.Text        // First hint after wrong attempt
+  hint2            String?  @db.Text        // Second hint
+  explanation      String?  @db.Text        // Shown after correct/max attempts
+
+  // Metadata
+  difficulty       ExerciseDifficulty @default(MEDIUM)
+  xpReward         Int      @default(10)
+
+  // Relations
+  attempts         ExerciseAttempt[]
+
+  createdAt        DateTime @default(now())
+
+  @@index([lessonId, orderIndex])
+}
+
+model ExerciseAttempt {
+  id               String   @id @default(uuid())
+  exerciseId       String
+  exercise         InteractiveExercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  childId          String
+  child            Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  submittedAnswer  String   @db.Text
+  isCorrect        Boolean
+  attemptNumber    Int      @default(1)
+  aiFeedback       String?  @db.Text        // Jeffrey's personalized feedback
+  xpAwarded        Int      @default(0)
+
+  createdAt        DateTime @default(now())
+
+  @@index([exerciseId, childId])
+  @@index([childId, createdAt])
+}
+
+// ============================================
 // SAFETY & MONITORING
 // ============================================
 
@@ -599,6 +661,8 @@ enum XPReason {
   BADGE_EARNED
   FIRST_OF_DAY
   TEXT_SELECTION
+  EXERCISE_CORRECT
+  EXERCISE_PERFECT
 }
 
 enum BadgeCategory {
@@ -647,4 +711,24 @@ enum SafetySeverity {
   MEDIUM
   HIGH
   CRITICAL
+}
+
+enum ExerciseType {
+  FILL_IN_BLANK
+  MATH_PROBLEM
+  SHORT_ANSWER
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+}
+
+enum AnswerType {
+  TEXT
+  NUMBER
+  SELECTION
+}
+
+enum ExerciseDifficulty {
+  EASY
+  MEDIUM
+  HARD
 }

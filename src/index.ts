@@ -26,6 +26,7 @@ import chatRoutes from './routes/chat.routes.js';
 import flashcardRoutes from './routes/flashcard.routes.js';
 import quizRoutes from './routes/quiz.routes.js';
 import aiRoutes from './routes/ai.routes.js';
+import exerciseRoutes from './routes/exercise.routes.js';
 
 // Services initialization
 import { initializeContentProcessor, shutdownContentProcessor } from './services/learning/contentProcessor.js';
@@ -121,6 +122,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/exercises', exerciseRoutes);
 
 // TODO: Add remaining routes as they're implemented
 // app.use('/api/gamification', gamificationRoutes);

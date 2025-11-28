@@ -1,0 +1,206 @@
+// Exercise routes for interactive lesson exercises
+import { Router, Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
+import { authenticate } from '../middleware/auth.js';
+import { validateInput } from '../middleware/validateInput.js';
+import { exerciseService } from '../services/learning/exerciseService.js';
+import { logger } from '../utils/logger.js';
+import { NotFoundError, ForbiddenError } from '../middleware/errorHandler.js';
+
+const router = Router();
+
+// ============================================
+// SCHEMAS
+// ============================================
+
+const submitAnswerSchema = z.object({
+  submittedAnswer: z.string().min(1, 'Answer is required'),
+});
+
+const hintParamSchema = z.object({
+  exerciseId: z.string().uuid(),
+  hintNumber: z.enum(['1', '2']),
+});
+
+// ============================================
+// ROUTES
+// ============================================
+
+/**
+ * GET /api/exercises/lesson/:lessonId
+ * Get all exercises for a lesson with completion status
+ */
+router.get(
+  '/lesson/:lessonId',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { lessonId } = req.params;
+
+      // Must be authenticated as a child
+      if (!req.child) {
+        throw new ForbiddenError('Child authentication required');
+      }
+
+      const exercises = await exerciseService.getExercisesForLesson(
+        lessonId,
+        req.child.id
+      );
+
+      logger.info('Fetched exercises for lesson', {
+        lessonId,
+        childId: req.child.id,
+        exerciseCount: exercises.length,
+        completedCount: exercises.filter(e => e.isCompleted).length,
+      });
+
+      res.json({
+        success: true,
+        data: exercises,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /api/exercises/:exerciseId
+ * Get a single exercise (hides answer until completed)
+ */
+router.get(
+  '/:exerciseId',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { exerciseId } = req.params;
+
+      if (!req.child) {
+        throw new ForbiddenError('Child authentication required');
+      }
+
+      const exercise = await exerciseService.getExerciseForChild(
+        exerciseId,
+        req.child.id
+      );
+
+      res.json({
+        success: true,
+        data: exercise,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /api/exercises/:exerciseId/submit
+ * Submit an answer for validation
+ */
+router.post(
+  '/:exerciseId/submit',
+  authenticate,
+  validateInput(submitAnswerSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { exerciseId } = req.params;
+      const { submittedAnswer } = req.body;
+
+      if (!req.child) {
+        throw new ForbiddenError('Child authentication required');
+      }
+
+      logger.info('Exercise answer submitted', {
+        exerciseId,
+        childId: req.child.id,
+        answerLength: submittedAnswer.length,
+      });
+
+      const result = await exerciseService.submitAnswer(
+        exerciseId,
+        req.child.id,
+        submittedAnswer,
+        req.child.ageGroup
+      );
+
+      logger.info('Exercise answer result', {
+        exerciseId,
+        childId: req.child.id,
+        isCorrect: result.isCorrect,
+        attemptNumber: result.attemptNumber,
+        xpAwarded: result.xpAwarded,
+      });
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /api/exercises/:exerciseId/hint/:hintNumber
+ * Get a specific hint for an exercise
+ */
+router.get(
+  '/:exerciseId/hint/:hintNumber',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { exerciseId, hintNumber } = req.params;
+
+      if (!req.child) {
+        throw new ForbiddenError('Child authentication required');
+      }
+
+      // Validate hint number
+      if (hintNumber !== '1' && hintNumber !== '2') {
+        throw new NotFoundError('Invalid hint number');
+      }
+
+      const hint = await exerciseService.getHint(
+        exerciseId,
+        req.child.id,
+        parseInt(hintNumber) as 1 | 2
+      );
+
+      res.json({
+        success: true,
+        data: { hint },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /api/exercises/stats
+ * Get exercise statistics for the current child
+ */
+router.get(
+  '/stats/me',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.child) {
+        throw new ForbiddenError('Child authentication required');
+      }
+
+      const stats = await exerciseService.getStatsForChild(req.child.id);
+
+      res.json({
+        success: true,
+        data: stats,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+export default router;

@@ -4,6 +4,7 @@ import { createBullConnection } from '../../config/redis.js';
 import { prisma } from '../../config/database.js';
 import { geminiService } from '../ai/geminiService.js';
 import { lessonService } from './lessonService.js';
+import { exerciseService } from './exerciseService.js';
 import { AgeGroup, SourceType } from '@prisma/client';
 import { logger } from '../../utils/logger.js';
 
@@ -137,6 +138,28 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
       processingStatus: 'COMPLETED',
       safetyReviewed: true,
     });
+
+    // 5. Detect and create interactive exercises from the content
+    try {
+      const detectedExercises = await geminiService.detectExercises(extractedText, {
+        ageGroup,
+        curriculumType,
+        gradeLevel,
+        subject: lesson?.subject,
+      });
+
+      if (detectedExercises.length > 0) {
+        await exerciseService.createExercisesForLesson(lessonId, detectedExercises);
+        logger.info(`Created ${detectedExercises.length} interactive exercises for lesson ${lessonId}`);
+      } else {
+        logger.info(`No interactive exercises detected in lesson ${lessonId}`);
+      }
+    } catch (exerciseError) {
+      // Don't fail the whole processing if exercise detection fails
+      logger.error(`Failed to detect exercises for lesson ${lessonId}`, {
+        error: exerciseError instanceof Error ? exerciseError.message : 'Unknown error',
+      });
+    }
 
     logger.info(`Successfully processed lesson ${lessonId}`);
   } catch (error) {

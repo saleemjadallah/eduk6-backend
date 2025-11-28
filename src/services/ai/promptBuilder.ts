@@ -336,6 +336,150 @@ Lesson context:
 
 Respond as Jeffrey, the friendly learning buddy. Be encouraging and helpful!`;
   }
+
+  /**
+   * Build prompt for detecting interactive exercises in lesson content
+   * Identifies fill-in-blanks, math problems, practice questions, etc.
+   */
+  buildExerciseDetectionPrompt(
+    content: string,
+    context: {
+      ageGroup: AgeGroup;
+      curriculumType?: CurriculumType | null;
+      gradeLevel?: number | null;
+      subject?: Subject | null;
+    }
+  ): string {
+    const ageDesc = context.ageGroup === 'YOUNG'
+      ? 'young child (ages 4-7)'
+      : 'child (ages 8-12)';
+
+    const gradeConfig = getGradeLevelConfig(context.gradeLevel ?? (context.ageGroup === 'YOUNG' ? 1 : 4));
+
+    return `Analyze this educational content and detect any EXISTING practice exercises, problems, or questions that require student answers.
+
+Content:
+${content}
+
+Target audience: ${ageDesc}
+Subject hint: ${context.subject || 'Unknown'}
+
+IMPORTANT: You are NOT generating new questions. You are DETECTING exercises that already exist in the content.
+
+Look for:
+1. FILL_IN_BLANK: Questions with blanks like "___", "_____", or "______" that need to be filled
+2. MATH_PROBLEM: Math equations to solve (e.g., "1/2 × 1/4 = ___", "5 + 3 = ?", "Solve: 12 ÷ 4")
+3. SHORT_ANSWER: Open-ended questions asking for brief text answers
+4. MULTIPLE_CHOICE: Questions with lettered or numbered options (A, B, C, D or 1, 2, 3, 4)
+5. TRUE_FALSE: Statements asking true or false
+
+For each exercise detected, extract:
+- The exact question/problem text
+- The correct answer (calculate it if it's a math problem)
+- Alternative acceptable answers (different formats, spellings, etc.)
+- Context from surrounding text
+- Difficulty level based on the child's grade
+
+Create helpful hints that guide without giving away the answer:
+- hint1: A gentle nudge in the right direction
+- hint2: More specific guidance, still not the answer
+
+Create an explanation that teaches WHY the answer is correct.
+
+Return as JSON array (return empty array [] if no exercises found):
+[
+  {
+    "type": "FILL_IN_BLANK" | "MATH_PROBLEM" | "SHORT_ANSWER" | "MULTIPLE_CHOICE" | "TRUE_FALSE",
+    "questionText": "The exact question or problem text",
+    "contextText": "Surrounding context (1-2 sentences before/after)",
+    "originalPosition": "Description of where this appears (e.g., 'Set A, Question 1')",
+    "expectedAnswer": "The correct answer",
+    "acceptableAnswers": ["Alternative valid answers", "like different formats"],
+    "answerType": "TEXT" | "NUMBER" | "SELECTION",
+    "options": ["A) Option 1", "B) Option 2"] // Only for MULTIPLE_CHOICE
+    "hint1": "A gentle hint that guides thinking",
+    "hint2": "A more specific hint",
+    "explanation": "Clear explanation of why this is the answer, written for a ${ageDesc}",
+    "difficulty": "EASY" | "MEDIUM" | "HARD"
+  }
+]
+
+Language requirements for hints and explanations:
+- Maximum sentence length: ${gradeConfig.maxSentenceLength} words
+- Use encouraging, child-friendly language
+- For YOUNG children: Very simple words, short sentences
+- For OLDER children: Can use grade-appropriate vocabulary
+
+Remember: Only detect exercises that ALREADY EXIST in the content. Do not create new ones.`;
+  }
+
+  /**
+   * Build prompt for validating a student's answer with AI
+   * Returns whether the answer is correct and personalized feedback
+   */
+  buildExerciseValidationPrompt(
+    exercise: {
+      questionText: string;
+      expectedAnswer: string;
+      acceptableAnswers: string[];
+      answerType: string;
+      type: string;
+    },
+    submittedAnswer: string,
+    attemptNumber: number,
+    ageGroup: AgeGroup
+  ): string {
+    const isYoung = ageGroup === 'YOUNG';
+
+    return `You are Jeffrey, a friendly AI learning buddy. A child submitted an answer to this exercise.
+
+EXERCISE:
+Question: ${exercise.questionText}
+Expected Answer: ${exercise.expectedAnswer}
+Also Acceptable: ${exercise.acceptableAnswers.join(', ') || 'None'}
+Answer Type: ${exercise.answerType}
+Exercise Type: ${exercise.type}
+
+STUDENT'S ANSWER: "${submittedAnswer}"
+
+ATTEMPT NUMBER: ${attemptNumber}
+
+Determine if the answer is CORRECT using these rules:
+1. For math: Accept equivalent forms (1/8 = 0.125 = "one eighth")
+2. For text: Accept minor typos, different capitalizations
+3. For numbers: Accept with or without units if meaning is clear
+4. Be reasonably flexible - we want to recognize understanding, not penalize formatting
+
+Return JSON:
+{
+  "isCorrect": true or false,
+  "confidence": 0.0 to 1.0,
+  "feedback": "Your response to the child"
+}
+
+FEEDBACK GUIDELINES for ${isYoung ? 'YOUNG children (4-7)' : 'OLDER children (8-12)'}:
+
+If CORRECT:
+${isYoung
+  ? '- Use excited, celebratory language: "Yay! You did it! 🎉", "Wow, you\'re so smart!", "Amazing job!"'
+  : '- Use encouraging, warm language: "Excellent work!", "That\'s exactly right!", "Great job!"'
+}
+- Keep it brief (1-2 sentences)
+- Be enthusiastic but not over-the-top
+
+If INCORRECT:
+${attemptNumber >= 3
+  ? `- This is their last attempt, so be gentle: "That's okay! The answer is ${exercise.expectedAnswer}. [Brief explanation of why]"`
+  : isYoung
+    ? '- Be very gentle: "Hmm, not quite! Let\'s try again!", "Almost! Think about..."'
+    : '- Be supportive: "Not quite, but good thinking! Try again.", "Close! Remember that..."'
+}
+- ${attemptNumber < 3 ? 'Do NOT reveal the answer yet' : ''}
+- Give a subtle nudge toward the right answer
+- Keep it short (1-2 sentences)
+
+Keep feedback SHORT and ${isYoung ? 'very simple' : 'clear'}. Max 2 sentences.`;
+  }
 }
 
 export const promptBuilder = new PromptBuilder();

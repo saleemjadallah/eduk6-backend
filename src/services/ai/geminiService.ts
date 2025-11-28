@@ -83,6 +83,27 @@ export interface TranslationResult {
   simpleExplanation?: string; // Kid-friendly explanation of the word/phrase
 }
 
+export interface DetectedExercise {
+  type: 'FILL_IN_BLANK' | 'MATH_PROBLEM' | 'SHORT_ANSWER' | 'MULTIPLE_CHOICE' | 'TRUE_FALSE';
+  questionText: string;
+  contextText?: string;
+  originalPosition?: string;
+  expectedAnswer: string;
+  acceptableAnswers?: string[];
+  answerType?: 'TEXT' | 'NUMBER' | 'SELECTION';
+  options?: string[];
+  hint1?: string;
+  hint2?: string;
+  explanation?: string;
+  difficulty?: 'EASY' | 'MEDIUM' | 'HARD';
+}
+
+export interface ExerciseValidationResult {
+  isCorrect: boolean;
+  confidence: number;
+  feedback: string;
+}
+
 export class GeminiService {
   /**
    * Chat with Jeffrey AI tutor
@@ -513,6 +534,211 @@ Requirements:
       logger.error('Failed to parse translation response', { responseText });
       throw new Error('Failed to translate text');
     }
+  }
+
+  /**
+   * Detect interactive exercises in lesson content
+   * Scans content for fill-in-blanks, math problems, practice questions, etc.
+   */
+  async detectExercises(
+    content: string,
+    context: {
+      ageGroup: AgeGroup;
+      curriculumType?: CurriculumType | null;
+      gradeLevel?: number | null;
+      subject?: Subject | null;
+    }
+  ): Promise<DetectedExercise[]> {
+    const prompt = promptBuilder.buildExerciseDetectionPrompt(content, context);
+
+    logger.info('Detecting exercises in content', {
+      contentLength: content.length,
+      ageGroup: context.ageGroup,
+      subject: context.subject,
+    });
+
+    const model = genAI.getGenerativeModel({
+      model: config.gemini.models.pro, // Use Pro for best detection accuracy
+      safetySettings: CHILD_SAFETY_SETTINGS,
+      generationConfig: {
+        temperature: 0.3, // Lower temperature for more consistent detection
+        maxOutputTokens: 4000,
+        responseMimeType: 'application/json',
+      },
+    });
+
+    try {
+      const result = await model.generateContent(prompt);
+      const responseText = result.response.text();
+
+      const exercises = JSON.parse(responseText) as DetectedExercise[];
+
+      logger.info(`Detected ${exercises.length} exercises in content`, {
+        exerciseTypes: exercises.map(e => e.type),
+      });
+
+      // Validate and clean up the exercises
+      return exercises.filter(ex =>
+        ex.questionText &&
+        ex.expectedAnswer &&
+        ex.type
+      );
+    } catch (error) {
+      logger.error('Failed to detect exercises', { error });
+      // Return empty array on error - don't fail the whole content processing
+      return [];
+    }
+  }
+
+  /**
+   * Validate a student's answer to an exercise using AI
+   * Provides flexible matching and personalized feedback
+   */
+  async validateExerciseAnswer(
+    exercise: {
+      questionText: string;
+      expectedAnswer: string;
+      acceptableAnswers: string[];
+      answerType: string;
+      type: string;
+    },
+    submittedAnswer: string,
+    attemptNumber: number,
+    ageGroup: AgeGroup
+  ): Promise<ExerciseValidationResult> {
+    // First, try simple matching for fast response
+    const simpleMatch = this.checkSimpleMatch(
+      submittedAnswer,
+      exercise.expectedAnswer,
+      exercise.acceptableAnswers
+    );
+
+    if (simpleMatch) {
+      // Exact or close match - skip AI call for faster response
+      const feedback = ageGroup === 'YOUNG'
+        ? 'Yay! You got it right! Great job!'
+        : 'Excellent! That\'s correct!';
+
+      return {
+        isCorrect: true,
+        confidence: 1.0,
+        feedback,
+      };
+    }
+
+    // Use AI for more flexible validation
+    const prompt = promptBuilder.buildExerciseValidationPrompt(
+      exercise,
+      submittedAnswer,
+      attemptNumber,
+      ageGroup
+    );
+
+    logger.info('Validating exercise answer with AI', {
+      exerciseType: exercise.type,
+      attemptNumber,
+      ageGroup,
+    });
+
+    const model = genAI.getGenerativeModel({
+      model: config.gemini.models.flash, // Use Flash for faster validation
+      safetySettings: CHILD_SAFETY_SETTINGS,
+      generationConfig: {
+        temperature: 0.2, // Low temperature for consistent evaluation
+        maxOutputTokens: 300,
+        responseMimeType: 'application/json',
+      },
+    });
+
+    try {
+      const result = await model.generateContent(prompt);
+      const responseText = result.response.text();
+      const validation = JSON.parse(responseText) as ExerciseValidationResult;
+
+      logger.info('AI validation result', {
+        isCorrect: validation.isCorrect,
+        confidence: validation.confidence,
+      });
+
+      return validation;
+    } catch (error) {
+      logger.error('Failed to validate answer with AI', { error });
+
+      // Fallback: strict comparison
+      const isCorrect = submittedAnswer.toLowerCase().trim() ===
+        exercise.expectedAnswer.toLowerCase().trim();
+
+      return {
+        isCorrect,
+        confidence: 0.5,
+        feedback: isCorrect
+          ? 'That looks right!'
+          : 'Hmm, that\'s not quite right. Try again!',
+      };
+    }
+  }
+
+  /**
+   * Simple string matching for fast answer validation
+   * Returns true if exact or close match, false if needs AI
+   */
+  private checkSimpleMatch(
+    submitted: string,
+    expected: string,
+    acceptable: string[]
+  ): boolean {
+    const normalizedSubmitted = submitted.toLowerCase().trim();
+    const normalizedExpected = expected.toLowerCase().trim();
+
+    // Exact match
+    if (normalizedSubmitted === normalizedExpected) {
+      return true;
+    }
+
+    // Check acceptable answers
+    for (const alt of acceptable) {
+      if (normalizedSubmitted === alt.toLowerCase().trim()) {
+        return true;
+      }
+    }
+
+    // Number comparison (handles "1/8" vs "0.125")
+    try {
+      const submittedNum = this.parseNumber(normalizedSubmitted);
+      const expectedNum = this.parseNumber(normalizedExpected);
+
+      if (submittedNum !== null && expectedNum !== null) {
+        // Allow small floating point tolerance
+        if (Math.abs(submittedNum - expectedNum) < 0.0001) {
+          return true;
+        }
+      }
+    } catch {
+      // Not a number comparison
+    }
+
+    return false;
+  }
+
+  /**
+   * Parse a string to a number, handling fractions
+   */
+  private parseNumber(str: string): number | null {
+    // Handle fractions like "1/8"
+    if (str.includes('/')) {
+      const parts = str.split('/');
+      if (parts.length === 2) {
+        const num = parseFloat(parts[0]);
+        const denom = parseFloat(parts[1]);
+        if (!isNaN(num) && !isNaN(denom) && denom !== 0) {
+          return num / denom;
+        }
+      }
+    }
+
+    // Handle regular numbers
+    const num = parseFloat(str);
+    return isNaN(num) ? null : num;
   }
 
   /**
