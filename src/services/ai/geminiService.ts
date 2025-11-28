@@ -805,10 +805,25 @@ Requirements:
       return [];
     }
 
-    return messages.map((msg) => ({
+    // Format messages
+    const formatted = messages.map((msg) => ({
       role: msg.role === 'USER' ? 'user' : 'model',
       parts: [{ text: msg.content }],
     }));
+
+    // Gemini requires history to start with 'user' role
+    // If first message is from 'model', skip it (or prepend a user greeting)
+    if (formatted.length > 0 && formatted[0].role === 'model') {
+      // Skip leading model messages until we find a user message
+      const firstUserIndex = formatted.findIndex(m => m.role === 'user');
+      if (firstUserIndex === -1) {
+        // No user messages at all - return empty history
+        return [];
+      }
+      return formatted.slice(firstUserIndex);
+    }
+
+    return formatted;
   }
 
   /**
