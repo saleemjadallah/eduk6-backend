@@ -46,11 +46,12 @@ router.get('/dashboard', authenticate, async (req, res, next) => {
     today.setHours(0, 0, 0, 0);
 
     // Get lessons completed today across all children
+    // Use createdAt since lessons are processed immediately after creation
     const lessonsCompletedToday = await prisma.lesson.count({
       where: {
         child: { parentId },
         processingStatus: 'COMPLETED',
-        updatedAt: { gte: today },
+        createdAt: { gte: today },
       },
     });
 
@@ -60,12 +61,8 @@ router.get('/dashboard', authenticate, async (req, res, next) => {
         const lessonsCount = child.lessons.length;
         totalLessons += lessonsCount;
 
-        const streakInfo = child.streak
-          ? {
-              current: child.streak.current,
-              longest: child.streak.longest,
-            }
-          : { current: 0, longest: 0 };
+        // Use streakService to get properly validated streak info
+        const streakInfo = await streakService.getStreakInfo(child.id);
 
         if (streakInfo.current > longestStreak) {
           longestStreak = streakInfo.current;
@@ -89,6 +86,9 @@ router.get('/dashboard', authenticate, async (req, res, next) => {
           lessonsCompleted: 0,
         };
 
+        // Check activity based on streak service or child's lastActiveAt
+        const isActiveToday = streakInfo.isActiveToday || wasActiveToday;
+
         return {
           id: child.id,
           displayName: child.displayName,
@@ -99,12 +99,12 @@ router.get('/dashboard', authenticate, async (req, res, next) => {
           lessonsCompleted: lessonsCount,
           currentStreak: streakInfo.current,
           longestStreak: streakInfo.longest,
-          lastActive: wasActiveToday
+          lastActive: isActiveToday
             ? 'Today'
             : child.lastActiveAt
               ? formatTimeAgo(child.lastActiveAt)
               : 'Never',
-          wasActiveToday,
+          wasActiveToday: isActiveToday,
           xp: progress.totalXP,
           level: progress.level,
           recentBadges: child.earnedBadges.map((eb) => ({
@@ -122,6 +122,7 @@ router.get('/dashboard', authenticate, async (req, res, next) => {
     // Calculate weekly progress (lessons completed this week / weekly goal)
     const weekStart = new Date(today);
     weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Start of week (Sunday)
+    weekStart.setHours(0, 0, 0, 0);
 
     const lessonsThisWeek = await prisma.lesson.count({
       where: {

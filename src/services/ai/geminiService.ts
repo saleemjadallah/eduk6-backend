@@ -106,6 +106,38 @@ export interface ExerciseValidationResult {
 
 export class GeminiService {
   /**
+   * Extract JSON from a response that might contain markdown code blocks or extra text
+   */
+  private extractJSON(text: string): string {
+    // First, try to parse as-is (in case it's already clean JSON)
+    try {
+      JSON.parse(text);
+      return text;
+    } catch {
+      // Continue to extraction logic
+    }
+
+    // Try to extract JSON from markdown code blocks
+    const jsonBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonBlockMatch) {
+      return jsonBlockMatch[1].trim();
+    }
+
+    // Try to find JSON array or object in the text
+    const jsonArrayMatch = text.match(/\[[\s\S]*\]/);
+    const jsonObjectMatch = text.match(/\{[\s\S]*\}/);
+
+    // Prefer the longer match (more complete JSON)
+    if (jsonArrayMatch && jsonObjectMatch) {
+      return jsonArrayMatch[0].length > jsonObjectMatch[0].length
+        ? jsonArrayMatch[0]
+        : jsonObjectMatch[0];
+    }
+
+    return jsonArrayMatch?.[0] || jsonObjectMatch?.[0] || text;
+  }
+
+  /**
    * Chat with Jeffrey AI tutor
    * Now supports curriculum-aware teaching style personalization
    */
@@ -259,9 +291,13 @@ export class GeminiService {
 
     let analysis: LessonAnalysis;
     try {
-      analysis = JSON.parse(responseText);
+      const jsonText = this.extractJSON(responseText);
+      analysis = JSON.parse(jsonText);
     } catch (error) {
-      logger.error('Failed to parse content analysis response', { responseText });
+      logger.error('Failed to parse content analysis response', {
+        responseText: responseText.substring(0, 500), // Log first 500 chars for debugging
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
       throw new Error('Failed to analyze content');
     }
 
@@ -304,9 +340,13 @@ export class GeminiService {
     const responseText = result.response.text();
 
     try {
-      return JSON.parse(responseText);
+      const jsonText = this.extractJSON(responseText);
+      return JSON.parse(jsonText);
     } catch (error) {
-      logger.error('Failed to parse flashcard response', { responseText });
+      logger.error('Failed to parse flashcard response', {
+        responseText: responseText.substring(0, 500),
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
       throw new Error('Failed to generate flashcards');
     }
   }
@@ -341,9 +381,13 @@ export class GeminiService {
     const responseText = result.response.text();
 
     try {
-      return JSON.parse(responseText);
+      const jsonText = this.extractJSON(responseText);
+      return JSON.parse(jsonText);
     } catch (error) {
-      logger.error('Failed to parse quiz response', { responseText });
+      logger.error('Failed to parse quiz response', {
+        responseText: responseText.substring(0, 500),
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
       throw new Error('Failed to generate quiz');
     }
   }
@@ -522,7 +566,8 @@ Requirements:
     });
 
     try {
-      const parsed = JSON.parse(responseText);
+      const jsonText = this.extractJSON(responseText);
+      const parsed = JSON.parse(jsonText);
       return {
         originalText: text,
         translatedText: parsed.translatedText,
@@ -531,7 +576,10 @@ Requirements:
         simpleExplanation: parsed.simpleExplanation || undefined,
       };
     } catch (error) {
-      logger.error('Failed to parse translation response', { responseText });
+      logger.error('Failed to parse translation response', {
+        responseText: responseText.substring(0, 500),
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
       throw new Error('Failed to translate text');
     }
   }
@@ -571,7 +619,8 @@ Requirements:
       const result = await model.generateContent(prompt);
       const responseText = result.response.text();
 
-      const exercises = JSON.parse(responseText) as DetectedExercise[];
+      const jsonText = this.extractJSON(responseText);
+      const exercises = JSON.parse(jsonText) as DetectedExercise[];
 
       logger.info(`Detected ${exercises.length} exercises in content`, {
         exerciseTypes: exercises.map(e => e.type),
@@ -584,7 +633,9 @@ Requirements:
         ex.type
       );
     } catch (error) {
-      logger.error('Failed to detect exercises', { error });
+      logger.error('Failed to detect exercises', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
       // Return empty array on error - don't fail the whole content processing
       return [];
     }
@@ -653,7 +704,8 @@ Requirements:
     try {
       const result = await model.generateContent(prompt);
       const responseText = result.response.text();
-      const validation = JSON.parse(responseText) as ExerciseValidationResult;
+      const jsonText = this.extractJSON(responseText);
+      const validation = JSON.parse(jsonText) as ExerciseValidationResult;
 
       logger.info('AI validation result', {
         isCorrect: validation.isCorrect,
@@ -662,7 +714,9 @@ Requirements:
 
       return validation;
     } catch (error) {
-      logger.error('Failed to validate answer with AI', { error });
+      logger.error('Failed to validate answer with AI', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
 
       // Fallback: strict comparison
       const isCorrect = submittedAnswer.toLowerCase().trim() ===
