@@ -39,23 +39,42 @@ router.post(
         style,
       });
 
-      // Build the enhanced prompt with style guidelines
+      // Build the enhanced prompt following Gemini best practices:
+      // 1. Use natural language & full sentences (not tag soup)
+      // 2. Be specific and descriptive (subject, setting, lighting, mood, materiality)
+      // 3. Provide context (the "why" or "for whom")
+
       const styleGuide: Record<string, string> = {
-        cartoon: 'in a fun cartoon style with bold outlines and bright colors',
-        illustration: 'as a clean, modern illustration with soft gradients',
-        educational: 'as an educational infographic with clear visuals',
-        playful: 'in a playful, child-friendly style with warm, inviting colors',
+        cartoon: `as a polished cartoon illustration with bold black outlines, smooth cel-shading, and vibrant saturated colors. The style should be reminiscent of modern animated films like Pixar or DreamWorks, with expressive characters and dynamic poses. Use clean shapes and avoid messy or sketchy lines.`,
+        illustration: `as a refined digital illustration with soft gradients, subtle shadows, and a harmonious color palette. Think of the elegant style used in award-winning children's book illustrations - sophisticated yet accessible, with careful attention to composition and balance.`,
+        educational: `as a clear, informative educational graphic that balances visual appeal with clarity. Use a style similar to high-quality textbook illustrations or museum exhibit graphics - accurate, detailed, and engaging. Include visual hierarchy that guides the eye through the information.`,
+        playful: `as a warm, inviting illustration that feels like a cozy children's book. Use soft, rounded shapes, gentle gradients, and a comforting color palette of pastels mixed with cheerful accent colors. Every element should feel friendly, approachable, and full of wonder.`,
       };
 
       const selectedStyle = style || 'playful';
-      const enhancedPrompt = `${prompt}. Create this ${styleGuide[selectedStyle]}.
+      const enhancedPrompt = `Create an illustration for the landing page of an educational learning platform for children. This image will help parents and children understand that learning can be fun and engaging.
 
-Style requirements:
-- Child-safe and appropriate for all ages
-- Bright, cheerful color palette
-- NO text or words in the image
-- High quality, detailed artwork
-- Welcoming and positive mood`;
+SUBJECT TO ILLUSTRATE:
+${prompt}
+
+VISUAL STYLE:
+${styleGuide[selectedStyle]}
+
+COMPOSITION & SETTING:
+Create a well-balanced composition with a clear focal point. The scene should feel warm and inviting, like stepping into a beloved classroom or cozy reading nook. Use depth and layering to create visual interest, with the main subject prominently featured.
+
+LIGHTING & ATMOSPHERE:
+Use soft, warm lighting that creates a sense of comfort and positivity. Think of golden hour sunlight streaming through a window, or the warm glow of a well-lit learning space. Avoid harsh shadows or dramatic contrasts that might feel intimidating.
+
+COLOR PALETTE:
+Build a harmonious palette around warm yellows, friendly blues, fresh greens, and gentle oranges. Colors should be vibrant enough to be engaging but not so saturated that they feel overwhelming. The overall impression should be cheerful, professional, and trustworthy.
+
+CRITICAL REQUIREMENTS:
+- The image must be completely safe and appropriate for all ages
+- Do NOT include any text, words, letters, or numbers in the image
+- All characters should appear friendly, diverse, and welcoming
+- The mood should convey joy, curiosity, and the excitement of learning
+- Quality should be high enough for professional website use`;
 
       const model = genAI.getGenerativeModel({
         model: config.gemini.models.image,

@@ -133,7 +133,7 @@ When answering questions:
 
   /**
    * Build prompt for generating flashcards from lesson content
-   * Now includes curriculum-aware style guidance
+   * Follows Google AI Studio best practices for educational content generation
    */
   buildFlashcardPrompt(
     content: string,
@@ -144,33 +144,53 @@ When answering questions:
       count?: number;
     }
   ): string {
-    const ageDesc = context.ageGroup === 'YOUNG'
-      ? 'young child (ages 4-7)'
-      : 'child (ages 8-12)';
+    const isYoung = context.ageGroup === 'YOUNG';
+    const cardCount = context.count || 10;
 
-    const gradeConfig = getGradeLevelConfig(context.gradeLevel ?? (context.ageGroup === 'YOUNG' ? 1 : 4));
+    const gradeConfig = getGradeLevelConfig(context.gradeLevel ?? (isYoung ? 1 : 4));
     const curriculumGuidance = getFlashcardCurriculumGuidance(context.curriculumType);
 
-    return `Generate ${context.count || 10} flashcards from this educational content for a ${ageDesc}.
+    return `You are creating a set of ${cardCount} flashcards for ${isYoung
+      ? 'a young child aged 4-7 who is just learning to read and responds best to simple, fun questions with clear, memorable answers'
+      : 'an elementary school student aged 8-12 who can handle more detail and appreciates understanding the reasoning behind concepts'}.
 
-Content:
+LESSON CONTENT TO CREATE FLASHCARDS FROM:
 ${content}
 
-Requirements:
-- Each card should test ONE concept only
-- Questions should be clear and simple
-- Answers should be concise (1-2 sentences max)
-- Use age-appropriate language (max ${gradeConfig.maxSentenceLength} words per sentence)
-- Make it engaging and fun
-- Include helpful hints where appropriate
+YOUR TASK:
+Transform the key concepts from this lesson into engaging flashcards that make studying feel like a game. Each flashcard should help the child remember one specific piece of information through active recall.
+
+FLASHCARD DESIGN PRINCIPLES:
+${isYoung
+  ? `- Questions should be like friendly puzzles: "What color is...?", "How many...?", "What does a ___ do?"
+- Answers should be 1-5 words maximum - short enough to say in one breath
+- Use familiar comparisons: "It's like a...", "Think of it as..."
+- Hints should give a fun clue without giving away the answer`
+  : `- Questions should encourage thinking: "Why does...?", "What happens when...?", "How is ___ different from ___?"
+- Answers should be clear and complete but concise (1-2 sentences maximum)
+- Connect concepts to their experiences: school, sports, games, nature
+- Hints should guide their thinking process toward the answer`}
+
+LANGUAGE REQUIREMENTS:
+- Maximum sentence length: ${gradeConfig.maxSentenceLength} words
+- Vocabulary level: ${gradeConfig.vocabularyTier.replace('_', ' ')}
+- Every word should be purposeful and age-appropriate
 ${curriculumGuidance}
 
-Return as JSON array:
+QUALITY STANDARDS:
+- Each card tests exactly ONE concept (never combine multiple facts)
+- Questions are clear and unambiguous - only one correct answer possible
+- Answers are factually accurate based on the lesson content
+- Hints guide thinking without being too obvious
+- The set covers the most important concepts from the lesson
+- Cards progress from foundational to more challenging concepts
+
+Return ONLY a valid JSON array with this exact structure (no additional text):
 [
   {
-    "front": "Question text",
-    "back": "Answer text",
-    "hint": "Optional hint"
+    "front": "${isYoung ? 'Simple, engaging question' : 'Clear, thought-provoking question'}",
+    "back": "${isYoung ? 'Short, memorable answer' : 'Complete but concise answer'}",
+    "hint": "${isYoung ? 'Fun clue that helps them remember' : 'Thinking prompt that guides toward the answer'}"
   }
 ]`;
   }
@@ -269,7 +289,7 @@ Remember: BOTH formattedContent AND exercises fields are REQUIRED in your respon
 
   /**
    * Build prompt for quiz generation
-   * Now includes curriculum-aware assessment style
+   * Follows Google AI Studio best practices for educational assessment
    */
   buildQuizPrompt(
     content: string,
@@ -282,41 +302,83 @@ Remember: BOTH formattedContent AND exercises fields are REQUIRED in your respon
     }
   ): string {
     const count = context.count || 5;
-    const ageDesc = context.ageGroup === 'YOUNG'
-      ? 'young child (4-7 years old)'
-      : 'child (8-12 years old)';
+    const isYoung = context.ageGroup === 'YOUNG';
+    const quizType = context.type.toLowerCase();
 
-    const gradeConfig = getGradeLevelConfig(context.gradeLevel ?? (context.ageGroup === 'YOUNG' ? 1 : 4));
+    const gradeConfig = getGradeLevelConfig(context.gradeLevel ?? (isYoung ? 1 : 4));
     const curriculumGuidance = getQuizCurriculumGuidance(context.curriculumType);
 
-    return `Create a ${context.type.toLowerCase()} quiz with ${count} questions from this content for a ${ageDesc}.
+    // Map quiz types to more descriptive formats
+    const quizTypeDescriptions: Record<string, string> = {
+      'multiple_choice': 'multiple choice (4 options per question)',
+      'true_false': 'true or false',
+      'fill_in_blank': 'fill-in-the-blank',
+    };
+    const quizTypeDesc = quizTypeDescriptions[quizType] || quizType;
 
-Content:
+    return `You are creating a fun, encouraging ${quizTypeDesc} quiz for ${isYoung
+      ? 'a young child aged 4-7 who is still developing reading skills and thrives on positive reinforcement'
+      : 'an elementary school student aged 8-12 who enjoys a good challenge and appreciates understanding why answers are correct'}.
+
+LESSON CONTENT TO QUIZ ON:
 ${content}
 
-Language requirements:
+YOUR TASK:
+Create ${count} quiz questions that feel like a fun game rather than a test. The quiz should help the child feel confident about what they've learned while gently identifying areas for review.
+
+QUIZ DESIGN PHILOSOPHY:
+${isYoung
+  ? `- Questions should feel like friendly challenges, not tests
+- Use encouraging language: "Can you remember...?", "Which one...?", "What's the..."
+- Options should be clearly different (no tricky similar answers)
+- Wrong answers should be obviously wrong to a child who learned the material
+- Feedback should always be warm and encouraging, even for wrong answers`
+  : `- Questions should make them think but not frustrate
+- Include a mix of recall questions and "why/how" questions
+- Wrong answer options should be plausible but clearly incorrect upon reflection
+- Explanations should teach, not just confirm the right answer
+- Encourage deeper thinking about the material`}
+
+${quizType === 'multiple_choice' ? `MULTIPLE CHOICE SPECIFIC:
+- Always provide exactly 4 options (A, B, C, D)
+- Correct answer should be randomly distributed across positions
+- Distractors should be related to the topic but clearly wrong
+- ${isYoung ? 'Keep all options short (1-5 words each)' : 'Options can be phrases but keep them concise'}` : ''}
+
+${quizType === 'true_false' ? `TRUE/FALSE SPECIFIC:
+- Statements should be clearly true or clearly false
+- Avoid tricky wording or double negatives
+- Base statements directly on lesson content
+- ${isYoung ? 'Use simple declarative sentences' : 'Can include cause-and-effect statements'}` : ''}
+
+${quizType === 'fill_in_blank' ? `FILL-IN-THE-BLANK SPECIFIC:
+- The blank should test a key concept, not random words
+- Provide enough context that the answer is clear
+- ${isYoung ? 'Use only one blank per question' : 'Can use multiple blanks if they test related concepts'}
+- Accept reasonable alternative answers where appropriate` : ''}
+
+LANGUAGE REQUIREMENTS:
 - Maximum sentence length: ${gradeConfig.maxSentenceLength} words
 - Vocabulary level: ${gradeConfig.vocabularyTier.replace('_', ' ')}
 ${curriculumGuidance}
 
-Requirements:
-- Questions must be age-appropriate
-- Use simple, clear language
-- Include positive feedback for correct answers
-- For wrong answers, provide gentle, educational explanations
+FEEDBACK TONE:
+- Correct answers: ${isYoung ? 'Celebrate with enthusiasm! "Yay!", "You got it!", "Wonderful!"' : 'Affirm confidently: "Excellent!", "Exactly right!", "Perfect!"'}
+- Wrong answers: ${isYoung ? 'Gentle and warm: "Not quite, but great try!", "Almost!", "Let\'s learn this together!"' : 'Supportive and educational: "Good thinking, but...", "Close! The answer is... because..."'}
+- Explanations: ${isYoung ? 'Super simple - one short sentence explaining why' : 'Clear teaching moment - help them understand the concept'}
 
-Return as JSON:
+Return ONLY valid JSON with this exact structure (no additional text):
 {
-  "title": "Quiz title",
+  "title": "${isYoung ? 'Fun, playful quiz title' : 'Engaging, encouraging quiz title'}",
   "questions": [
     {
       "id": "q1",
-      "question": "Question text",
+      "question": "Clear, ${isYoung ? 'simple' : 'thought-provoking'} question text",
       "type": "${context.type}",
-      "options": ["A", "B", "C", "D"],  // for MULTIPLE_CHOICE
-      "correctAnswer": "A",
-      "explanation": "Why this is correct",
-      "encouragement": "Great job!" // Shown when correct
+      ${quizType === 'multiple_choice' ? '"options": ["Option A", "Option B", "Option C", "Option D"],' : ''}
+      "correctAnswer": "${quizType === 'multiple_choice' ? 'A' : quizType === 'true_false' ? 'true' : 'the correct word/phrase'}",
+      "explanation": "Why this is correct (teaches the concept)",
+      "encouragement": "${isYoung ? 'Celebratory message with enthusiasm' : 'Affirming message that builds confidence'}"
     }
   ]
 }`;
@@ -324,7 +386,7 @@ Return as JSON:
 
   /**
    * Build prompt for answering questions about selected text
-   * Now includes curriculum-aware explanation style
+   * Follows Google AI Studio best practices for educational explanations
    */
   buildTextSelectionAnswerPrompt(
     selectedText: string,
@@ -336,39 +398,53 @@ Return as JSON:
       lessonContext?: LessonContext;
     }
   ): string {
-    const ageGuidance = context.ageGroup === 'YOUNG'
-      ? 'Explain in very simple terms a 5-year-old would understand. Use short sentences.'
-      : 'Explain clearly for a child aged 8-12. You can use slightly more complex vocabulary.';
-
-    const gradeConfig = getGradeLevelConfig(context.gradeLevel ?? (context.ageGroup === 'YOUNG' ? 1 : 4));
+    const isYoung = context.ageGroup === 'YOUNG';
+    const gradeConfig = getGradeLevelConfig(context.gradeLevel ?? (isYoung ? 1 : 4));
     const curriculumGuidance = getCurriculumGuidance(context.curriculumType, context.ageGroup, context.gradeLevel);
 
-    return `A child selected this text from their lesson:
+    return `You are Jeffrey, a warm and enthusiastic AI learning buddy helping ${isYoung
+      ? 'a young child aged 4-7 who is just starting their learning journey and responds best to simple, playful explanations with lots of familiar examples'
+      : 'an elementary school student aged 8-12 who is curious and capable of understanding more detailed explanations with reasoning'}.
 
-"${selectedText}"
+THE CHILD'S QUESTION:
+The child highlighted this part of their lesson: "${selectedText}"
 
-And asked: "${userQuestion || 'Can you explain this?'}"
+Their question: "${userQuestion || 'Can you explain this?'}"
 
-${ageGuidance}
-
-Language requirements:
-- Maximum sentence length: ${gradeConfig.maxSentenceLength} words
-- Vocabulary level: ${gradeConfig.vocabularyTier.replace('_', ' ')}
-
-${curriculumGuidance}
-
-${context.lessonContext ? `
-Lesson context:
-- Subject: ${context.lessonContext.subject || 'General'}
-- Topic: ${context.lessonContext.title}
+${context.lessonContext ? `LESSON CONTEXT:
+The child is currently studying ${context.lessonContext.subject || 'a topic'} and the lesson is about "${context.lessonContext.title}".
+${context.lessonContext.keyConcepts?.length ? `Key concepts in this lesson include: ${context.lessonContext.keyConcepts.join(', ')}.` : ''}
 ` : ''}
 
-Respond as Jeffrey, the friendly learning buddy. Be encouraging and helpful!`;
+YOUR TASK:
+Help the child understand by explaining in a way that connects to things they already know and experience in daily life. ${isYoung
+  ? 'Think of how a patient, loving teacher would explain this to a curious 5-year-old - using simple words, familiar comparisons, and a warm, encouraging tone.'
+  : 'Explain like a knowledgeable older friend would - clear and informative, but never condescending. Make the child feel smart for asking.'}
+
+HOW TO EXPLAIN:
+${isYoung
+  ? `- Use very short sentences (5-10 words each)
+- Compare to things kids know: toys, animals, family, playing, eating
+- Use one simple example they can picture in their mind
+- Speak with warmth and excitement about learning
+- End with encouragement or a fun fact that sparks curiosity`
+  : `- Use clear, grade-appropriate language
+- Connect to their world: school, sports, games, nature, technology
+- Explain the "why" behind concepts when relevant
+- Give a concrete example that makes the abstract tangible
+- Encourage them to think deeper with a follow-up thought`}
+
+LANGUAGE GUIDELINES:
+- Maximum sentence length: ${gradeConfig.maxSentenceLength} words
+- Vocabulary: ${gradeConfig.vocabularyTier.replace('_', ' ')} (introduce new words gently with quick explanations)
+${curriculumGuidance}
+
+Remember: Your goal is to make this child feel confident and excited about learning. Be their cheerleader and guide!`;
   }
 
   /**
    * Build prompt for detecting interactive exercises in lesson content
-   * Identifies fill-in-blanks, math problems, practice questions, etc.
+   * Follows Google AI Studio best practices for content analysis
    */
   buildExerciseDetectionPrompt(
     content: string,
@@ -379,72 +455,74 @@ Respond as Jeffrey, the friendly learning buddy. Be encouraging and helpful!`;
       subject?: Subject | null;
     }
   ): string {
-    const ageDesc = context.ageGroup === 'YOUNG'
-      ? 'young child (ages 4-7)'
-      : 'child (ages 8-12)';
+    const isYoung = context.ageGroup === 'YOUNG';
+    const gradeConfig = getGradeLevelConfig(context.gradeLevel ?? (isYoung ? 1 : 4));
 
-    const gradeConfig = getGradeLevelConfig(context.gradeLevel ?? (context.ageGroup === 'YOUNG' ? 1 : 4));
+    return `You are analyzing educational content to find practice exercises that students can interact with. This content is designed for ${isYoung
+      ? 'young children aged 4-7 who are early learners and need simple, encouraging feedback'
+      : 'elementary students aged 8-12 who can handle more complex problems and appreciate understanding the reasoning behind answers'}.
 
-    return `Analyze this educational content and detect any EXISTING practice exercises, problems, or questions that require student answers.
-
-Content:
+CONTENT TO ANALYZE:
 ${content}
 
-Target audience: ${ageDesc}
-Subject hint: ${context.subject || 'Unknown'}
+SUBJECT: ${context.subject || 'Not specified'}
 
-IMPORTANT: You are NOT generating new questions. You are DETECTING exercises that already exist in the content.
+YOUR TASK:
+Carefully scan this content for ANY existing practice exercises, problems, or questions that ask students to provide an answer. You are detecting what's already there, not creating new exercises.
 
-Look for:
-1. FILL_IN_BLANK: Questions with blanks like "___", "_____", or "______" that need to be filled
-2. MATH_PROBLEM: Math equations to solve (e.g., "1/2 × 1/4 = ___", "5 + 3 = ?", "Solve: 12 ÷ 4")
-3. SHORT_ANSWER: Open-ended questions asking for brief text answers
-4. MULTIPLE_CHOICE: Questions with lettered or numbered options (A, B, C, D or 1, 2, 3, 4)
-5. TRUE_FALSE: Statements asking true or false
+WHAT TO LOOK FOR:
+- Fill-in-the-blank questions: Look for blanks shown as "___", "_____", or similar placeholders
+- Math problems: Equations to solve like "1/2 × 1/4 = ___" or "Solve: 12 ÷ 4 = ?"
+- Short answer questions: Questions that ask students to write a brief response
+- Multiple choice: Questions with options labeled A, B, C, D or 1, 2, 3, 4
+- True/False: Statements where students must determine if they're true or false
 
-For each exercise detected, extract:
-- The exact question/problem text
-- The correct answer (calculate it if it's a math problem)
-- Alternative acceptable answers (different formats, spellings, etc.)
-- Context from surrounding text
-- Difficulty level based on the child's grade
+FOR EACH EXERCISE YOU FIND:
+1. Extract the exact question text as it appears
+2. Calculate or identify the correct answer
+3. Think of alternative acceptable answers (different formats like "1/8" vs "0.125", minor spelling variations)
+4. Note the surrounding context so the exercise makes sense
+5. Assess difficulty based on grade level
 
-Create helpful hints that guide without giving away the answer:
-- hint1: A gentle nudge in the right direction
-- hint2: More specific guidance, still not the answer
+CREATING HELPFUL HINTS:
+Write hints that guide the student's thinking without giving away the answer:
+- Hint 1: A gentle nudge in the right direction (${isYoung ? '"Think about what happens when..."' : '"Remember the rule for..."'})
+- Hint 2: More specific guidance that still requires thinking (${isYoung ? '"Count on your fingers..."' : '"Try breaking this into smaller steps..."'})
 
-Create an explanation that teaches WHY the answer is correct.
+WRITING EXPLANATIONS:
+The explanation should teach WHY the answer is correct in a way that ${isYoung
+  ? 'a young child can understand - use simple words, familiar comparisons, and an encouraging tone'
+  : 'helps the student truly understand the concept - clear reasoning, useful for future problems'}.
 
-Return as JSON array (return empty array [] if no exercises found):
+LANGUAGE REQUIREMENTS:
+- Maximum sentence length: ${gradeConfig.maxSentenceLength} words
+- Tone: ${isYoung ? 'Warm, playful, and encouraging like a patient teacher' : 'Friendly and educational like a helpful tutor'}
+- Vocabulary: ${isYoung ? 'Very simple, everyday words' : 'Grade-appropriate, introducing terms when needed'}
+
+Return ONLY a valid JSON array with this structure (return [] if no exercises found):
 [
   {
     "type": "FILL_IN_BLANK" | "MATH_PROBLEM" | "SHORT_ANSWER" | "MULTIPLE_CHOICE" | "TRUE_FALSE",
-    "questionText": "The exact question or problem text",
-    "contextText": "Surrounding context (1-2 sentences before/after)",
-    "originalPosition": "Description of where this appears (e.g., 'Set A, Question 1')",
+    "questionText": "The exact question or problem text as it appears",
+    "contextText": "1-2 sentences of surrounding context",
+    "originalPosition": "Where this appears (e.g., 'Practice Section, Problem 3')",
     "expectedAnswer": "The correct answer",
-    "acceptableAnswers": ["Alternative valid answers", "like different formats"],
+    "acceptableAnswers": ["Alternative valid formats"],
     "answerType": "TEXT" | "NUMBER" | "SELECTION",
-    "options": ["A) Option 1", "B) Option 2"] // Only for MULTIPLE_CHOICE
-    "hint1": "A gentle hint that guides thinking",
-    "hint2": "A more specific hint",
-    "explanation": "Clear explanation of why this is the answer, written for a ${ageDesc}",
+    "options": ["Only for MULTIPLE_CHOICE"],
+    "hint1": "Gentle guidance that points in the right direction",
+    "hint2": "More specific help that still requires thinking",
+    "explanation": "Clear, ${isYoung ? 'simple' : 'educational'} explanation of why this is correct",
     "difficulty": "EASY" | "MEDIUM" | "HARD"
   }
 ]
 
-Language requirements for hints and explanations:
-- Maximum sentence length: ${gradeConfig.maxSentenceLength} words
-- Use encouraging, child-friendly language
-- For YOUNG children: Very simple words, short sentences
-- For OLDER children: Can use grade-appropriate vocabulary
-
-Remember: Only detect exercises that ALREADY EXIST in the content. Do not create new ones.`;
+CRITICAL: Only detect exercises that ALREADY EXIST in the content. Do not invent or create new ones.`;
   }
 
   /**
    * Build prompt for validating a student's answer with AI
-   * Returns whether the answer is correct and personalized feedback
+   * Follows Google AI Studio best practices for personalized feedback
    */
   buildExerciseValidationPrompt(
     exercise: {
@@ -460,54 +538,49 @@ Remember: Only detect exercises that ALREADY EXIST in the content. Do not create
   ): string {
     const isYoung = ageGroup === 'YOUNG';
 
-    return `You are Jeffrey, a friendly AI learning buddy. A child submitted an answer to this exercise.
+    return `You are Jeffrey, a warm and encouraging AI learning buddy who celebrates effort and learning. A ${isYoung
+      ? 'young child aged 4-7 who is still building confidence with learning and needs lots of encouragement'
+      : 'student aged 8-12 who appreciates honest feedback and wants to understand their mistakes'} just submitted an answer to a practice exercise.
 
-EXERCISE:
-Question: ${exercise.questionText}
-Expected Answer: ${exercise.expectedAnswer}
-Also Acceptable: ${exercise.acceptableAnswers.join(', ') || 'None'}
-Answer Type: ${exercise.answerType}
+THE EXERCISE:
+Question: "${exercise.questionText}"
+Correct Answer: "${exercise.expectedAnswer}"
+Also Acceptable: ${exercise.acceptableAnswers.length > 0 ? exercise.acceptableAnswers.join(', ') : 'Only the exact answer'}
+Answer Format: ${exercise.answerType}
 Exercise Type: ${exercise.type}
 
-STUDENT'S ANSWER: "${submittedAnswer}"
+STUDENT'S SUBMISSION: "${submittedAnswer}"
+ATTEMPT NUMBER: ${attemptNumber} of 3
 
-ATTEMPT NUMBER: ${attemptNumber}
+YOUR TASK:
+Determine whether this answer demonstrates understanding of the concept. Be thoughtfully flexible:
+- For math: Accept equivalent representations (1/8 = 0.125 = "one eighth" = "1 out of 8")
+- For text: Accept minor typos, different capitalizations, reasonable abbreviations
+- For numbers: Accept with or without units if the value is clearly correct
+- Overall: Recognize genuine understanding rather than penalizing formatting differences
 
-Determine if the answer is CORRECT using these rules:
-1. For math: Accept equivalent forms (1/8 = 0.125 = "one eighth")
-2. For text: Accept minor typos, different capitalizations
-3. For numbers: Accept with or without units if meaning is clear
-4. Be reasonably flexible - we want to recognize understanding, not penalize formatting
+HOW TO RESPOND:
+${attemptNumber >= 3
+  ? `This is their final attempt. If incorrect, gently reveal the answer: "That's okay - learning takes practice! The answer is ${exercise.expectedAnswer}." Then give a brief, encouraging explanation of why.`
+  : `They still have ${3 - attemptNumber} more ${3 - attemptNumber === 1 ? 'try' : 'tries'}. ${isYoung
+      ? 'If wrong, be gentle and give a playful hint without revealing the answer.'
+      : 'If wrong, acknowledge their thinking and give a helpful nudge toward the right direction.'}`}
 
-Return JSON:
+${isYoung ? `FOR YOUNG LEARNERS:
+- Correct: Celebrate warmly! "Yay, you got it!" or "Amazing work!"
+- Incorrect: Be very gentle. "Hmm, not quite - let's think again!" Give a simple hint.
+- Keep feedback to 1 short sentence. Use simple, happy words.` :
+`FOR OLDER STUDENTS:
+- Correct: Affirm confidently. "Excellent!" or "Exactly right!"
+- Incorrect: Be supportive and educational. "Good thinking, but..." Guide their reasoning.
+- Keep feedback to 1-2 clear sentences. Help them understand.`}
+
+Return ONLY valid JSON:
 {
   "isCorrect": true or false,
   "confidence": 0.0 to 1.0,
-  "feedback": "Your response to the child"
-}
-
-FEEDBACK GUIDELINES for ${isYoung ? 'YOUNG children (4-7)' : 'OLDER children (8-12)'}:
-
-If CORRECT:
-${isYoung
-  ? '- Use excited, celebratory language: "Yay! You did it! 🎉", "Wow, you\'re so smart!", "Amazing job!"'
-  : '- Use encouraging, warm language: "Excellent work!", "That\'s exactly right!", "Great job!"'
-}
-- Keep it brief (1-2 sentences)
-- Be enthusiastic but not over-the-top
-
-If INCORRECT:
-${attemptNumber >= 3
-  ? `- This is their last attempt, so be gentle: "That's okay! The answer is ${exercise.expectedAnswer}. [Brief explanation of why]"`
-  : isYoung
-    ? '- Be very gentle: "Hmm, not quite! Let\'s try again!", "Almost! Think about..."'
-    : '- Be supportive: "Not quite, but good thinking! Try again.", "Close! Remember that..."'
-}
-- ${attemptNumber < 3 ? 'Do NOT reveal the answer yet' : ''}
-- Give a subtle nudge toward the right answer
-- Keep it short (1-2 sentences)
-
-Keep feedback SHORT and ${isYoung ? 'very simple' : 'clear'}. Max 2 sentences.`;
+  "feedback": "Your warm, ${isYoung ? 'simple' : 'helpful'} response to the child (max 2 sentences)"
+}`;
   }
 }
 

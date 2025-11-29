@@ -327,6 +327,7 @@ router.post(
 
 /**
  * Generate a structured summary using Gemini
+ * Follows Google AI Studio best practices for educational content generation
  */
 async function generateStructuredSummary(
   content: string,
@@ -342,34 +343,70 @@ async function generateStructuredSummary(
 }> {
   const isYoung = ageGroup === 'YOUNG';
 
-  const prompt = `Create a fun, engaging summary of this lesson for a ${isYoung ? 'young child (ages 4-7)' : 'child (ages 8-12)'}.
+  // Following Gemini best practices:
+  // 1. Provide clear context about the audience and purpose
+  // 2. Be specific about what kind of output we want
+  // 3. Use natural language to describe requirements
 
-Lesson${title ? ` (${title})` : ''}: ${content.substring(0, 3000)}
+  const prompt = `You are creating a lesson summary for ${isYoung
+    ? 'a young child aged 4-7 who is just beginning their learning journey. This child responds best to simple, exciting language and relatable examples from their daily life (toys, animals, family activities, playground games).'
+    : 'an elementary school student aged 8-12 who is curious and eager to learn. This student can handle more detail and appreciates understanding the "why" behind concepts.'}
 
-Return ONLY a valid JSON object with this exact format, no other text:
+LESSON CONTENT TO SUMMARIZE:
+Title: ${title || 'Learning Adventure'}
+Content: ${content.substring(0, 3000)}
+
+YOUR TASK:
+Transform this lesson into an engaging, memorable summary that will help the child retain and recall the key information. Think of yourself as a friendly teacher creating study notes that the child will actually want to read.
+
+WRITING STYLE GUIDANCE:
+${isYoung
+  ? `- Use the simplest words possible (1-2 syllables preferred)
+- Write like you're explaining to a curious 5-year-old
+- Use comparisons to things they know: "It's like when you..." or "Just like your favorite..."
+- Keep each sentence to 5-8 words maximum
+- Add excitement with words like "Wow!", "Amazing!", "Guess what?"`
+  : `- Use grade-appropriate vocabulary, explaining new terms clearly
+- Connect concepts to their world: school, sports, games, nature, technology
+- Encourage deeper thinking with phrases like "Here's why this matters..."
+- Sentences can be 10-15 words, but vary the rhythm
+- Include "Did you know?" moments to spark curiosity`}
+
+Return ONLY a valid JSON object with this exact structure (no additional text before or after):
 {
-  "title": "${title || 'Lesson Summary'}",
-  "overview": "A ${isYoung ? '1-2 sentence' : '2-3 sentence'} engaging overview of the lesson",
+  "title": "An engaging, ${isYoung ? 'playful' : 'intriguing'} title that captures the main topic",
+  "overview": "${isYoung
+    ? 'One or two short, exciting sentences that make the child want to learn more. Start with something attention-grabbing!'
+    : 'Two to three sentences that clearly explain what this lesson is about and why it matters. Hook them with an interesting angle.'}",
   "keyPoints": [
-    "${isYoung ? '3 very simple key points' : '4-5 clear key points'}"
+    ${isYoung
+      ? '"Three simple key points, each one a short complete thought that stands alone"'
+      : '"Four to five clear key points that capture the essential learning, each building understanding"'}
   ],
   "vocabulary": [
     {
-      "term": "Important word",
-      "definition": "${isYoung ? 'Very simple definition' : 'Clear definition'}"
+      "term": "Important word from the lesson",
+      "definition": "${isYoung
+        ? 'Super simple explanation using words a 5-year-old knows'
+        : 'Clear, helpful definition that connects to what they already know'}"
     }
   ],
   "funFacts": [
-    "${isYoung ? '2 fun, simple facts' : '2-3 interesting facts'}"
+    "${isYoung
+      ? 'Two surprising, delightful facts that will make them say Wow!'
+      : 'Two or three fascinating facts that deepen understanding and spark curiosity'}"
   ],
-  "takeaway": "One main thing to remember from this lesson"
+  "takeaway": "${isYoung
+    ? 'One simple, memorable sentence they can tell their parents about what they learned'
+    : 'One powerful sentence capturing the most important thing to remember from this lesson'}"
 }
 
-Requirements:
-- ${isYoung ? 'Use very simple words a 5-year-old would understand' : 'Use clear, age-appropriate language'}
-- Make it fun and engaging
-- Focus on the most important concepts
-- Include ${isYoung ? '2-3' : '3-4'} vocabulary words`;
+QUALITY REQUIREMENTS:
+- Every word should be purposeful and age-appropriate
+- The summary should feel like a gift, not homework
+- Focus on understanding, not memorization
+- Include exactly ${isYoung ? '2-3' : '3-4'} vocabulary words that appear in the lesson
+- Fun facts should genuinely surprise and delight`;
 
   const model = genAI.getGenerativeModel({
     model: config.gemini.models.flash,
@@ -392,6 +429,7 @@ Requirements:
 
 /**
  * Generate an infographic using Gemini's image generation
+ * Follows Google AI Studio best practices for Gemini prompting
  */
 async function generateInfographic(
   content: string,
@@ -404,20 +442,50 @@ async function generateInfographic(
   // Create a summary of key points for the image prompt
   const keyPointsSummary = keyConcepts?.slice(0, 4).join(', ') || '';
 
-  const imagePrompt = `Create a colorful, child-friendly educational infographic poster about "${title || 'this topic'}".
+  // Extract the core topic for context
+  const topicSummary = content.substring(0, 500);
 
-Topic: ${content.substring(0, 500)}
-${keyPointsSummary ? `Key concepts to include: ${keyPointsSummary}` : ''}
+  // Build prompt following Gemini best practices:
+  // 1. Use natural language & full sentences (not tag soup)
+  // 2. Be specific and descriptive (subject, setting, lighting, mood, materiality)
+  // 3. Provide context (the "why" or "for whom")
+  // 4. Specify style (polished editorial, technical diagram, or hand-drawn whiteboard)
 
-Style requirements:
-- Bright, cheerful colors suitable for ${isYoung ? 'young children (ages 4-7)' : 'children (ages 8-12)'}
-- ${isYoung ? 'Very simple, cartoon-style illustrations' : 'Clear, engaging illustrations'}
-- Large, readable text
-- Fun icons and visual elements
-- Educational but playful design
-- Include ${isYoung ? '2-3' : '3-4'} main visual elements representing key concepts
-- NO scary or complex imagery
-- Safe for children`;
+  const imagePrompt = `Design a professional educational infographic poster for ${isYoung ? 'a young child aged 4-7 who is just learning to read' : 'an elementary school student aged 8-12'}, explaining the topic "${title || 'Learning Concepts'}".
+
+CONTENT TO VISUALIZE:
+${topicSummary}
+${keyPointsSummary ? `\nKEY CONCEPTS TO HIGHLIGHT: ${keyPointsSummary}` : ''}
+
+LAYOUT & COMPOSITION:
+Create a single-page infographic with a clear visual hierarchy. ${isYoung
+  ? 'Use a simple top-to-bottom flow with 2-3 large illustrated sections. Each section should have one big, friendly illustration with minimal supporting text.'
+  : 'Organize into 3-4 distinct sections using a combination of icons, simple diagrams, and short text blocks. Use visual connectors like arrows or numbered steps to show relationships between concepts.'}
+
+VISUAL STYLE:
+${isYoung
+  ? 'Create this in a warm, friendly cartoon style similar to a preschool educational poster. Use rounded shapes, thick outlines, and a soft, approachable aesthetic. Characters should have big expressive eyes and friendly smiles. Think Pixar-meets-educational-content.'
+  : 'Create this as a polished editorial infographic with clean vector-style illustrations. Use a modern, engaging design similar to National Geographic Kids or Highlights magazine. Include detailed but accessible diagrams with clear labels.'}
+
+COLOR PALETTE:
+Use a harmonious ${isYoung ? 'primary color scheme with bright yellows, sky blues, and grass greens' : 'vibrant but sophisticated palette with teals, oranges, and purples'}. Ensure high contrast between text and backgrounds for readability. The overall mood should feel ${isYoung ? 'warm, safe, and inviting like a sunny classroom' : 'exciting and discovery-oriented like a science museum exhibit'}.
+
+TYPOGRAPHY & TEXT:
+${isYoung
+  ? 'Use very large, bold, rounded sans-serif text. Limit text to single words or 2-3 word labels. The title should be playful and oversized.'
+  : 'Use clear, modern sans-serif fonts. Include a prominent title, section headers, and brief explanatory text (keep each text block under 15 words). Ensure all text is legible at a glance.'}
+
+SPECIFIC ELEMENTS TO INCLUDE:
+${isYoung
+  ? '- One friendly mascot character (like a curious animal or smiling object related to the topic) guiding the viewer\n- Large, simple icons representing each key concept\n- Decorative elements like stars, sparkles, or clouds to fill empty space'
+  : '- Clear data visualizations if applicable (simple bar charts, pie charts, or comparison graphics)\n- Numbered steps or bullet points for processes\n- "Did you know?" style callout boxes for interesting facts\n- Small illustrative icons next to each section'}
+
+CRITICAL REQUIREMENTS:
+- All imagery must be child-safe, positive, and non-frightening
+- No complex or abstract imagery that could confuse young learners
+- Text must be accurate and clearly rendered (not garbled or misspelled)
+- The design should inspire curiosity and make learning feel exciting
+- Format: Single poster layout, 16:9 aspect ratio preferred`;
 
   const model = genAI.getGenerativeModel({
     model: config.gemini.models.image,
@@ -536,6 +604,7 @@ Guidelines:
 
 /**
  * Generate an image for chat using the image model
+ * Follows Google AI Studio best practices for Gemini prompting
  */
 async function generateChatImage(
   imagePrompt: string,
@@ -544,22 +613,40 @@ async function generateChatImage(
 ): Promise<{ imageData: string; mimeType: string }> {
   const isYoung = ageGroup === 'YOUNG';
 
-  // Build context-aware prompt
-  let contextualPrompt = imagePrompt;
-  if (lessonContext?.title) {
-    contextualPrompt = `${imagePrompt} (from a lesson about ${lessonContext.title})`;
-  }
+  // Build context-aware prompt following Gemini best practices:
+  // 1. Use natural language & full sentences (not tag soup)
+  // 2. Be specific and descriptive (subject, setting, lighting, mood)
+  // 3. Provide context (the "why" or "for whom")
 
-  const fullPrompt = `Create a colorful, child-friendly educational illustration: ${contextualPrompt}
+  const subjectContext = lessonContext?.title
+    ? ` This illustration is for a lesson about "${lessonContext.title}" and should help the child visualize the concept.`
+    : '';
 
-Style requirements:
-- Bright, cheerful colors suitable for ${isYoung ? 'young children (ages 4-7)' : 'children (ages 8-12)'}
-- ${isYoung ? 'Very simple, cartoon-style, cute and friendly' : 'Clear, engaging, educational style'}
-- Fun and appealing to kids
-- NO text or words in the image
-- NO scary, violent, or inappropriate content
-- High quality, detailed artwork
-- Educational and age-appropriate`;
+  const fullPrompt = `Create an educational illustration showing: ${imagePrompt}.${subjectContext}
+
+PURPOSE: This image is for ${isYoung ? 'a young child aged 4-7 who learns best through colorful, friendly visuals' : 'an elementary student aged 8-12 who benefits from detailed, engaging illustrations'}.
+
+VISUAL STYLE:
+${isYoung
+  ? `Design this as a warm, inviting cartoon illustration that a preschooler would find delightful. Use a style reminiscent of picture books like "The Very Hungry Caterpillar" or "Pete the Cat" - simple shapes, bold colors, and friendly characters with expressive faces. Every element should feel soft, rounded, and approachable.`
+  : `Create this as a polished educational illustration suitable for a children's encyclopedia or science textbook. The style should be detailed enough to be informative but vibrant and engaging like illustrations in DK Publishing or Usborne books. Include accurate details while maintaining visual appeal.`}
+
+COMPOSITION & LIGHTING:
+${isYoung
+  ? `Center the main subject prominently with a simple, uncluttered background. Use warm, soft lighting like a sunny day. Leave plenty of breathing room around elements. The scene should feel calm, safe, and inviting.`
+  : `Create a dynamic composition that draws the eye to key educational elements. Use lighting to highlight important details. The background can include contextual elements that add to understanding without overwhelming the main subject.`}
+
+COLOR PALETTE:
+${isYoung
+  ? `Use a cheerful palette of primary colors - sunny yellows, sky blues, grass greens, and happy oranges. Colors should be saturated but not harsh. Think of the warm, comforting colors of a well-lit nursery.`
+  : `Use a rich, sophisticated palette with good contrast. Include both vibrant accent colors and more nuanced tones. Colors should support the educational content - use color coding if showing different categories or concepts.`}
+
+CRITICAL REQUIREMENTS:
+- The image must be completely safe and appropriate for children
+- No text, words, letters, or numbers rendered in the image
+- No scary, violent, threatening, or unsettling elements
+- All characters (if any) should appear friendly and welcoming
+- The illustration should spark curiosity and joy about learning`;
 
   const model = genAI.getGenerativeModel({
     model: config.gemini.models.image,

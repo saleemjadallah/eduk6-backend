@@ -537,6 +537,7 @@ export class GeminiService {
   /**
    * Translate selected text to a target language
    * Provides kid-friendly translations with optional pronunciation and explanation
+   * Follows Google AI Studio best practices for educational content
    */
   async translateText(
     text: string,
@@ -548,26 +549,49 @@ export class GeminiService {
   ): Promise<TranslationResult> {
     const isYoung = context.ageGroup === 'YOUNG';
 
-    const prompt = `Translate the following text to ${targetLanguage}.
-This translation is for a ${isYoung ? 'young child (ages 4-7)' : 'child (ages 8-12)'}.
+    // Following Gemini best practices:
+    // 1. Provide clear context about the audience
+    // 2. Be specific about what kind of output we want
+    // 3. Use natural language to describe requirements
 
-Text to translate: "${text}"
+    const prompt = `You are helping ${isYoung
+      ? 'a young child aged 4-7 who is just starting to learn about different languages and finds it exciting to discover new words'
+      : 'an elementary school student aged 8-12 who is curious about languages and enjoys learning how people communicate around the world'}.
 
-Return ONLY a valid JSON object with this exact format, no other text:
+TRANSLATION REQUEST:
+Please translate this text into ${targetLanguage}: "${text}"
+
+YOUR TASK:
+Provide a translation that feels natural and would actually be used by native ${targetLanguage} speakers. ${isYoung
+  ? 'If there are multiple ways to say something, choose the simplest, most common version that a child would understand.'
+  : 'Choose clear, standard language that represents how the phrase would commonly be expressed.'}
+
+WHAT TO INCLUDE:
+${isYoung
+  ? `- A simple, easy-to-remember translation
+- For languages with different writing systems (Arabic, Chinese, etc.), show how to pronounce it using sounds they know
+- A fun, simple explanation that makes the child excited about learning the new word`
+  : `- An accurate, natural translation
+- For languages with different writing systems, provide a phonetic pronunciation guide
+- If helpful, a brief note about interesting language facts or usage context`}
+
+Return ONLY a valid JSON object with this exact structure (no additional text):
 {
-  "originalText": "${text}",
+  "originalText": "The original text",
   "translatedText": "The translation in ${targetLanguage}",
   "targetLanguage": "${targetLanguage}",
-  "pronunciation": "How to pronounce it (only if the target language uses a different script, like Arabic, Chinese, Japanese, Korean, Russian, Greek, Hebrew, Hindi, Thai - otherwise set to null)",
-  "simpleExplanation": "A ${isYoung ? 'very simple 1-sentence explanation for a 5-year-old' : 'brief kid-friendly explanation if helpful, otherwise null'}"
+  "pronunciation": ${isYoung
+    ? '"Simple pronunciation using familiar sounds, like \\"say: Bone-jour\\" (only for non-Latin scripts, otherwise null)"'
+    : '"Phonetic guide for non-Latin scripts, otherwise null"'},
+  "simpleExplanation": "${isYoung
+    ? 'A delightful 1-sentence explanation like: \\"This is how kids in France say hello!\\"'
+    : 'A brief, interesting note about the translation if it adds value, otherwise null'}"
 }
 
-Requirements:
-- Keep the translation simple and natural
-- ${isYoung ? 'Use the simplest possible words' : 'Use clear age-appropriate language'}
-- If the text is a single word, provide a simple definition in simpleExplanation
-- If the text is a phrase or sentence, simpleExplanation can be null unless clarification helps
-- pronunciation should ONLY be included for non-Latin scripts`;
+QUALITY STANDARDS:
+- Translation must be accurate and natural-sounding
+- Pronunciation (when included) should use sounds familiar to English speakers
+- Explanation should spark curiosity about languages, not feel like a lecture`;
 
     const model = genAI.getGenerativeModel({
       model: config.gemini.models.flash,
