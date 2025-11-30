@@ -36,7 +36,7 @@ export interface LessonAnalysis {
   summary: string;
   subject?: string; // Detected subject from content (MATH, SCIENCE, ENGLISH, etc.)
   gradeLevel: string;
-  formattedContent?: string; // DEPRECATED: We now display extractedText directly
+  formattedContent?: string; // AI-formatted version of the content with proper line breaks and structure
   chapters?: Array<{
     title: string;
     content?: string;

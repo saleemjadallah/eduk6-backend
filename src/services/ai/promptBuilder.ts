@@ -197,9 +197,8 @@ Return ONLY a valid JSON array with this exact structure (no additional text):
 
   /**
    * Build prompt for content analysis
-   * Extracts METADATA ONLY (not regenerating content) to save tokens
-   * The original extractedText is preserved and displayed on the frontend
-   * Jeffrey uses the full extractedText for answering contextual questions
+   * Extracts metadata AND formats the content for display
+   * The formattedContent preserves ALL original text but adds proper structure
    */
   buildContentAnalysisPrompt(
     content: string,
@@ -214,23 +213,60 @@ Return ONLY a valid JSON array with this exact structure (no additional text):
     const curriculumGuidance = getCurriculumGuidance(context.curriculumType, context.ageGroup, context.gradeLevel);
     const isYoung = context.ageGroup === 'YOUNG';
 
-    return `You are analyzing educational content to extract key metadata for ${isYoung
+    return `You are analyzing educational content for ${isYoung
       ? 'a young child aged 4-7 who is just beginning their learning journey'
       : 'an elementary student aged 8-12 who can handle more detailed explanations'}.
 
-IMPORTANT: Your job is to ANALYZE and EXTRACT metadata, NOT to rewrite or regenerate the content. The original content will be displayed directly to the student - you are just helping us understand what's in it.
+You have TWO jobs:
+1. EXTRACT metadata (title, summary, vocabulary, exercises, etc.)
+2. FORMAT the content for readable display
 
-CONTENT TO ANALYZE:
+CONTENT TO ANALYZE AND FORMAT:
 ${content}
 
 SUBJECT HINT: ${context.subject || 'Not specified'}
 
-YOUR TASK:
-1. Identify what this lesson is about (title, subject, grade level)
-2. Write a brief summary that captures the main ideas
-3. Extract key concepts and vocabulary terms
-4. Find any practice exercises/problems already in the content
-5. Suggest questions the student might want to explore
+═══════════════════════════════════════════════════════════
+TASK 1: FORMAT THE CONTENT (formattedContent field)
+═══════════════════════════════════════════════════════════
+
+CRITICAL RULES - YOU MUST FOLLOW THESE EXACTLY:
+- DO NOT summarize, shorten, or remove ANY content
+- DO NOT add new content, explanations, or commentary
+- DO NOT change any wording - preserve the EXACT original text
+- DO NOT skip any sections, examples, problems, or answers
+- Your ONLY job is to add proper formatting/structure
+
+FORMATTING TO ADD:
+- Add line breaks between paragraphs
+- Add line breaks before/after section headers
+- Add line breaks before each bullet point (•, -, *)
+- Add line breaks before numbered items (1., 2., Step 1:, Example 1:, etc.)
+- Add line breaks before metadata fields (Grade Level:, Subject:, Duration:, etc.)
+- Add line breaks before/after [Page X] markers
+- Separate distinct sections with blank lines
+- Keep all mathematical expressions, formulas, and answers exactly as written
+
+EXAMPLE of what you should do:
+INPUT: "[Page 1] Fractions Grade Level: 5th Subject: Math Learning Objectives • Add fractions • Subtract fractions Example 1: 1/2 + 1/4 = 3/4"
+
+OUTPUT (formattedContent):
+"[Page 1]
+
+Fractions
+
+Grade Level: 5th
+Subject: Math
+
+Learning Objectives
+• Add fractions
+• Subtract fractions
+
+Example 1: 1/2 + 1/4 = 3/4"
+
+═══════════════════════════════════════════════════════════
+TASK 2: EXTRACT METADATA
+═══════════════════════════════════════════════════════════
 
 ${curriculumGuidance}
 
@@ -246,6 +282,7 @@ For each exercise found, extract it with its location context (e.g., "Set A, Que
 
 Return ONLY valid JSON with this structure:
 {
+  "formattedContent": "The COMPLETE original content with proper line breaks and formatting added. Include EVERY word, sentence, example, problem, and answer from the original. This should be the FULL content, just with better structure.",
   "title": "A concise, engaging title for this lesson",
   "summary": "${isYoung ? 'A 2-3 sentence summary using very simple words' : 'A 3-5 sentence summary that captures the key learning objectives'}",
   "subject": "One of: MATH, SCIENCE, ENGLISH, ARABIC, ISLAMIC_STUDIES, SOCIAL_STUDIES, ART, MUSIC, OTHER",
@@ -290,6 +327,7 @@ LANGUAGE FOR SUMMARIES AND VOCABULARY:
 - Vocabulary level: ${gradeConfig.vocabularyTier.replace('_', ' ')}
 
 QUALITY GUIDELINES:
+- formattedContent MUST contain ALL original text - do not skip anything
 - Title should be engaging and descriptive
 - Summary should help the student know what they'll learn
 - Vocabulary should include terms that might be new or important

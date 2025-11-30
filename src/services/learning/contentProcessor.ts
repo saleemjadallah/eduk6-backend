@@ -139,12 +139,13 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
     });
 
     await lessonService.update(lessonId, {
-      extractedText, // This is the PRIMARY content displayed on the frontend
+      extractedText, // Raw extracted text (kept for reference and Jeffrey's context)
+      // Use AI-formatted content if available, otherwise fall back to raw extractedText
+      formattedContent: analysis.formattedContent || extractedText,
       title: analysis.title || lesson?.title,
       summary: analysis.summary,
       // Convert gradeLevel to string if it's a number (Prisma expects string)
       gradeLevel: analysis.gradeLevel != null ? String(analysis.gradeLevel) : undefined,
-      // Note: formattedContent is deprecated - we display extractedText directly
       // Cast arrays to JSON-compatible format for Prisma
       chapters: analysis.chapters ? JSON.parse(JSON.stringify(analysis.chapters)) : undefined,
       keyConcepts: analysis.keyConcepts,
