@@ -230,6 +230,7 @@ router.post(
       }
 
       // Map frontend reasons to backend XPReason enum
+      // Valid reasons from Prisma schema XPReason enum
       const validReasons = [
         'LESSON_COMPLETE',
         'LESSON_PROGRESS',
@@ -241,10 +242,14 @@ router.post(
         'DAILY_CHALLENGE',
         'TEXT_SELECTION',
         'BADGE_EARNED',
-        'OTHER',
+        'STREAK_BONUS',
+        'FIRST_OF_DAY',
+        'EXERCISE_CORRECT',
+        'EXERCISE_PERFECT',
       ];
 
-      const xpReason = validReasons.includes(reason) ? reason : 'OTHER';
+      // Default to CHAT_QUESTION for unknown reasons (most common action)
+      const xpReason = validReasons.includes(reason) ? reason : 'CHAT_QUESTION';
 
       const result = await xpEngine.awardXP(childId, {
         amount,
@@ -293,6 +298,7 @@ router.post(
       }
 
       // Map frontend reasons to backend XPReason enum
+      // Valid reasons from Prisma schema XPReason enum
       const validReasons = [
         'LESSON_COMPLETE',
         'LESSON_PROGRESS',
@@ -304,10 +310,14 @@ router.post(
         'DAILY_CHALLENGE',
         'TEXT_SELECTION',
         'BADGE_EARNED',
-        'OTHER',
+        'STREAK_BONUS',
+        'FIRST_OF_DAY',
+        'EXERCISE_CORRECT',
+        'EXERCISE_PERFECT',
       ];
 
-      const xpReason = validReasons.includes(reason) ? reason : 'OTHER';
+      // Default to CHAT_QUESTION for unknown reasons (most common action)
+      const xpReason = validReasons.includes(reason) ? reason : 'CHAT_QUESTION';
 
       const result = await xpEngine.awardXP(childId, {
         amount,
