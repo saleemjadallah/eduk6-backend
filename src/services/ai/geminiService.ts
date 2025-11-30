@@ -36,10 +36,10 @@ export interface LessonAnalysis {
   summary: string;
   subject?: string; // Detected subject from content (MATH, SCIENCE, ENGLISH, etc.)
   gradeLevel: string;
-  formattedContent?: string; // HTML content with embedded interactive exercise markers
+  formattedContent?: string; // DEPRECATED: We now display extractedText directly
   chapters?: Array<{
     title: string;
-    content: string;
+    content?: string;
     keyPoints?: string[];
   }>;
   keyConcepts: string[];
@@ -58,6 +58,7 @@ export interface LessonAnalysis {
     hint2?: string;
     explanation?: string;
     difficulty?: 'EASY' | 'MEDIUM' | 'HARD';
+    locationInContent?: string; // Where this exercise appears (e.g., "Set A, Question 3")
   }>;
   suggestedQuestions: string[];
   confidence: number;

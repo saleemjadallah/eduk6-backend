@@ -11,70 +11,9 @@ import { LessonAnalysis } from '../ai/geminiService.js';
 
 import { CurriculumType } from '@prisma/client';
 
-/**
- * Extract exercises from formattedContent HTML when exercises array is empty
- * Parses <span class="interactive-exercise" data-exercise-id="ex-1" data-type="MATH_PROBLEM" data-answer="1/6">...</span>
- */
-function extractExercisesFromHTML(html: string): NonNullable<LessonAnalysis['exercises']> {
-  const exercises: NonNullable<LessonAnalysis['exercises']> = [];
-
-  // Regex to match interactive exercise spans
-  const exerciseRegex = /<span[^>]*class=["'][^"']*interactive-exercise[^"']*["'][^>]*data-exercise-id=["']([^"']+)["'][^>]*data-type=["']([^"']+)["'][^>]*data-answer=["']([^"']+)["'][^>]*>([^<]*)<\/span>/gi;
-
-  // Also try alternative attribute order
-  const altRegex = /<span[^>]*data-exercise-id=["']([^"']+)["'][^>]*data-type=["']([^"']+)["'][^>]*data-answer=["']([^"']+)["'][^>]*class=["'][^"']*interactive-exercise[^"']*["'][^>]*>([^<]*)<\/span>/gi;
-
-  let match;
-
-  // Try primary regex
-  while ((match = exerciseRegex.exec(html)) !== null) {
-    exercises.push({
-      id: match[1],
-      type: match[2] as any,
-      questionText: match[4],
-      expectedAnswer: match[3],
-      acceptableAnswers: [],
-      difficulty: 'MEDIUM' as const,
-    });
-  }
-
-  // Try alternative regex if no matches
-  if (exercises.length === 0) {
-    while ((match = altRegex.exec(html)) !== null) {
-      exercises.push({
-        id: match[1],
-        type: match[2] as any,
-        questionText: match[4],
-        expectedAnswer: match[3],
-        acceptableAnswers: [],
-        difficulty: 'MEDIUM' as const,
-      });
-    }
-  }
-
-  // If still no matches, try a more lenient approach
-  if (exercises.length === 0) {
-    const lenientRegex = /data-exercise-id=["']([^"']+)["'][^>]*data-type=["']([^"']+)["'][^>]*data-answer=["']([^"']+)["']/gi;
-    let exerciseNum = 1;
-    while ((match = lenientRegex.exec(html)) !== null) {
-      exercises.push({
-        id: match[1],
-        type: match[2] as any,
-        questionText: `Exercise ${exerciseNum}`, // Fallback text
-        expectedAnswer: match[3],
-        acceptableAnswers: [],
-        difficulty: 'MEDIUM' as const,
-      });
-      exerciseNum++;
-    }
-  }
-
-  logger.info(`Extracted ${exercises.length} exercises from HTML using fallback parser`, {
-    exerciseIds: exercises.map(e => e.id),
-  });
-
-  return exercises;
-}
+// Note: We no longer use formattedContent or HTML parsing for exercises.
+// Exercises are now detected directly by the AI from the raw content.
+// The original extractedText is displayed on the frontend for full content viewing.
 
 // Job data types
 export interface ContentProcessingJobData {
@@ -189,23 +128,22 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
       subject: lesson?.subject,
     });
 
-    // 4. Update lesson with processed content (including formattedContent with exercise markers)
-    // Log what we're about to save for debugging
+    // 4. Update lesson with analysis metadata
+    // Note: We store extractedText as the primary content (displayed on frontend)
+    // The AI only extracts metadata (title, summary, vocabulary, exercises) to save tokens
     logger.info(`Updating lesson ${lessonId} with analysis results`, {
-      hasFormattedContent: !!analysis.formattedContent,
-      formattedContentLength: analysis.formattedContent?.length || 0,
-      hasInteractiveExerciseMarkers: analysis.formattedContent?.includes('interactive-exercise') || false,
       exerciseCount: analysis.exercises?.length || 0,
       chapterCount: analysis.chapters?.length || 0,
       vocabularyCount: analysis.vocabulary?.length || 0,
+      extractedTextLength: extractedText.length,
     });
 
     await lessonService.update(lessonId, {
-      extractedText,
+      extractedText, // This is the PRIMARY content displayed on the frontend
       title: analysis.title || lesson?.title,
       summary: analysis.summary,
       gradeLevel: analysis.gradeLevel,
-      formattedContent: analysis.formattedContent || undefined, // HTML with embedded exercise markers
+      // Note: formattedContent is deprecated - we display extractedText directly
       // Cast arrays to JSON-compatible format for Prisma
       chapters: analysis.chapters ? JSON.parse(JSON.stringify(analysis.chapters)) : undefined,
       keyConcepts: analysis.keyConcepts,
@@ -218,20 +156,10 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
 
     logger.info(`Lesson ${lessonId} updated successfully`);
 
-    // 5. Create interactive exercises from the analysis (exercises are now embedded in formattedContent)
+    // 5. Create interactive exercises from the analysis
+    // Exercises are detected by AI from the raw content and stored separately
     try {
-      let exercisesToCreate = analysis.exercises || [];
-
-      // Fallback: If exercises array is empty but formattedContent has exercise markers,
-      // try to extract exercises from the HTML
-      if (exercisesToCreate.length === 0 && analysis.formattedContent?.includes('interactive-exercise')) {
-        logger.info(`Exercises array empty but formattedContent has markers, attempting extraction for lesson ${lessonId}`);
-        const extractedExercises = extractExercisesFromHTML(analysis.formattedContent);
-        if (extractedExercises.length > 0) {
-          exercisesToCreate = extractedExercises;
-          logger.info(`Extracted ${extractedExercises.length} exercises from formattedContent HTML`);
-        }
-      }
+      const exercisesToCreate = analysis.exercises || [];
 
       if (exercisesToCreate.length > 0) {
         logger.info(`Processing ${exercisesToCreate.length} exercises for lesson ${lessonId}`, {
@@ -239,6 +167,7 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
             id: ex.id,
             type: ex.type,
             questionPreview: ex.questionText?.substring(0, 50),
+            location: ex.locationInContent,
           })),
         });
 
@@ -252,20 +181,16 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
           hint2: ex.hint2,
           explanation: ex.explanation,
           difficulty: ex.difficulty as any,
-          // Store the exercise ID from the HTML markers for frontend matching
-          originalPosition: ex.id,
+          // Store the exercise ID and location for reference
+          originalPosition: ex.locationInContent || ex.id,
         }));
 
         const createdExercises = await exerciseService.createExercisesForLesson(lessonId, detectedExercises);
-        logger.info(`Created ${createdExercises.length} inline interactive exercises for lesson ${lessonId}`, {
-          exerciseIds: createdExercises.map(e => ({ dbId: e.id, markerId: e.originalPosition })),
+        logger.info(`Created ${createdExercises.length} exercises for lesson ${lessonId}`, {
+          exerciseIds: createdExercises.map(e => ({ dbId: e.id, location: e.originalPosition })),
         });
       } else {
-        logger.info(`No interactive exercises found in analysis for lesson ${lessonId}`, {
-          analysisHasExercises: 'exercises' in analysis,
-          exercisesArrayExists: Array.isArray(analysis.exercises),
-          formattedContentHasMarkers: analysis.formattedContent?.includes('interactive-exercise') || false,
-        });
+        logger.info(`No exercises found in content for lesson ${lessonId}`);
       }
     } catch (exerciseError) {
       // Don't fail the whole processing if exercise creation fails

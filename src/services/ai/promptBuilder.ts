@@ -197,7 +197,9 @@ Return ONLY a valid JSON array with this exact structure (no additional text):
 
   /**
    * Build prompt for content analysis
-   * Now includes curriculum-aware content structuring
+   * Extracts METADATA ONLY (not regenerating content) to save tokens
+   * The original extractedText is preserved and displayed on the frontend
+   * Jeffrey uses the full extractedText for answering contextual questions
    */
   buildContentAnalysisPrompt(
     content: string,
@@ -210,81 +212,89 @@ Return ONLY a valid JSON array with this exact structure (no additional text):
   ): string {
     const gradeConfig = getGradeLevelConfig(context.gradeLevel ?? (context.ageGroup === 'YOUNG' ? 1 : 4));
     const curriculumGuidance = getCurriculumGuidance(context.curriculumType, context.ageGroup, context.gradeLevel);
-    const ageDesc = context.ageGroup === 'YOUNG' ? 'young child (4-7)' : 'child (8-12)';
+    const isYoung = context.ageGroup === 'YOUNG';
 
-    return `Analyze this educational content and extract key information for a ${ageDesc}.
+    return `You are analyzing educational content to extract key metadata for ${isYoung
+      ? 'a young child aged 4-7 who is just beginning their learning journey'
+      : 'an elementary student aged 8-12 who can handle more detailed explanations'}.
 
-Content:
+IMPORTANT: Your job is to ANALYZE and EXTRACT metadata, NOT to rewrite or regenerate the content. The original content will be displayed directly to the student - you are just helping us understand what's in it.
+
+CONTENT TO ANALYZE:
 ${content}
 
-Subject hint: ${context.subject || 'Unknown'}
+SUBJECT HINT: ${context.subject || 'Not specified'}
 
-Language requirements:
-- Maximum sentence length: ${gradeConfig.maxSentenceLength} words
-- Vocabulary level: ${gradeConfig.vocabularyTier.replace('_', ' ')}
+YOUR TASK:
+1. Identify what this lesson is about (title, subject, grade level)
+2. Write a brief summary that captures the main ideas
+3. Extract key concepts and vocabulary terms
+4. Find any practice exercises/problems already in the content
+5. Suggest questions the student might want to explore
 
 ${curriculumGuidance}
 
-IMPORTANT - INTERACTIVE EXERCISES:
-Look for ANY existing practice problems, fill-in-blanks, or questions that require student answers in the content:
-- Math problems like "1/2 × 1/3 = ___" or "Solve: 5 + 3 = ?"
-- Fill-in-the-blank questions like "The capital of France is ___"
-- Short answer questions asking students to provide answers
-- Multiple choice questions
+DETECTING EXERCISES:
+Scan the content for ANY existing practice problems, questions, or activities:
+- Math problems: "1/2 × 1/3 = ___", "Solve: 5 + 3 = ?", "Calculate..."
+- Fill-in-blanks: "The capital of France is ___"
+- Practice questions: numbered lists of questions, "Answer the following..."
+- Multiple choice: questions with options A, B, C, D
+- True/False statements
 
-When you find these exercises, wrap them with this EXACT format in the formattedContent:
-<span class="interactive-exercise" data-exercise-id="ex-1" data-type="MATH_PROBLEM" data-answer="1/6">1/2 × 1/3 = ___</span>
+For each exercise found, extract it with its location context (e.g., "Set A, Question 3" or "Practice Problem 2").
 
-Use sequential IDs: ex-1, ex-2, ex-3, etc.
-data-type must be one of: MATH_PROBLEM, FILL_IN_BLANK, SHORT_ANSWER, MULTIPLE_CHOICE, TRUE_FALSE
-data-answer contains the correct answer
-
-CRITICAL: You MUST return a valid JSON object with ALL of the following fields. Do NOT omit any field.
-
-Return this EXACT structure (all fields are REQUIRED):
+Return ONLY valid JSON with this structure:
 {
-  "title": "A concise, engaging title",
-  "summary": "A ${context.ageGroup === 'YOUNG' ? '2-3 sentence' : '3-5 sentence'} summary in simple language",
-  "subject": "MUST be exactly one of: MATH, SCIENCE, ENGLISH, ARABIC, ISLAMIC_STUDIES, SOCIAL_STUDIES, ART, MUSIC, OTHER",
-  "gradeLevel": "Estimated grade level (K-6)",
-  "formattedContent": "REQUIRED! The FULL lesson content as HTML. Rules:
-    - Use <h2> for main sections, <h3> for subsections
-    - Use <p> for all paragraphs
-    - Use <strong> for vocabulary terms
-    - Use <ul>/<ol> and <li> for lists
-    - For ANY practice problems/questions, wrap them like this:
-      <span class='interactive-exercise' data-exercise-id='ex-1' data-type='MATH_PROBLEM' data-answer='THE_ANSWER'>Question text here</span>
-    - Use ex-1, ex-2, ex-3, etc. for data-exercise-id
-    This field MUST contain the full lesson content as formatted HTML!",
-  "exercises": [],
-  "chapters": [],
-  "keyConcepts": [],
-  "vocabulary": [],
-  "suggestedQuestions": [],
+  "title": "A concise, engaging title for this lesson",
+  "summary": "${isYoung ? 'A 2-3 sentence summary using very simple words' : 'A 3-5 sentence summary that captures the key learning objectives'}",
+  "subject": "One of: MATH, SCIENCE, ENGLISH, ARABIC, ISLAMIC_STUDIES, SOCIAL_STUDIES, ART, MUSIC, OTHER",
+  "gradeLevel": "Estimated grade level (K, 1, 2, 3, 4, 5, or 6)",
+  "chapters": [
+    {
+      "title": "Section/chapter title if the content has clear sections",
+      "keyPoints": ["Main point 1", "Main point 2"]
+    }
+  ],
+  "keyConcepts": ["Important concept 1", "Important concept 2", "...up to 8 key concepts"],
+  "vocabulary": [
+    {
+      "term": "Important vocabulary word",
+      "definition": "${isYoung ? 'Very simple definition' : 'Clear, grade-appropriate definition'}",
+      "example": "Optional example sentence"
+    }
+  ],
+  "exercises": [
+    {
+      "id": "ex-1",
+      "type": "MATH_PROBLEM | FILL_IN_BLANK | SHORT_ANSWER | MULTIPLE_CHOICE | TRUE_FALSE",
+      "questionText": "The exact question/problem text as it appears",
+      "expectedAnswer": "The correct answer",
+      "acceptableAnswers": ["Alternative correct formats"],
+      "hint1": "A helpful hint without giving away the answer",
+      "hint2": "A more specific hint",
+      "explanation": "${isYoung ? 'Simple explanation of why' : 'Clear explanation of the solution'}",
+      "difficulty": "EASY | MEDIUM | HARD",
+      "locationInContent": "Where this appears (e.g., 'Practice Set A, #3')"
+    }
+  ],
+  "suggestedQuestions": [
+    "Question the student might want to ask Jeffrey about this content",
+    "Another curiosity-sparking question"
+  ],
   "confidence": 0.8
 }
 
-EXERCISES ARRAY RULES:
-- If the content contains practice problems, questions, or fill-in-the-blanks, you MUST include them in the exercises array
-- Each exercise in the array MUST have this structure:
-  {
-    "id": "ex-1",
-    "type": "MATH_PROBLEM",
-    "questionText": "1/2 × 1/4 = ___",
-    "expectedAnswer": "1/8",
-    "acceptableAnswers": ["0.125", "one eighth"],
-    "hint1": "Multiply the numerators, then multiply the denominators",
-    "hint2": "What is 1×1 and 2×4?",
-    "explanation": "When multiplying fractions, multiply top numbers and bottom numbers",
-    "difficulty": "MEDIUM"
-  }
-- Valid types: MATH_PROBLEM, FILL_IN_BLANK, SHORT_ANSWER, MULTIPLE_CHOICE, TRUE_FALSE
-- Valid difficulties: EASY, MEDIUM, HARD
-- The "id" MUST match the data-exercise-id in formattedContent (ex-1, ex-2, etc.)
+LANGUAGE FOR SUMMARIES AND VOCABULARY:
+- Maximum sentence length: ${gradeConfig.maxSentenceLength} words
+- Vocabulary level: ${gradeConfig.vocabularyTier.replace('_', ' ')}
 
-If there are NO practice problems in the content, return an empty array: "exercises": []
-
-Remember: BOTH formattedContent AND exercises fields are REQUIRED in your response!`;
+QUALITY GUIDELINES:
+- Title should be engaging and descriptive
+- Summary should help the student know what they'll learn
+- Vocabulary should include terms that might be new or important
+- Exercises should capture ALL practice problems found in the content
+- If no exercises exist in the content, return an empty array: "exercises": []`;
   }
 
   /**

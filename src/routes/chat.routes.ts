@@ -585,11 +585,16 @@ Guidelines:
       prompt += `\n\nLesson Summary:\n${lessonContext.summary.substring(0, 1000)}`;
     }
     if (lessonContext.content) {
-      // Include lesson content (truncated to avoid token limits)
-      const truncatedContent = lessonContext.content.substring(0, 4000);
-      prompt += `\n\n=== LESSON CONTENT ===\n${truncatedContent}`;
-      if (lessonContext.content.length > 4000) {
-        prompt += '\n[Content truncated for brevity]';
+      // Include lesson content for Jeffrey to reference
+      // This allows answering contextual questions like "what does question 3 mean?"
+      // Using 8000 chars to allow referencing most lesson content while staying within token limits
+      const truncatedContent = lessonContext.content.substring(0, 8000);
+      prompt += `\n\n=== FULL LESSON CONTENT ===
+The following is the complete lesson content. Use this to answer questions about specific parts of the lesson (e.g., "what does practice question 3 mean?" or "explain the second paragraph").
+
+${truncatedContent}`;
+      if (lessonContext.content.length > 8000) {
+        prompt += '\n\n[Note: Content was truncated. If the student asks about something not shown above, let them know you can only see the first part of the lesson.]';
       }
     }
     prompt += `\n\nIMPORTANT: Use this lesson content to answer questions accurately. When the student asks about specific topics from the lesson, reference this content directly.`;
