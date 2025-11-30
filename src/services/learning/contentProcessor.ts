@@ -142,7 +142,8 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
       extractedText, // This is the PRIMARY content displayed on the frontend
       title: analysis.title || lesson?.title,
       summary: analysis.summary,
-      gradeLevel: analysis.gradeLevel,
+      // Convert gradeLevel to string if it's a number (Prisma expects string)
+      gradeLevel: analysis.gradeLevel != null ? String(analysis.gradeLevel) : undefined,
       // Note: formattedContent is deprecated - we display extractedText directly
       // Cast arrays to JSON-compatible format for Prisma
       chapters: analysis.chapters ? JSON.parse(JSON.stringify(analysis.chapters)) : undefined,
