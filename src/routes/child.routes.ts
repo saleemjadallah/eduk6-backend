@@ -208,6 +208,69 @@ router.get(
 );
 
 /**
+ * POST /api/children/:childId/xp
+ * Award XP to a specific child (parent can award to their children)
+ * Requires parent authentication with child access
+ */
+router.post(
+  '/:childId/xp',
+  authenticate,
+  authorizeChildAccess(),
+  async (req, res, next) => {
+    try {
+      const { childId } = req.params;
+      const { amount, reason, sourceType, sourceId } = req.body;
+
+      // Validate input
+      if (!amount || typeof amount !== 'number' || amount <= 0 || amount > 1000) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid XP amount (must be 1-1000)',
+        });
+      }
+
+      // Map frontend reasons to backend XPReason enum
+      const validReasons = [
+        'LESSON_COMPLETE',
+        'LESSON_PROGRESS',
+        'FLASHCARD_REVIEW',
+        'FLASHCARD_CORRECT',
+        'QUIZ_COMPLETE',
+        'QUIZ_PERFECT',
+        'CHAT_QUESTION',
+        'DAILY_CHALLENGE',
+        'TEXT_SELECTION',
+        'BADGE_EARNED',
+        'OTHER',
+      ];
+
+      const xpReason = validReasons.includes(reason) ? reason : 'OTHER';
+
+      const result = await xpEngine.awardXP(childId, {
+        amount,
+        reason: xpReason as any,
+        sourceType,
+        sourceId,
+      });
+
+      res.json({
+        success: true,
+        data: {
+          xpAwarded: result.xpAwarded,
+          currentXP: result.currentXP,
+          totalXP: result.totalXP,
+          level: result.newLevel || (await xpEngine.getProgress(childId)).level,
+          leveledUp: result.leveledUp,
+          newBadges: result.newBadges,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * POST /api/children/me/xp
  * Award XP to current child
  * Requires child authentication
@@ -262,6 +325,34 @@ router.post(
           level: result.newLevel || (await xpEngine.getProgress(childId)).level,
           leveledUp: result.leveledUp,
           newBadges: result.newBadges,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /api/children/:childId/activity
+ * Record activity for a specific child (parent can record for their children)
+ * Requires parent authentication with child access
+ */
+router.post(
+  '/:childId/activity',
+  authenticate,
+  authorizeChildAccess(),
+  async (req, res, next) => {
+    try {
+      const { childId } = req.params;
+
+      await streakService.recordActivity(childId);
+      const streakInfo = await streakService.getStreakInfo(childId);
+
+      res.json({
+        success: true,
+        data: {
+          streak: streakInfo,
         },
       });
     } catch (error) {
