@@ -304,10 +304,25 @@ export class GeminiService {
 
     let analysis: LessonAnalysis;
     try {
-      const jsonText = this.extractJSON(responseText);
+      // Split response into JSON part and formatted content part
+      const delimiter = '===FORMATTED_CONTENT_START===';
+      const parts = responseText.split(delimiter);
+
+      // Parse the JSON part (first part)
+      const jsonPart = parts[0];
+      const jsonText = this.extractJSON(jsonPart);
       analysis = JSON.parse(jsonText);
 
-      // Log what Gemini returned for debugging exercises issue
+      // Extract formatted content (second part, if present)
+      if (parts.length > 1) {
+        // Get everything after the delimiter, trim whitespace
+        const formattedContent = parts[1].trim();
+        if (formattedContent) {
+          analysis.formattedContent = formattedContent;
+        }
+      }
+
+      // Log what Gemini returned for debugging
       logger.info('Content analysis parsed successfully', {
         hasFormattedContent: !!analysis.formattedContent,
         formattedContentLength: analysis.formattedContent?.length || 0,

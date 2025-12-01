@@ -280,9 +280,10 @@ Scan the content for ANY existing practice problems, questions, or activities:
 
 For each exercise found, extract it with its location context (e.g., "Set A, Question 3" or "Practice Problem 2").
 
-Return ONLY valid JSON with this structure:
+Return your response in TWO parts, separated by the delimiter ===FORMATTED_CONTENT_START===
+
+PART 1: Return ONLY valid JSON with this structure (do NOT include formattedContent here):
 {
-  "formattedContent": "The COMPLETE original content with proper line breaks and formatting added. Include EVERY word, sentence, example, problem, and answer from the original. This should be the FULL content, just with better structure.",
   "title": "A concise, engaging title for this lesson",
   "summary": "${isYoung ? 'A 2-3 sentence summary using very simple words' : 'A 3-5 sentence summary that captures the key learning objectives'}",
   "subject": "One of: MATH, SCIENCE, ENGLISH, ARABIC, ISLAMIC_STUDIES, SOCIAL_STUDIES, ART, MUSIC, OTHER",
@@ -322,12 +323,17 @@ Return ONLY valid JSON with this structure:
   "confidence": 0.8
 }
 
+===FORMATTED_CONTENT_START===
+
+PART 2: After the delimiter above, output the COMPLETE formatted content.
+This is the full original content with proper line breaks added - include EVERY word, nothing summarized or removed.
+
 LANGUAGE FOR SUMMARIES AND VOCABULARY:
 - Maximum sentence length: ${gradeConfig.maxSentenceLength} words
 - Vocabulary level: ${gradeConfig.vocabularyTier.replace('_', ' ')}
 
 QUALITY GUIDELINES:
-- formattedContent MUST contain ALL original text - do not skip anything
+- The formatted content after ===FORMATTED_CONTENT_START=== MUST contain ALL original text
 - Title should be engaging and descriptive
 - Summary should help the student know what they'll learn
 - Vocabulary should include terms that might be new or important
