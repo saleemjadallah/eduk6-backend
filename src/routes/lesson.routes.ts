@@ -181,7 +181,8 @@ router.post(
       // Update with analysis results
       await lessonService.update(lesson.id, {
         summary: analysis.summary,
-        gradeLevel: analysis.gradeLevel,
+        gradeLevel: String(analysis.gradeLevel), // Convert to string for Prisma
+        formattedContent: analysis.formattedContent, // AI-formatted content with proper line breaks
         chapters: analysis.chapters ? JSON.parse(JSON.stringify(analysis.chapters)) : undefined,
         keyConcepts: analysis.keyConcepts,
         vocabulary: analysis.vocabulary ? JSON.parse(JSON.stringify(analysis.vocabulary)) : undefined,
