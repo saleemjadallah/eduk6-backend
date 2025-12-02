@@ -268,9 +268,9 @@ export class GeminiService {
 
   /**
    * Analyze content and extract structured lesson data
-   * Uses parallel AI calls for speed:
-   * - Gemini 3 Pro for metadata extraction (exercises, vocabulary, etc.)
-   * - Gemini 2.5 Flash for fast content formatting
+   * Uses parallel AI calls with Gemini 2.5 Flash for both:
+   * - Analysis: metadata extraction (exercises, vocabulary, etc.)
+   * - Formatting: content structure with proper line breaks
    */
   async analyzeContent(
     content: string,
@@ -287,23 +287,21 @@ export class GeminiService {
     logger.info(`Starting parallel content analysis`, {
       contentLength: content.length,
       ageGroup: context.ageGroup,
-      models: {
-        analysis: config.gemini.models.pro,
-        formatting: config.gemini.models.flash,
-      },
+      model: config.gemini.models.flash,
     });
 
-    // Set up both models
-    const proModel = genAI.getGenerativeModel({
-      model: config.gemini.models.pro, // gemini-3-pro-preview
+    // Use Gemini 2.5 Flash for both - stable and fast
+    const analysisModel = genAI.getGenerativeModel({
+      model: config.gemini.models.flash, // gemini-2.5-flash
       safetySettings: CHILD_SAFETY_SETTINGS,
       generationConfig: {
-        ...GEMINI_3_PRO_ANALYSIS_CONFIG,
+        temperature: 0.3,
+        maxOutputTokens: 8000,
         responseMimeType: 'application/json',
       },
     });
 
-    const flashModel = genAI.getGenerativeModel({
+    const formattingModel = genAI.getGenerativeModel({
       model: config.gemini.models.flash, // gemini-2.5-flash
       safetySettings: CHILD_SAFETY_SETTINGS,
       generationConfig: {
@@ -314,8 +312,8 @@ export class GeminiService {
 
     // Run both calls in parallel
     const [analysisResult, formattingResult] = await Promise.all([
-      proModel.generateContent(analysisPrompt),
-      flashModel.generateContent(formattingPrompt).catch((error) => {
+      analysisModel.generateContent(analysisPrompt),
+      formattingModel.generateContent(formattingPrompt).catch((error) => {
         logger.error('Formatting call failed, will use raw content', {
           error: error instanceof Error ? error.message : 'Unknown error',
         });
@@ -326,7 +324,7 @@ export class GeminiService {
     // Process analysis result
     const analysisResponseText = analysisResult.response.text();
 
-    logger.info(`Gemini 3 Pro analysis completed`, {
+    logger.info(`Gemini 2.5 Flash analysis completed`, {
       responseLength: analysisResponseText.length,
       tokensUsed: analysisResult.response.usageMetadata?.totalTokenCount,
     });
