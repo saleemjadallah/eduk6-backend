@@ -190,23 +190,25 @@ export class GeminiService {
     const history = this.formatConversationHistory(context.conversationHistory);
 
     // 4. Get appropriate config for age group
-    // Use Gemini 3 Pro for Jeffrey - best reasoning for educational content
+    // Use Gemini 2.5 Flash for Jeffrey - fast and reliable for text-based chat
     const baseConfig = context.ageGroup === 'YOUNG' ? YOUNG_CHILD_CONFIG : OLDER_CHILD_CONFIG;
     const generationConfig = {
-      ...GEMINI_3_PRO_CHAT_CONFIG,
+      temperature: 1.0,
+      topP: 0.95,
+      topK: 40,
       maxOutputTokens: baseConfig.maxOutputTokens, // Age-appropriate length
     };
 
-    // 5. Call Gemini 3 Pro for Jeffrey AI tutor
+    // 5. Call Gemini 2.5 Flash for Jeffrey AI tutor
     const model = genAI.getGenerativeModel({
-      model: config.gemini.models.pro, // gemini-3-pro-preview
+      model: config.gemini.models.flash, // gemini-2.5-flash
       safetySettings: CHILD_SAFETY_SETTINGS,
       generationConfig,
       systemInstruction: systemPrompt,
     });
 
-    logger.info(`Using Gemini 3 Pro for Jeffrey chat`, {
-      model: config.gemini.models.pro,
+    logger.info(`Using Gemini 2.5 Flash for Jeffrey chat`, {
+      model: config.gemini.models.flash,
       ageGroup: context.ageGroup,
     });
 
@@ -692,7 +694,7 @@ QUALITY STANDARDS:
     });
 
     const model = genAI.getGenerativeModel({
-      model: config.gemini.models.pro, // Use Pro for best detection accuracy
+      model: config.gemini.models.flash, // Use Flash for text-based analysis
       safetySettings: CHILD_SAFETY_SETTINGS,
       generationConfig: {
         temperature: 0.3, // Lower temperature for more consistent detection
