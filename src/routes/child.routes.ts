@@ -137,6 +137,53 @@ router.get(
 );
 
 /**
+ * GET /api/children/:childId/badges
+ * Get all badges for a specific child (for parent to view)
+ * Requires parent authentication with child access
+ */
+router.get(
+  '/:childId/badges',
+  authenticate,
+  authorizeChildAccess(),
+  async (req, res, next) => {
+    try {
+      const { childId } = req.params;
+      const badges = await badgeService.getBadgesForChild(childId);
+
+      res.json({
+        success: true,
+        data: {
+          earned: badges.earned.map((b) => ({
+            id: b.id,
+            code: b.code,
+            name: b.name,
+            description: b.description,
+            icon: b.icon,
+            category: b.category,
+            rarity: b.rarity,
+            xpReward: b.xpReward,
+            earnedAt: b.earnedAt,
+          })),
+          available: badges.available.map((b) => ({
+            id: b.id,
+            code: b.code,
+            name: b.name,
+            description: b.description,
+            icon: b.icon,
+            category: b.category,
+            rarity: b.rarity,
+            xpReward: b.xpReward,
+            requirements: b.requirements,
+          })),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * GET /api/children/me/badges
  * Get all badges for current child
  */
