@@ -359,10 +359,21 @@ router.post(
       await streakService.recordActivity(childId);
       const streakInfo = await streakService.getStreakInfo(childId);
 
+      // Check for streak-related badges after activity recording
+      const progress = await xpEngine.getProgress(childId);
+      const newBadges = await badgeService.checkAndAwardBadges(childId, {
+        xpEarned: 0,
+        totalXP: progress.totalXP,
+        level: progress.level,
+        reason: 'STREAK_BONUS',
+        leveledUp: false,
+      });
+
       res.json({
         success: true,
         data: {
           streak: streakInfo,
+          newBadges: newBadges.length > 0 ? newBadges : undefined,
         },
       });
     } catch (error) {
@@ -387,10 +398,21 @@ router.post(
       await streakService.recordActivity(childId);
       const streakInfo = await streakService.getStreakInfo(childId);
 
+      // Check for streak-related badges after activity recording
+      const progress = await xpEngine.getProgress(childId);
+      const newBadges = await badgeService.checkAndAwardBadges(childId, {
+        xpEarned: 0,
+        totalXP: progress.totalXP,
+        level: progress.level,
+        reason: 'STREAK_BONUS',
+        leveledUp: false,
+      });
+
       res.json({
         success: true,
         data: {
           streak: streakInfo,
+          newBadges: newBadges.length > 0 ? newBadges : undefined,
         },
       });
     } catch (error) {

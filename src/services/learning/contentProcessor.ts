@@ -10,6 +10,8 @@ import { logger } from '../../utils/logger.js';
 import { LessonAnalysis } from '../ai/geminiService.js';
 
 import { CurriculumType } from '@prisma/client';
+import { badgeService } from '../gamification/badgeService.js';
+import { xpEngine } from '../gamification/xpEngine.js';
 
 // Note: We no longer use formattedContent or HTML parsing for exercises.
 // Exercises are now detected directly by the AI from the raw content.
@@ -158,7 +160,47 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
 
     logger.info(`Lesson ${lessonId} updated successfully`);
 
-    // 5. Create interactive exercises from the analysis
+    // 5. Increment lesson completion count and check badges
+    try {
+      // Update UserProgress.lessonsCompleted
+      await prisma.userProgress.upsert({
+        where: { childId },
+        create: {
+          childId,
+          lessonsCompleted: 1,
+        },
+        update: {
+          lessonsCompleted: { increment: 1 },
+        },
+      });
+
+      // Get current progress to check badges
+      const progress = await xpEngine.getProgress(childId);
+
+      // Check for badge unlocks (lesson completion badges)
+      const newBadges = await badgeService.checkAndAwardBadges(childId, {
+        xpEarned: 0,
+        totalXP: progress.totalXP,
+        level: progress.level,
+        reason: 'LESSON_COMPLETE',
+        leveledUp: false,
+      });
+
+      if (newBadges.length > 0) {
+        logger.info(`Awarded ${newBadges.length} badges for lesson completion`, {
+          lessonId,
+          childId,
+          badges: newBadges.map(b => b.name),
+        });
+      }
+    } catch (progressError) {
+      // Don't fail processing if progress update fails
+      logger.error(`Failed to update progress for lesson ${lessonId}`, {
+        error: progressError instanceof Error ? progressError.message : 'Unknown error',
+      });
+    }
+
+    // 6. Create interactive exercises from the analysis
     // Exercises are detected by AI from the raw content and stored separately
     try {
       const exercisesToCreate = analysis.exercises || [];

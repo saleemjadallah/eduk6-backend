@@ -201,9 +201,17 @@ export const badgeService = {
   ): Promise<Array<{ code: string; name: string; xpReward: number }>> {
     const awardedBadges: Array<{ code: string; name: string; xpReward: number }> = [];
 
-    // Get child's stats
+    // Get child's stats from UserProgress
     const progress = await prisma.userProgress.findUnique({
       where: { childId },
+    });
+
+    // Get actual lesson count from Lesson table (more accurate than UserProgress.lessonsCompleted)
+    const actualLessonsCompleted = await prisma.lesson.count({
+      where: {
+        childId,
+        processingStatus: 'COMPLETED',
+      },
     });
 
     const streak = await prisma.streak.findUnique({
@@ -232,9 +240,9 @@ export const badgeService = {
         earned = true;
       }
 
-      // Check lesson requirements
-      if (requirements.lessonsCompleted && progress) {
-        if (progress.lessonsCompleted >= requirements.lessonsCompleted) {
+      // Check lesson requirements (use actual count from Lesson table)
+      if (requirements.lessonsCompleted) {
+        if (actualLessonsCompleted >= requirements.lessonsCompleted) {
           earned = true;
         }
       }
