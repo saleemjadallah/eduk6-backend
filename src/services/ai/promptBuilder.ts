@@ -291,42 +291,9 @@ QUALITY GUIDELINES:
    * Uses Gemini 2.5 Flash for fast, efficient formatting
    */
   buildContentFormattingPrompt(content: string): string {
-    return `You are a text formatter. Your job is to add BLANK LINES to separate sections and make content readable.
+    return `Format this educational content for easy reading. Add blank lines between paragraphs, sections, and before bullet points. Keep all original text exactly as-is.
 
-CRITICAL: Use DOUBLE line breaks (blank lines) to separate content. Single line breaks get merged!
-
-FORMATTING RULES:
-1. Add a BLANK LINE before and after each section header
-2. Add a BLANK LINE before and after each bullet list
-3. Add a BLANK LINE between paragraphs
-4. Add a BLANK LINE before numbered steps (Step 1:, 1., etc.)
-5. Change [Page X] to [Section X] with blank lines around it
-6. Keep bullet points (•, -, *) each on their own line
-7. Preserve ALL original text exactly - no changes to wording
-
-EXAMPLE:
-Input: "[Page 1] Fractions Grade Level: 5th Learning Objectives • Add fractions • Subtract fractions The first step is..."
-
-Output:
-[Section 1]
-
-Fractions
-
-Grade Level: 5th
-
-Learning Objectives
-
-• Add fractions
-• Subtract fractions
-
-The first step is...
-
-CONTENT TO FORMAT:
----
-${content}
----
-
-Output ONLY the formatted text. No introductions like "Here is" - start directly with the content.`;
+${content}`;
   }
 
   /**
