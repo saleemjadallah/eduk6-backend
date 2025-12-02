@@ -351,17 +351,27 @@ export class GeminiService {
 
     // Process formatting result
     if (formattingResult) {
-      const formattedContent = formattingResult.response.text();
+      let formattedContent = formattingResult.response.text();
 
       logger.info(`Gemini 2.5 Flash formatting completed`, {
         responseLength: formattedContent.length,
         tokensUsed: formattingResult.response.usageMetadata?.totalTokenCount,
+        firstChars: formattedContent.substring(0, 100),
+        hasLineBreaks: formattedContent.includes('\n'),
+        lineBreakCount: (formattedContent.match(/\n/g) || []).length,
       });
 
-      analysis.formattedContent = formattedContent.trim();
+      // Clean up any "Here is..." intro that Gemini might add
+      formattedContent = formattedContent
+        .replace(/^["']/, '') // Remove leading quote
+        .replace(/["']$/, '') // Remove trailing quote
+        .replace(/^(Here is|Here's|The formatted content is|Below is)[^:]*:\s*/i, '') // Remove intro phrases
+        .trim();
+
+      analysis.formattedContent = formattedContent;
     } else {
       // Fall back to raw content if formatting failed
-      logger.warn('Using raw content as fallback');
+      logger.warn('Using raw content as fallback - formatting call returned null');
       analysis.formattedContent = content;
     }
 

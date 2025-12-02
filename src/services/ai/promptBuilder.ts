@@ -291,46 +291,28 @@ QUALITY GUIDELINES:
    * Uses Gemini 2.5 Flash for fast, efficient formatting
    */
   buildContentFormattingPrompt(content: string): string {
-    return `Format this educational content for readable display. Your ONLY job is to add proper line breaks and structure.
+    return `You are a text formatter. Take the educational content below and add proper line breaks to make it readable.
+
+IMPORTANT INSTRUCTIONS:
+1. Output ONLY the formatted text - no introductions, no explanations, no "Here is..." phrases
+2. Preserve ALL original text exactly - do not summarize, shorten, or change wording
+3. Your only job is to insert line breaks (\\n) in appropriate places
+
+WHERE TO ADD LINE BREAKS:
+- Between paragraphs (add blank line)
+- Before and after headers/titles
+- Before each bullet point (•, -, *)
+- Before numbered items (1., 2., Step 1:, etc.)
+- Before metadata like "Grade Level:", "Subject:", "Duration:"
+- Change [Page X] to [Section X] and put on its own line
+- Keep math expressions exactly as written
 
 CONTENT TO FORMAT:
+---
 ${content}
+---
 
-CRITICAL RULES:
-- DO NOT summarize, shorten, or remove ANY content
-- DO NOT add new content, explanations, or commentary
-- DO NOT change any wording - preserve the EXACT original text
-- DO NOT skip any sections, examples, problems, or answers
-- ONLY add proper formatting/structure
-
-FORMATTING TO ADD:
-- Add line breaks between paragraphs
-- Add line breaks before/after section headers
-- Add line breaks before each bullet point (•, -, *)
-- Add line breaks before numbered items (1., 2., Step 1:, Example 1:, etc.)
-- Add line breaks before metadata fields (Grade Level:, Subject:, Duration:, etc.)
-- Convert [Page X] markers to [Section X] (we use scrolling, not pages)
-- Separate distinct sections with blank lines
-- Keep all mathematical expressions, formulas, and answers exactly as written
-
-EXAMPLE:
-INPUT: "[Page 1] Fractions Grade Level: 5th Subject: Math Learning Objectives • Add fractions • Subtract fractions Example 1: 1/2 + 1/4 = 3/4"
-
-OUTPUT:
-"[Section 1]
-
-Fractions
-
-Grade Level: 5th
-Subject: Math
-
-Learning Objectives
-• Add fractions
-• Subtract fractions
-
-Example 1: 1/2 + 1/4 = 3/4"
-
-Now format the content above. Output ONLY the formatted text, nothing else.`;
+Remember: Output ONLY the formatted text. Start directly with the content, not with phrases like "Here is" or "The formatted content is".`;
   }
 
   /**
