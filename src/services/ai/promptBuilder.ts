@@ -291,28 +291,42 @@ QUALITY GUIDELINES:
    * Uses Gemini 2.5 Flash for fast, efficient formatting
    */
   buildContentFormattingPrompt(content: string): string {
-    return `You are a text formatter. Take the educational content below and add proper line breaks to make it readable.
+    return `You are a text formatter. Your job is to add BLANK LINES to separate sections and make content readable.
 
-IMPORTANT INSTRUCTIONS:
-1. Output ONLY the formatted text - no introductions, no explanations, no "Here is..." phrases
-2. Preserve ALL original text exactly - do not summarize, shorten, or change wording
-3. Your only job is to insert line breaks (\\n) in appropriate places
+CRITICAL: Use DOUBLE line breaks (blank lines) to separate content. Single line breaks get merged!
 
-WHERE TO ADD LINE BREAKS:
-- Between paragraphs (add blank line)
-- Before and after headers/titles
-- Before each bullet point (•, -, *)
-- Before numbered items (1., 2., Step 1:, etc.)
-- Before metadata like "Grade Level:", "Subject:", "Duration:"
-- Change [Page X] to [Section X] and put on its own line
-- Keep math expressions exactly as written
+FORMATTING RULES:
+1. Add a BLANK LINE before and after each section header
+2. Add a BLANK LINE before and after each bullet list
+3. Add a BLANK LINE between paragraphs
+4. Add a BLANK LINE before numbered steps (Step 1:, 1., etc.)
+5. Change [Page X] to [Section X] with blank lines around it
+6. Keep bullet points (•, -, *) each on their own line
+7. Preserve ALL original text exactly - no changes to wording
+
+EXAMPLE:
+Input: "[Page 1] Fractions Grade Level: 5th Learning Objectives • Add fractions • Subtract fractions The first step is..."
+
+Output:
+[Section 1]
+
+Fractions
+
+Grade Level: 5th
+
+Learning Objectives
+
+• Add fractions
+• Subtract fractions
+
+The first step is...
 
 CONTENT TO FORMAT:
 ---
 ${content}
 ---
 
-Remember: Output ONLY the formatted text. Start directly with the content, not with phrases like "Here is" or "The formatted content is".`;
+Output ONLY the formatted text. No introductions like "Here is" - start directly with the content.`;
   }
 
   /**

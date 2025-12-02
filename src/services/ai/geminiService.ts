@@ -356,9 +356,9 @@ export class GeminiService {
       logger.info(`Gemini 2.5 Flash formatting completed`, {
         responseLength: formattedContent.length,
         tokensUsed: formattingResult.response.usageMetadata?.totalTokenCount,
-        firstChars: formattedContent.substring(0, 100),
-        hasLineBreaks: formattedContent.includes('\n'),
-        lineBreakCount: (formattedContent.match(/\n/g) || []).length,
+        firstChars: formattedContent.substring(0, 150),
+        singleNewlines: (formattedContent.match(/\n/g) || []).length,
+        blankLines: (formattedContent.match(/\n\n/g) || []).length, // KEY: Must have blank lines!
       });
 
       // Clean up any "Here is..." intro that Gemini might add
