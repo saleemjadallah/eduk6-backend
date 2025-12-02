@@ -196,9 +196,8 @@ Return ONLY a valid JSON array with this exact structure (no additional text):
   }
 
   /**
-   * Build prompt for content analysis
-   * Extracts metadata AND formats the content for display
-   * The formattedContent preserves ALL original text but adds proper structure
+   * Build prompt for content analysis (metadata extraction only)
+   * Uses Gemini 3 Pro for best reasoning on exercises, vocabulary, etc.
    */
   buildContentAnalysisPrompt(
     content: string,
@@ -217,56 +216,10 @@ Return ONLY a valid JSON array with this exact structure (no additional text):
       ? 'a young child aged 4-7 who is just beginning their learning journey'
       : 'an elementary student aged 8-12 who can handle more detailed explanations'}.
 
-You have TWO jobs:
-1. EXTRACT metadata (title, summary, vocabulary, exercises, etc.)
-2. FORMAT the content for readable display
-
-CONTENT TO ANALYZE AND FORMAT:
+CONTENT TO ANALYZE:
 ${content}
 
 SUBJECT HINT: ${context.subject || 'Not specified'}
-
-═══════════════════════════════════════════════════════════
-TASK 1: FORMAT THE CONTENT (formattedContent field)
-═══════════════════════════════════════════════════════════
-
-CRITICAL RULES - YOU MUST FOLLOW THESE EXACTLY:
-- DO NOT summarize, shorten, or remove ANY content
-- DO NOT add new content, explanations, or commentary
-- DO NOT change any wording - preserve the EXACT original text
-- DO NOT skip any sections, examples, problems, or answers
-- Your ONLY job is to add proper formatting/structure
-
-FORMATTING TO ADD:
-- Add line breaks between paragraphs
-- Add line breaks before/after section headers
-- Add line breaks before each bullet point (•, -, *)
-- Add line breaks before numbered items (1., 2., Step 1:, Example 1:, etc.)
-- Add line breaks before metadata fields (Grade Level:, Subject:, Duration:, etc.)
-- Convert [Page X] markers to [Section X] (we use scrolling, not pages)
-- Separate distinct sections with blank lines
-- Keep all mathematical expressions, formulas, and answers exactly as written
-
-EXAMPLE of what you should do:
-INPUT: "[Page 1] Fractions Grade Level: 5th Subject: Math Learning Objectives • Add fractions • Subtract fractions Example 1: 1/2 + 1/4 = 3/4"
-
-OUTPUT (formattedContent):
-"[Section 1]
-
-Fractions
-
-Grade Level: 5th
-Subject: Math
-
-Learning Objectives
-• Add fractions
-• Subtract fractions
-
-Example 1: 1/2 + 1/4 = 3/4"
-
-═══════════════════════════════════════════════════════════
-TASK 2: EXTRACT METADATA
-═══════════════════════════════════════════════════════════
 
 ${curriculumGuidance}
 
@@ -280,9 +233,7 @@ Scan the content for ANY existing practice problems, questions, or activities:
 
 For each exercise found, extract it with its location context (e.g., "Set A, Question 3" or "Practice Problem 2").
 
-Return your response in TWO parts, separated by the delimiter ===FORMATTED_CONTENT_START===
-
-PART 1: Return ONLY valid JSON with this structure (do NOT include formattedContent here):
+Return ONLY valid JSON with this structure:
 {
   "title": "A concise, engaging title for this lesson",
   "summary": "${isYoung ? 'A 2-3 sentence summary using very simple words' : 'A 3-5 sentence summary that captures the key learning objectives'}",
@@ -323,22 +274,63 @@ PART 1: Return ONLY valid JSON with this structure (do NOT include formattedCont
   "confidence": 0.8
 }
 
-===FORMATTED_CONTENT_START===
-
-PART 2: After the delimiter above, output the COMPLETE formatted content.
-This is the full original content with proper line breaks added - include EVERY word, nothing summarized or removed.
-
 LANGUAGE FOR SUMMARIES AND VOCABULARY:
 - Maximum sentence length: ${gradeConfig.maxSentenceLength} words
 - Vocabulary level: ${gradeConfig.vocabularyTier.replace('_', ' ')}
 
 QUALITY GUIDELINES:
-- The formatted content after ===FORMATTED_CONTENT_START=== MUST contain ALL original text
 - Title should be engaging and descriptive
 - Summary should help the student know what they'll learn
 - Vocabulary should include terms that might be new or important
 - Exercises should capture ALL practice problems found in the content
 - If no exercises exist in the content, return an empty array: "exercises": []`;
+  }
+
+  /**
+   * Build prompt for content formatting only
+   * Uses Gemini 2.5 Flash for fast, efficient formatting
+   */
+  buildContentFormattingPrompt(content: string): string {
+    return `Format this educational content for readable display. Your ONLY job is to add proper line breaks and structure.
+
+CONTENT TO FORMAT:
+${content}
+
+CRITICAL RULES:
+- DO NOT summarize, shorten, or remove ANY content
+- DO NOT add new content, explanations, or commentary
+- DO NOT change any wording - preserve the EXACT original text
+- DO NOT skip any sections, examples, problems, or answers
+- ONLY add proper formatting/structure
+
+FORMATTING TO ADD:
+- Add line breaks between paragraphs
+- Add line breaks before/after section headers
+- Add line breaks before each bullet point (•, -, *)
+- Add line breaks before numbered items (1., 2., Step 1:, Example 1:, etc.)
+- Add line breaks before metadata fields (Grade Level:, Subject:, Duration:, etc.)
+- Convert [Page X] markers to [Section X] (we use scrolling, not pages)
+- Separate distinct sections with blank lines
+- Keep all mathematical expressions, formulas, and answers exactly as written
+
+EXAMPLE:
+INPUT: "[Page 1] Fractions Grade Level: 5th Subject: Math Learning Objectives • Add fractions • Subtract fractions Example 1: 1/2 + 1/4 = 3/4"
+
+OUTPUT:
+"[Section 1]
+
+Fractions
+
+Grade Level: 5th
+Subject: Math
+
+Learning Objectives
+• Add fractions
+• Subtract fractions
+
+Example 1: 1/2 + 1/4 = 3/4"
+
+Now format the content above. Output ONLY the formatted text, nothing else.`;
   }
 
   /**

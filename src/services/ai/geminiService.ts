@@ -268,7 +268,9 @@ export class GeminiService {
 
   /**
    * Analyze content and extract structured lesson data
-   * Uses Gemini 3 Pro for advanced reasoning and curriculum-aware content structuring
+   * Uses two-stage approach:
+   * 1. Gemini 3 Pro for metadata extraction (exercises, vocabulary, etc.)
+   * 2. Gemini 2.5 Flash for fast content formatting
    */
   async analyzeContent(
     content: string,
@@ -279,68 +281,90 @@ export class GeminiService {
       subject?: Subject | null;
     }
   ): Promise<LessonAnalysis> {
-    const prompt = promptBuilder.buildContentAnalysisPrompt(content, context);
+    // Stage 1: Extract metadata with Gemini 3 Pro (best reasoning)
+    const analysisPrompt = promptBuilder.buildContentAnalysisPrompt(content, context);
 
-    logger.info(`Analyzing content with Gemini 2.5 Flash`, {
-      model: config.gemini.models.flash,
+    logger.info(`Stage 1: Analyzing content with Gemini 3 Pro`, {
+      model: config.gemini.models.pro,
       contentLength: content.length,
       ageGroup: context.ageGroup,
     });
 
-    // Use Gemini 2.5 Flash for faster content analysis and formatting
-    const model = genAI.getGenerativeModel({
-      model: config.gemini.models.flash, // gemini-2.5-flash
+    const proModel = genAI.getGenerativeModel({
+      model: config.gemini.models.pro, // gemini-3-pro-preview
       safetySettings: CHILD_SAFETY_SETTINGS,
       generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 8000,
+        ...GEMINI_3_PRO_ANALYSIS_CONFIG,
+        responseMimeType: 'application/json',
       },
     });
 
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
+    const analysisResult = await proModel.generateContent(analysisPrompt);
+    const analysisResponseText = analysisResult.response.text();
 
-    logger.info(`Gemini 2.5 Flash analysis completed`, {
-      responseLength: responseText.length,
-      tokensUsed: result.response.usageMetadata?.totalTokenCount,
+    logger.info(`Gemini 3 Pro analysis completed`, {
+      responseLength: analysisResponseText.length,
+      tokensUsed: analysisResult.response.usageMetadata?.totalTokenCount,
     });
 
     let analysis: LessonAnalysis;
     try {
-      // Split response into JSON part and formatted content part
-      const delimiter = '===FORMATTED_CONTENT_START===';
-      const parts = responseText.split(delimiter);
-
-      // Parse the JSON part (first part)
-      const jsonPart = parts[0];
-      const jsonText = this.extractJSON(jsonPart);
+      const jsonText = this.extractJSON(analysisResponseText);
       analysis = JSON.parse(jsonText);
 
-      // Extract formatted content (second part, if present)
-      if (parts.length > 1) {
-        // Get everything after the delimiter, trim whitespace
-        const formattedContent = parts[1].trim();
-        if (formattedContent) {
-          analysis.formattedContent = formattedContent;
-        }
-      }
-
-      // Log what Gemini returned for debugging
       logger.info('Content analysis parsed successfully', {
-        hasFormattedContent: !!analysis.formattedContent,
-        formattedContentLength: analysis.formattedContent?.length || 0,
-        formattedContentPreview: analysis.formattedContent?.substring(0, 200) || 'NONE',
         hasExercises: !!analysis.exercises,
         exerciseCount: analysis.exercises?.length || 0,
-        exerciseIds: analysis.exercises?.map(e => e.id) || [],
-        exerciseTypes: analysis.exercises?.map(e => e.type) || [],
+        vocabularyCount: analysis.vocabulary?.length || 0,
       });
     } catch (error) {
       logger.error('Failed to parse content analysis response', {
-        responseText: responseText.substring(0, 1000), // Log more for debugging
+        responseText: analysisResponseText.substring(0, 1000),
         error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw new Error('Failed to analyze content');
+    }
+
+    // Stage 2: Format content with Gemini 2.5 Flash (fast)
+    const formattingPrompt = promptBuilder.buildContentFormattingPrompt(content);
+
+    logger.info(`Stage 2: Formatting content with Gemini 2.5 Flash`, {
+      model: config.gemini.models.flash,
+      contentLength: content.length,
+    });
+
+    const flashModel = genAI.getGenerativeModel({
+      model: config.gemini.models.flash, // gemini-2.5-flash
+      safetySettings: CHILD_SAFETY_SETTINGS,
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 8000,
+      },
+    });
+
+    try {
+      const formattingResult = await flashModel.generateContent(formattingPrompt);
+      const formattedContent = formattingResult.response.text();
+
+      logger.info(`Gemini 2.5 Flash formatting completed`, {
+        responseLength: formattedContent.length,
+        tokensUsed: formattingResult.response.usageMetadata?.totalTokenCount,
+      });
+
+      // Add formatted content to analysis
+      analysis.formattedContent = formattedContent.trim();
+
+      logger.info('Content formatting added', {
+        formattedContentLength: analysis.formattedContent.length,
+        formattedContentPreview: analysis.formattedContent.substring(0, 200),
+      });
+    } catch (formattingError) {
+      // If formatting fails, log but don't fail the whole analysis
+      logger.error('Failed to format content, using raw text', {
+        error: formattingError instanceof Error ? formattingError.message : 'Unknown error',
+      });
+      // Fall back to raw content
+      analysis.formattedContent = content;
     }
 
     // Validate content is child-appropriate
