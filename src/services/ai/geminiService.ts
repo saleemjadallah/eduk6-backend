@@ -268,9 +268,9 @@ export class GeminiService {
 
   /**
    * Analyze content and extract structured lesson data
-   * Uses two-stage approach:
-   * 1. Gemini 3 Pro for metadata extraction (exercises, vocabulary, etc.)
-   * 2. Gemini 2.5 Flash for fast content formatting
+   * Uses parallel AI calls for speed:
+   * - Gemini 3 Pro for metadata extraction (exercises, vocabulary, etc.)
+   * - Gemini 2.5 Flash for fast content formatting
    */
   async analyzeContent(
     content: string,
@@ -281,15 +281,19 @@ export class GeminiService {
       subject?: Subject | null;
     }
   ): Promise<LessonAnalysis> {
-    // Stage 1: Extract metadata with Gemini 3 Pro (best reasoning)
     const analysisPrompt = promptBuilder.buildContentAnalysisPrompt(content, context);
+    const formattingPrompt = promptBuilder.buildContentFormattingPrompt(content);
 
-    logger.info(`Stage 1: Analyzing content with Gemini 3 Pro`, {
-      model: config.gemini.models.pro,
+    logger.info(`Starting parallel content analysis`, {
       contentLength: content.length,
       ageGroup: context.ageGroup,
+      models: {
+        analysis: config.gemini.models.pro,
+        formatting: config.gemini.models.flash,
+      },
     });
 
+    // Set up both models
     const proModel = genAI.getGenerativeModel({
       model: config.gemini.models.pro, // gemini-3-pro-preview
       safetySettings: CHILD_SAFETY_SETTINGS,
@@ -299,7 +303,27 @@ export class GeminiService {
       },
     });
 
-    const analysisResult = await proModel.generateContent(analysisPrompt);
+    const flashModel = genAI.getGenerativeModel({
+      model: config.gemini.models.flash, // gemini-2.5-flash
+      safetySettings: CHILD_SAFETY_SETTINGS,
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 8000,
+      },
+    });
+
+    // Run both calls in parallel
+    const [analysisResult, formattingResult] = await Promise.all([
+      proModel.generateContent(analysisPrompt),
+      flashModel.generateContent(formattingPrompt).catch((error) => {
+        logger.error('Formatting call failed, will use raw content', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        return null;
+      }),
+    ]);
+
+    // Process analysis result
     const analysisResponseText = analysisResult.response.text();
 
     logger.info(`Gemini 3 Pro analysis completed`, {
@@ -325,25 +349,8 @@ export class GeminiService {
       throw new Error('Failed to analyze content');
     }
 
-    // Stage 2: Format content with Gemini 2.5 Flash (fast)
-    const formattingPrompt = promptBuilder.buildContentFormattingPrompt(content);
-
-    logger.info(`Stage 2: Formatting content with Gemini 2.5 Flash`, {
-      model: config.gemini.models.flash,
-      contentLength: content.length,
-    });
-
-    const flashModel = genAI.getGenerativeModel({
-      model: config.gemini.models.flash, // gemini-2.5-flash
-      safetySettings: CHILD_SAFETY_SETTINGS,
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 8000,
-      },
-    });
-
-    try {
-      const formattingResult = await flashModel.generateContent(formattingPrompt);
+    // Process formatting result
+    if (formattingResult) {
       const formattedContent = formattingResult.response.text();
 
       logger.info(`Gemini 2.5 Flash formatting completed`, {
@@ -351,19 +358,10 @@ export class GeminiService {
         tokensUsed: formattingResult.response.usageMetadata?.totalTokenCount,
       });
 
-      // Add formatted content to analysis
       analysis.formattedContent = formattedContent.trim();
-
-      logger.info('Content formatting added', {
-        formattedContentLength: analysis.formattedContent.length,
-        formattedContentPreview: analysis.formattedContent.substring(0, 200),
-      });
-    } catch (formattingError) {
-      // If formatting fails, log but don't fail the whole analysis
-      logger.error('Failed to format content, using raw text', {
-        error: formattingError instanceof Error ? formattingError.message : 'Unknown error',
-      });
-      // Fall back to raw content
+    } else {
+      // Fall back to raw content if formatting failed
+      logger.warn('Using raw content as fallback');
       analysis.formattedContent = content;
     }
 
