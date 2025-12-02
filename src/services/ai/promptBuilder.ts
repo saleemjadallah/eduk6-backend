@@ -243,7 +243,7 @@ FORMATTING TO ADD:
 - Add line breaks before each bullet point (•, -, *)
 - Add line breaks before numbered items (1., 2., Step 1:, Example 1:, etc.)
 - Add line breaks before metadata fields (Grade Level:, Subject:, Duration:, etc.)
-- Add line breaks before/after [Page X] markers
+- Convert [Page X] markers to [Section X] (we use scrolling, not pages)
 - Separate distinct sections with blank lines
 - Keep all mathematical expressions, formulas, and answers exactly as written
 
@@ -251,7 +251,7 @@ EXAMPLE of what you should do:
 INPUT: "[Page 1] Fractions Grade Level: 5th Subject: Math Learning Objectives • Add fractions • Subtract fractions Example 1: 1/2 + 1/4 = 3/4"
 
 OUTPUT (formattedContent):
-"[Page 1]
+"[Section 1]
 
 Fractions
 

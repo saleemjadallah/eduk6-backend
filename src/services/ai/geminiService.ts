@@ -281,23 +281,26 @@ export class GeminiService {
   ): Promise<LessonAnalysis> {
     const prompt = promptBuilder.buildContentAnalysisPrompt(content, context);
 
-    logger.info(`Analyzing content with Gemini 3 Pro`, {
-      model: config.gemini.models.pro,
+    logger.info(`Analyzing content with Gemini 2.5 Flash`, {
+      model: config.gemini.models.flash,
       contentLength: content.length,
       ageGroup: context.ageGroup,
     });
 
-    // Use Gemini 3 Pro for best analysis quality
+    // Use Gemini 2.5 Flash for faster content analysis and formatting
     const model = genAI.getGenerativeModel({
-      model: config.gemini.models.pro, // gemini-3-pro-preview
+      model: config.gemini.models.flash, // gemini-2.5-flash
       safetySettings: CHILD_SAFETY_SETTINGS,
-      generationConfig: GEMINI_3_PRO_ANALYSIS_CONFIG,
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 8000,
+      },
     });
 
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
 
-    logger.info(`Gemini 3 Pro analysis completed`, {
+    logger.info(`Gemini 2.5 Flash analysis completed`, {
       responseLength: responseText.length,
       tokensUsed: result.response.usageMetadata?.totalTokenCount,
     });
