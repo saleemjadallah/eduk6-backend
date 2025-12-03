@@ -543,13 +543,13 @@ router.get(
   authenticate,
   async (req, res, next) => {
     try {
-      const parentId = req.parent?.id || req.user?.id;
+      const parentId = req.parent?.id;
       const { noteId } = req.params;
 
       if (!parentId) {
         return res.status(401).json({
           success: false,
-          error: 'Authentication required',
+          error: 'Parent authentication required',
         });
       }
 
@@ -607,14 +607,14 @@ router.post(
   authenticate,
   async (req, res, next) => {
     try {
-      const parentId = req.parent?.id || req.user?.id;
+      const parentId = req.parent?.id;
       const { noteId } = req.params;
       const { content, emoji } = req.body;
 
       if (!parentId) {
         return res.status(401).json({
           success: false,
-          error: 'Authentication required',
+          error: 'Parent authentication required',
         });
       }
 
@@ -680,13 +680,13 @@ router.delete(
   authenticate,
   async (req, res, next) => {
     try {
-      const parentId = req.parent?.id || req.user?.id;
+      const parentId = req.parent?.id;
       const { commentId } = req.params;
 
       if (!parentId) {
         return res.status(401).json({
           success: false,
-          error: 'Authentication required',
+          error: 'Parent authentication required',
         });
       }
 
