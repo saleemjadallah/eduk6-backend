@@ -674,8 +674,8 @@ export class GeminiService {
     // Step 1: Use Google Cloud Translate REST API for reliable translation
     let translatedText: string;
     try {
-      // Use the same API key as Gemini (it works for Cloud Translation too)
-      const apiKey = config.gemini.apiKey;
+      // Use dedicated Cloud Translation API key (separate from Gemini API key)
+      const apiKey = process.env.GOOGLE_TRANSLATE_API_KEY || config.gemini.apiKey;
 
       translatedText = await googleTranslate(text, targetLangCode, apiKey);
 
