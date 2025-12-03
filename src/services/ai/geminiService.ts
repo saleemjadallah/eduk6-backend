@@ -695,71 +695,13 @@ export class GeminiService {
       throw new Error('Failed to translate text');
     }
 
-    // Step 2: Use Gemini to add kid-friendly pronunciation and explanation
-    let pronunciation: string | undefined;
-    let simpleExplanation: string | undefined;
-
-    try {
-      const contextPrompt = `You are helping ${isYoung
-        ? 'a young child aged 4-7'
-        : 'an elementary school student aged 8-12'} learn about languages.
-
-The text "${text}" has been translated to ${targetLanguage} as: "${translatedText}"
-
-Please provide:
-1. A pronunciation guide using English sounds (e.g., "say: Bone-JOOR" for "Bonjour")
-2. A ${isYoung ? 'fun, simple one-sentence explanation that excites the child' : 'brief interesting note about the language or phrase'}
-
-Return ONLY a JSON object:
-{
-  "pronunciation": "the pronunciation guide or null if not needed for Latin scripts",
-  "explanation": "the kid-friendly explanation"
-}`;
-
-      const model = genAI.getGenerativeModel({
-        model: config.gemini.models.flashLite, // Use faster/cheaper model for context
-        safetySettings: CHILD_SAFETY_SETTINGS,
-        generationConfig: {
-          temperature: 0.5,
-          maxOutputTokens: 300,
-          responseMimeType: 'application/json',
-        },
-      });
-
-      const result = await model.generateContent(contextPrompt);
-      const responseText = result.response.text();
-
-      if (responseText) {
-        try {
-          const parsed = JSON.parse(responseText);
-          pronunciation = parsed.pronunciation || undefined;
-          simpleExplanation = parsed.explanation || undefined;
-        } catch {
-          // If parsing fails, try to extract manually
-          const pronMatch = responseText.match(/"pronunciation"\s*:\s*"([^"]+)"/);
-          const explMatch = responseText.match(/"explanation"\s*:\s*"([^"]+)"/);
-          pronunciation = pronMatch?.[1] || undefined;
-          simpleExplanation = explMatch?.[1] || undefined;
-        }
-      }
-
-      logger.info('Gemini context enrichment successful', {
-        hasPronunciation: !!pronunciation,
-        hasExplanation: !!simpleExplanation,
-      });
-    } catch (geminiError) {
-      // Gemini context is optional - log but don't fail
-      logger.warn('Gemini context enrichment failed, returning translation only', {
-        error: geminiError instanceof Error ? geminiError.message : 'Unknown error',
-      });
-    }
-
+    // Return just the translation - no extra context needed for lesson content
     return {
       originalText: text,
       translatedText,
       targetLanguage,
-      pronunciation,
-      simpleExplanation,
+      pronunciation: undefined,
+      simpleExplanation: undefined,
     };
   }
 
