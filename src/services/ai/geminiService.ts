@@ -657,16 +657,23 @@ QUALITY STANDARDS:
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
 
-    logger.info('Translation completed', {
+    logger.info('Translation raw response', {
       originalLength: text.length,
       targetLanguage,
       ageGroup: context.ageGroup,
       responseLength: responseText.length,
+      rawResponse: responseText, // Log full response for debugging
     });
 
+    // Check if response is empty
+    if (!responseText || responseText.trim().length === 0) {
+      logger.error('Empty translation response from Gemini');
+      throw new Error('Failed to translate text - empty response');
+    }
+
     try {
-      const jsonText = this.extractJSON(responseText);
-      const parsed = JSON.parse(jsonText);
+      // First try direct JSON parse (since we use responseMimeType: 'application/json')
+      const parsed = JSON.parse(responseText);
       return {
         originalText: text,
         translatedText: parsed.translatedText,
@@ -674,40 +681,50 @@ QUALITY STANDARDS:
         pronunciation: parsed.pronunciation || undefined,
         simpleExplanation: parsed.simpleExplanation || undefined,
       };
-    } catch (parseError) {
-      logger.error('Failed to parse translation response', {
-        responseText: responseText.substring(0, 1000),
-        error: parseError instanceof Error ? parseError.message : 'Unknown error',
+    } catch (directParseError) {
+      logger.warn('Direct JSON parse failed, trying extractJSON', {
+        error: directParseError instanceof Error ? directParseError.message : 'Unknown error',
       });
 
-      // Fallback: Try to extract fields using more robust regex for Unicode/RTL text
       try {
-        // Match content between quotes, handling escaped quotes and Unicode
-        const extractField = (fieldName: string): string | null => {
-          const regex = new RegExp(`"${fieldName}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`);
-          const match = responseText.match(regex);
-          return match ? match[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\') : null;
+        const jsonText = this.extractJSON(responseText);
+        const parsed = JSON.parse(jsonText);
+        return {
+          originalText: text,
+          translatedText: parsed.translatedText,
+          targetLanguage: targetLanguage,
+          pronunciation: parsed.pronunciation || undefined,
+          simpleExplanation: parsed.simpleExplanation || undefined,
         };
+      } catch (extractError) {
+        logger.error('Failed to parse translation response', {
+          responseText: responseText,
+          directError: directParseError instanceof Error ? directParseError.message : 'Unknown',
+          extractError: extractError instanceof Error ? extractError.message : 'Unknown',
+        });
 
-        const translatedText = extractField('translatedText');
+        // Last resort: Try simple regex extraction
+        // Look for Arabic/Unicode text after "translatedText":
+        const translatedMatch = responseText.match(/"translatedText"\s*:\s*"([\s\S]*?)(?:"|$)/);
 
-        if (translatedText) {
-          logger.info('Using fallback regex extraction for translation');
+        if (translatedMatch && translatedMatch[1]) {
+          const extractedText = translatedMatch[1]
+            .replace(/\\n/g, '\n')
+            .replace(/\\"/g, '"')
+            .replace(/\\\\/g, '\\');
+
+          logger.info('Using last-resort regex extraction', { extractedText });
           return {
             originalText: text,
-            translatedText: translatedText,
+            translatedText: extractedText,
             targetLanguage: targetLanguage,
-            pronunciation: extractField('pronunciation') || undefined,
-            simpleExplanation: extractField('simpleExplanation') || undefined,
+            pronunciation: undefined,
+            simpleExplanation: undefined,
           };
         }
-      } catch (fallbackError) {
-        logger.error('Fallback extraction also failed', {
-          error: fallbackError instanceof Error ? fallbackError.message : 'Unknown error',
-        });
-      }
 
-      throw new Error('Failed to translate text');
+        throw new Error('Failed to translate text');
+      }
     }
   }
 
