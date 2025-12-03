@@ -42,6 +42,7 @@ model Parent {
 
   // Relationships
   children         Child[]
+  noteComments     NoteComment[]
 
   // Timestamps
   createdAt        DateTime @default(now())
@@ -88,6 +89,7 @@ model Child {
   safetyLogs       SafetyLog[]
   textSelections   TextSelection[]
   exerciseAttempts ExerciseAttempt[]
+  notes            Note[]
 
   // Timestamps
   createdAt        DateTime @default(now())
@@ -166,6 +168,7 @@ model Lesson {
   quizzes          Quiz[]
   textSelections   TextSelection[]
   exercises        InteractiveExercise[]
+  notes            Note[]
 
   // Progress
   percentComplete  Float    @default(0)
@@ -463,6 +466,63 @@ model TextSelection {
 }
 
 // ============================================
+// NOTEBOOK & NOTES
+// ============================================
+
+model Note {
+  id               String   @id @default(uuid())
+  childId          String
+  child            Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  lessonId         String?
+  lesson           Lesson?  @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+
+  // Content
+  title            String   @db.VarChar(255)
+  content          String   @db.Text          // Rich text (HTML)
+  originalText     String?  @db.Text          // Original highlighted text that started the note
+  subject          Subject?
+  contentFormat    NoteContentFormat @default(RICH_TEXT)
+
+  // Personalization
+  coverColor       String?  @default("#FFD93D")
+  coverStickers    String[]                   // Array of sticker IDs selected by child
+  coverPattern     String?  @default("dots")  // Pattern: dots, lines, stars, hearts, etc.
+
+  // Organization
+  isPinned         Boolean  @default(false)
+  orderIndex       Int      @default(0)
+
+  // Parent interaction
+  parentComments   NoteComment[]
+
+  // Timestamps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([childId, subject])
+  @@index([childId, lessonId])
+  @@index([childId, isPinned, orderIndex])
+}
+
+model NoteComment {
+  id               String   @id @default(uuid())
+  noteId           String
+  note             Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  parentId         String
+  parent           Parent   @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  // Content
+  content          String   @db.Text
+  emoji            String?  // Optional emoji reaction
+
+  // Timestamps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([noteId, createdAt])
+}
+
+// ============================================
 // INTERACTIVE EXERCISES
 // ============================================
 
@@ -664,6 +724,8 @@ enum XPReason {
   TEXT_SELECTION
   EXERCISE_CORRECT
   EXERCISE_PERFECT
+  NOTE_CREATED
+  NOTE_EDITED
 }
 
 enum BadgeCategory {
@@ -732,4 +794,9 @@ enum ExerciseDifficulty {
   EASY
   MEDIUM
   HARD
+}
+
+enum NoteContentFormat {
+  PLAIN
+  RICH_TEXT
 }
