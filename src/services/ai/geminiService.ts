@@ -661,6 +661,7 @@ QUALITY STANDARDS:
       originalLength: text.length,
       targetLanguage,
       ageGroup: context.ageGroup,
+      responseLength: responseText.length,
     });
 
     try {
@@ -673,11 +674,39 @@ QUALITY STANDARDS:
         pronunciation: parsed.pronunciation || undefined,
         simpleExplanation: parsed.simpleExplanation || undefined,
       };
-    } catch (error) {
+    } catch (parseError) {
       logger.error('Failed to parse translation response', {
-        responseText: responseText.substring(0, 500),
-        error: error instanceof Error ? error.message : 'Unknown error',
+        responseText: responseText.substring(0, 1000),
+        error: parseError instanceof Error ? parseError.message : 'Unknown error',
       });
+
+      // Fallback: Try to extract fields using more robust regex for Unicode/RTL text
+      try {
+        // Match content between quotes, handling escaped quotes and Unicode
+        const extractField = (fieldName: string): string | null => {
+          const regex = new RegExp(`"${fieldName}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`);
+          const match = responseText.match(regex);
+          return match ? match[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\') : null;
+        };
+
+        const translatedText = extractField('translatedText');
+
+        if (translatedText) {
+          logger.info('Using fallback regex extraction for translation');
+          return {
+            originalText: text,
+            translatedText: translatedText,
+            targetLanguage: targetLanguage,
+            pronunciation: extractField('pronunciation') || undefined,
+            simpleExplanation: extractField('simpleExplanation') || undefined,
+          };
+        }
+      } catch (fallbackError) {
+        logger.error('Fallback extraction also failed', {
+          error: fallbackError instanceof Error ? fallbackError.message : 'Unknown error',
+        });
+      }
+
       throw new Error('Failed to translate text');
     }
   }
