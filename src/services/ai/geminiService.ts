@@ -13,6 +13,10 @@ import { promptBuilder, LessonContext } from './promptBuilder.js';
 import { safetyFilters, SafetyValidation } from './safetyFilters.js';
 import { AgeGroup, Subject, ChatMessage, CurriculumType } from '@prisma/client';
 import { logger } from '../../utils/logger.js';
+import { TranslationServiceClient } from '@google-cloud/translate';
+
+// Initialize Google Cloud Translate client
+const googleTranslateClient = new TranslationServiceClient();
 
 // Common context interface for curriculum-aware AI operations
 export interface ChildContext {
@@ -586,9 +590,9 @@ export class GeminiService {
   }
 
   /**
-   * Translate selected text to a target language
-   * Provides kid-friendly translations with optional pronunciation and explanation
-   * Follows Google AI Studio best practices for educational content
+   * Translate selected text to a target language using hybrid approach:
+   * 1. Google Cloud Translate API for reliable, accurate translation
+   * 2. Gemini AI for kid-friendly pronunciation and explanation
    */
   async translateText(
     text: string,
@@ -600,157 +604,146 @@ export class GeminiService {
   ): Promise<TranslationResult> {
     const isYoung = context.ageGroup === 'YOUNG';
 
-    // Following Gemini best practices:
-    // 1. Provide clear context about the audience
-    // 2. Be specific about what kind of output we want
-    // 3. Use natural language to describe requirements
+    // Language code mapping for Google Translate
+    const languageCodeMap: Record<string, string> = {
+      'arabic': 'ar',
+      'spanish': 'es',
+      'french': 'fr',
+      'german': 'de',
+      'italian': 'it',
+      'portuguese': 'pt',
+      'chinese': 'zh',
+      'japanese': 'ja',
+      'korean': 'ko',
+      'russian': 'ru',
+      'hindi': 'hi',
+      'hebrew': 'he',
+      'turkish': 'tr',
+      'dutch': 'nl',
+      'polish': 'pl',
+      'vietnamese': 'vi',
+      'thai': 'th',
+      'indonesian': 'id',
+      'malay': 'ms',
+      'swahili': 'sw',
+      'urdu': 'ur',
+      'persian': 'fa',
+      'bengali': 'bn',
+      'punjabi': 'pa',
+      'tamil': 'ta',
+      'telugu': 'te',
+      'marathi': 'mr',
+      'gujarati': 'gu',
+    };
 
-    const prompt = `You are helping ${isYoung
-      ? 'a young child aged 4-7 who is just starting to learn about different languages and finds it exciting to discover new words'
-      : 'an elementary school student aged 8-12 who is curious about languages and enjoys learning how people communicate around the world'}.
+    const targetLangCode = languageCodeMap[targetLanguage.toLowerCase()] || targetLanguage.substring(0, 2).toLowerCase();
 
-TRANSLATION REQUEST:
-Please translate this text into ${targetLanguage}: "${text}"
-
-YOUR TASK:
-Provide a translation that feels natural and would actually be used by native ${targetLanguage} speakers. ${isYoung
-  ? 'If there are multiple ways to say something, choose the simplest, most common version that a child would understand.'
-  : 'Choose clear, standard language that represents how the phrase would commonly be expressed.'}
-
-WHAT TO INCLUDE:
-${isYoung
-  ? `- A simple, easy-to-remember translation
-- For languages with different writing systems (Arabic, Chinese, etc.), show how to pronounce it using sounds they know
-- A fun, simple explanation that makes the child excited about learning the new word`
-  : `- An accurate, natural translation
-- For languages with different writing systems, provide a phonetic pronunciation guide
-- If helpful, a brief note about interesting language facts or usage context`}
-
-Return ONLY a valid JSON object with this exact structure (no additional text):
-{
-  "originalText": "The original text",
-  "translatedText": "The translation in ${targetLanguage}",
-  "targetLanguage": "${targetLanguage}",
-  "pronunciation": ${isYoung
-    ? '"Simple pronunciation using familiar sounds, like \\"say: Bone-jour\\" (only for non-Latin scripts, otherwise null)"'
-    : '"Phonetic guide for non-Latin scripts, otherwise null"'},
-  "simpleExplanation": "${isYoung
-    ? 'A delightful 1-sentence explanation like: \\"This is how kids in France say hello!\\"'
-    : 'A brief, interesting note about the translation if it adds value, otherwise null'}"
-}
-
-QUALITY STANDARDS:
-- Translation must be accurate and natural-sounding
-- Pronunciation (when included) should use sounds familiar to English speakers
-- Explanation should spark curiosity about languages, not feel like a lecture`;
-
-    const model = genAI.getGenerativeModel({
-      model: config.gemini.models.flash,
-      safetySettings: CHILD_SAFETY_SETTINGS,
-      generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 2500, // Higher limit for RTL languages (Arabic, Hebrew) which expand significantly
-        // Note: Removed responseMimeType: 'application/json' as it causes issues with RTL languages
-      },
-    });
-
-    const result = await model.generateContent(prompt);
-
-    // Check for blocked content or safety issues
-    const response = result.response;
-    const promptFeedback = response.promptFeedback;
-    const candidates = response.candidates;
-
-    logger.info('Translation response metadata', {
-      originalLength: text.length,
+    logger.info('Starting hybrid translation', {
+      text: text.substring(0, 100),
       targetLanguage,
-      promptFeedback: promptFeedback,
-      candidateCount: candidates?.length || 0,
-      finishReason: candidates?.[0]?.finishReason,
-      safetyRatings: candidates?.[0]?.safetyRatings,
+      targetLangCode,
+      ageGroup: context.ageGroup,
     });
 
-    // Check if blocked
-    if (promptFeedback?.blockReason) {
-      logger.error('Translation blocked by Gemini', { blockReason: promptFeedback.blockReason });
-      throw new Error(`Translation blocked: ${promptFeedback.blockReason}`);
-    }
+    // Step 1: Use Google Cloud Translate for reliable translation
+    let translatedText: string;
+    try {
+      const projectId = config.firebase.projectId;
+      const location = 'global';
 
-    if (!candidates || candidates.length === 0) {
-      logger.error('No candidates returned from Gemini');
-      throw new Error('Failed to translate text - no response candidates');
-    }
+      const request = {
+        parent: `projects/${projectId}/locations/${location}`,
+        contents: [text],
+        mimeType: 'text/plain',
+        sourceLanguageCode: 'en',
+        targetLanguageCode: targetLangCode,
+      };
 
-    const responseText = response.text();
+      const [response] = await googleTranslateClient.translateText(request);
+      translatedText = response.translations?.[0]?.translatedText || '';
 
-    logger.info('Translation raw response', {
-      responseLength: responseText.length,
-      rawResponse: responseText.substring(0, 500),
-    });
+      if (!translatedText) {
+        throw new Error('Empty translation from Google Translate');
+      }
 
-    // Check if response is empty
-    if (!responseText || responseText.trim().length === 0) {
-      logger.error('Empty translation response from Gemini', {
-        finishReason: candidates[0]?.finishReason,
+      logger.info('Google Translate successful', {
+        originalLength: text.length,
+        translatedLength: translatedText.length,
+        targetLangCode,
       });
-      throw new Error('Failed to translate text - empty response');
+    } catch (googleError) {
+      logger.error('Google Translate failed', {
+        error: googleError instanceof Error ? googleError.message : 'Unknown error',
+      });
+      throw new Error('Failed to translate text');
     }
+
+    // Step 2: Use Gemini to add kid-friendly pronunciation and explanation
+    let pronunciation: string | undefined;
+    let simpleExplanation: string | undefined;
 
     try {
-      // First try direct JSON parse (since we use responseMimeType: 'application/json')
-      const parsed = JSON.parse(responseText);
-      return {
-        originalText: text,
-        translatedText: parsed.translatedText,
-        targetLanguage: targetLanguage,
-        pronunciation: parsed.pronunciation || undefined,
-        simpleExplanation: parsed.simpleExplanation || undefined,
-      };
-    } catch (directParseError) {
-      logger.warn('Direct JSON parse failed, trying extractJSON', {
-        error: directParseError instanceof Error ? directParseError.message : 'Unknown error',
+      const contextPrompt = `You are helping ${isYoung
+        ? 'a young child aged 4-7'
+        : 'an elementary school student aged 8-12'} learn about languages.
+
+The text "${text}" has been translated to ${targetLanguage} as: "${translatedText}"
+
+Please provide:
+1. A pronunciation guide using English sounds (e.g., "say: Bone-JOOR" for "Bonjour")
+2. A ${isYoung ? 'fun, simple one-sentence explanation that excites the child' : 'brief interesting note about the language or phrase'}
+
+Return ONLY a JSON object:
+{
+  "pronunciation": "the pronunciation guide or null if not needed for Latin scripts",
+  "explanation": "the kid-friendly explanation"
+}`;
+
+      const model = genAI.getGenerativeModel({
+        model: config.gemini.models.flashLite, // Use faster/cheaper model for context
+        safetySettings: CHILD_SAFETY_SETTINGS,
+        generationConfig: {
+          temperature: 0.5,
+          maxOutputTokens: 300,
+          responseMimeType: 'application/json',
+        },
       });
 
-      try {
-        const jsonText = this.extractJSON(responseText);
-        const parsed = JSON.parse(jsonText);
-        return {
-          originalText: text,
-          translatedText: parsed.translatedText,
-          targetLanguage: targetLanguage,
-          pronunciation: parsed.pronunciation || undefined,
-          simpleExplanation: parsed.simpleExplanation || undefined,
-        };
-      } catch (extractError) {
-        logger.error('Failed to parse translation response', {
-          responseText: responseText,
-          directError: directParseError instanceof Error ? directParseError.message : 'Unknown',
-          extractError: extractError instanceof Error ? extractError.message : 'Unknown',
-        });
+      const result = await model.generateContent(contextPrompt);
+      const responseText = result.response.text();
 
-        // Last resort: Try simple regex extraction
-        // Look for Arabic/Unicode text after "translatedText":
-        const translatedMatch = responseText.match(/"translatedText"\s*:\s*"([\s\S]*?)(?:"|$)/);
-
-        if (translatedMatch && translatedMatch[1]) {
-          const extractedText = translatedMatch[1]
-            .replace(/\\n/g, '\n')
-            .replace(/\\"/g, '"')
-            .replace(/\\\\/g, '\\');
-
-          logger.info('Using last-resort regex extraction', { extractedText });
-          return {
-            originalText: text,
-            translatedText: extractedText,
-            targetLanguage: targetLanguage,
-            pronunciation: undefined,
-            simpleExplanation: undefined,
-          };
+      if (responseText) {
+        try {
+          const parsed = JSON.parse(responseText);
+          pronunciation = parsed.pronunciation || undefined;
+          simpleExplanation = parsed.explanation || undefined;
+        } catch {
+          // If parsing fails, try to extract manually
+          const pronMatch = responseText.match(/"pronunciation"\s*:\s*"([^"]+)"/);
+          const explMatch = responseText.match(/"explanation"\s*:\s*"([^"]+)"/);
+          pronunciation = pronMatch?.[1] || undefined;
+          simpleExplanation = explMatch?.[1] || undefined;
         }
-
-        throw new Error('Failed to translate text');
       }
+
+      logger.info('Gemini context enrichment successful', {
+        hasPronunciation: !!pronunciation,
+        hasExplanation: !!simpleExplanation,
+      });
+    } catch (geminiError) {
+      // Gemini context is optional - log but don't fail
+      logger.warn('Gemini context enrichment failed, returning translation only', {
+        error: geminiError instanceof Error ? geminiError.message : 'Unknown error',
+      });
     }
+
+    return {
+      originalText: text,
+      translatedText,
+      targetLanguage,
+      pronunciation,
+      simpleExplanation,
+    };
   }
 
   /**
