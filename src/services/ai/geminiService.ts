@@ -36,11 +36,11 @@ async function googleTranslate(text: string, targetLang: string, apiKey: string)
   });
 
   if (!response.ok) {
-    const error = await response.json();
+    const error = await response.json() as { error?: { message?: string } };
     throw new Error(error.error?.message || `Google Translate API error: ${response.status}`);
   }
 
-  const data = await response.json();
+  const data = await response.json() as { data?: { translations?: Array<{ translatedText?: string }> } };
   return data.data?.translations?.[0]?.translatedText || '';
 }
 
