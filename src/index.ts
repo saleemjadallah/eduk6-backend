@@ -28,6 +28,11 @@ import quizRoutes from './routes/quiz.routes.js';
 import aiRoutes from './routes/ai.routes.js';
 import exerciseRoutes from './routes/exercise.routes.js';
 import noteRoutes from './routes/note.routes.js';
+import safetyRoutes from './routes/safety.routes.js';
+import settingsRoutes from './routes/settings.routes.js';
+import privacyRoutes from './routes/privacy.routes.js';
+import reportsRoutes from './routes/reports.routes.js';
+import supportRoutes from './routes/support.routes.js';
 
 // Services initialization
 import { initializeContentProcessor, shutdownContentProcessor } from './services/learning/contentProcessor.js';
@@ -125,6 +130,11 @@ app.use('/api/quizzes', quizRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/exercises', exerciseRoutes);
 app.use('/api/notes', noteRoutes);
+app.use('/api/parent/safety', safetyRoutes);
+app.use('/api/parent/settings', settingsRoutes);
+app.use('/api/parent/privacy', privacyRoutes);
+app.use('/api/parent/reports', reportsRoutes);
+app.use('/api/support', supportRoutes);
 
 // TODO: Add remaining routes as they're implemented
 // app.use('/api/gamification', gamificationRoutes);
