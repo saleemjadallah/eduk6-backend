@@ -655,19 +655,44 @@ QUALITY STANDARDS:
     });
 
     const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
 
-    logger.info('Translation raw response', {
+    // Check for blocked content or safety issues
+    const response = result.response;
+    const promptFeedback = response.promptFeedback;
+    const candidates = response.candidates;
+
+    logger.info('Translation response metadata', {
       originalLength: text.length,
       targetLanguage,
-      ageGroup: context.ageGroup,
+      promptFeedback: promptFeedback,
+      candidateCount: candidates?.length || 0,
+      finishReason: candidates?.[0]?.finishReason,
+      safetyRatings: candidates?.[0]?.safetyRatings,
+    });
+
+    // Check if blocked
+    if (promptFeedback?.blockReason) {
+      logger.error('Translation blocked by Gemini', { blockReason: promptFeedback.blockReason });
+      throw new Error(`Translation blocked: ${promptFeedback.blockReason}`);
+    }
+
+    if (!candidates || candidates.length === 0) {
+      logger.error('No candidates returned from Gemini');
+      throw new Error('Failed to translate text - no response candidates');
+    }
+
+    const responseText = response.text();
+
+    logger.info('Translation raw response', {
       responseLength: responseText.length,
-      rawResponse: responseText, // Log full response for debugging
+      rawResponse: responseText.substring(0, 500),
     });
 
     // Check if response is empty
     if (!responseText || responseText.trim().length === 0) {
-      logger.error('Empty translation response from Gemini');
+      logger.error('Empty translation response from Gemini', {
+        finishReason: candidates[0]?.finishReason,
+      });
       throw new Error('Failed to translate text - empty response');
     }
 
