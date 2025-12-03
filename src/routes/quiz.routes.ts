@@ -116,7 +116,7 @@ Return ONLY a valid JSON object with this exact format, no other text:
 For correctAnswer, use the index (0-3) of the correct option.`;
 
   const model = genAI.getGenerativeModel({
-    model: config.gemini.models.flash,
+    model: config.gemini.models.pro, // Using Gemini 3 Pro for better quiz generation
     generationConfig: {
       temperature: 0.7,
       responseMimeType: 'application/json',
