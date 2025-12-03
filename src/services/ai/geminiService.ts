@@ -15,8 +15,29 @@ import { AgeGroup, Subject, ChatMessage, CurriculumType } from '@prisma/client';
 import { logger } from '../../utils/logger.js';
 import { TranslationServiceClient } from '@google-cloud/translate';
 
-// Initialize Google Cloud Translate client
-const googleTranslateClient = new TranslationServiceClient();
+// Initialize Google Cloud Translate client with Firebase service account credentials
+let googleTranslateClient: TranslationServiceClient;
+
+try {
+  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (serviceAccountJson) {
+    const credentials = JSON.parse(serviceAccountJson);
+    googleTranslateClient = new TranslationServiceClient({
+      credentials: {
+        client_email: credentials.client_email,
+        private_key: credentials.private_key,
+      },
+      projectId: credentials.project_id,
+    });
+    logger.info('Google Translate client initialized with Firebase credentials');
+  } else {
+    googleTranslateClient = new TranslationServiceClient();
+    logger.info('Google Translate client initialized with default credentials');
+  }
+} catch (error) {
+  logger.error('Failed to initialize Google Translate client', { error });
+  googleTranslateClient = new TranslationServiceClient();
+}
 
 // Common context interface for curriculum-aware AI operations
 export interface ChildContext {
