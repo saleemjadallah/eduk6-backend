@@ -649,8 +649,8 @@ QUALITY STANDARDS:
       safetySettings: CHILD_SAFETY_SETTINGS,
       generationConfig: {
         temperature: 0.3,
-        maxOutputTokens: 1000,
-        // Note: Removed responseMimeType: 'application/json' as it causes issues with RTL languages like Arabic
+        maxOutputTokens: 2500, // Higher limit for RTL languages (Arabic, Hebrew) which expand significantly
+        // Note: Removed responseMimeType: 'application/json' as it causes issues with RTL languages
       },
     });
 
