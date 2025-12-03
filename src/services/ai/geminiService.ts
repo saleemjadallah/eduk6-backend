@@ -13,30 +13,35 @@ import { promptBuilder, LessonContext } from './promptBuilder.js';
 import { safetyFilters, SafetyValidation } from './safetyFilters.js';
 import { AgeGroup, Subject, ChatMessage, CurriculumType } from '@prisma/client';
 import { logger } from '../../utils/logger.js';
-import { TranslationServiceClient } from '@google-cloud/translate';
 
-// Initialize Google Cloud Translate client with Firebase service account credentials
-let googleTranslateClient: TranslationServiceClient;
+// Google Cloud Translation API v2 REST endpoint
+const GOOGLE_TRANSLATE_API_URL = 'https://translation.googleapis.com/language/translate/v2';
 
-try {
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (serviceAccountJson) {
-    const credentials = JSON.parse(serviceAccountJson);
-    googleTranslateClient = new TranslationServiceClient({
-      credentials: {
-        client_email: credentials.client_email,
-        private_key: credentials.private_key,
-      },
-      projectId: credentials.project_id,
-    });
-    logger.info('Google Translate client initialized with Firebase credentials');
-  } else {
-    googleTranslateClient = new TranslationServiceClient();
-    logger.info('Google Translate client initialized with default credentials');
+/**
+ * Translate text using Google Cloud Translation API v2 (REST)
+ * Uses API key for authentication (simpler than service account)
+ */
+async function googleTranslate(text: string, targetLang: string, apiKey: string): Promise<string> {
+  const response = await fetch(`${GOOGLE_TRANSLATE_API_URL}?key=${apiKey}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      q: text,
+      target: targetLang,
+      source: 'en',
+      format: 'text',
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || `Google Translate API error: ${response.status}`);
   }
-} catch (error) {
-  logger.error('Failed to initialize Google Translate client', { error });
-  googleTranslateClient = new TranslationServiceClient();
+
+  const data = await response.json();
+  return data.data?.translations?.[0]?.translatedText || '';
 }
 
 // Common context interface for curriculum-aware AI operations
@@ -666,22 +671,13 @@ export class GeminiService {
       ageGroup: context.ageGroup,
     });
 
-    // Step 1: Use Google Cloud Translate for reliable translation
+    // Step 1: Use Google Cloud Translate REST API for reliable translation
     let translatedText: string;
     try {
-      const projectId = config.firebase.projectId;
-      const location = 'global';
+      // Use the same API key as Gemini (it works for Cloud Translation too)
+      const apiKey = config.gemini.apiKey;
 
-      const request = {
-        parent: `projects/${projectId}/locations/${location}`,
-        contents: [text],
-        mimeType: 'text/plain',
-        sourceLanguageCode: 'en',
-        targetLanguageCode: targetLangCode,
-      };
-
-      const [response] = await googleTranslateClient.translateText(request);
-      translatedText = response.translations?.[0]?.translatedText || '';
+      translatedText = await googleTranslate(text, targetLangCode, apiKey);
 
       if (!translatedText) {
         throw new Error('Empty translation from Google Translate');
