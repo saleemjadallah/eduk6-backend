@@ -323,12 +323,14 @@ export class GeminiService {
     });
 
     // Use Gemini 2.5 Flash for both - stable and fast
+    // Set maxOutputTokens high (65536 is the max for Flash) to prevent truncation
+    // The model only generates what it needs - this just removes the ceiling
     const analysisModel = genAI.getGenerativeModel({
       model: config.gemini.models.flash, // gemini-2.5-flash
       safetySettings: CHILD_SAFETY_SETTINGS,
       generationConfig: {
         temperature: 0.3,
-        maxOutputTokens: 8000,
+        maxOutputTokens: 65536,
         responseMimeType: 'application/json',
       },
     });
@@ -338,13 +340,49 @@ export class GeminiService {
       safetySettings: CHILD_SAFETY_SETTINGS,
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 8000,
+        maxOutputTokens: 65536,
       },
     });
 
+    // Helper function to attempt analysis with retry
+    const attemptAnalysis = async (retryCount = 0): Promise<Awaited<ReturnType<typeof analysisModel.generateContent>>> => {
+      try {
+        const result = await analysisModel.generateContent(analysisPrompt);
+        const responseText = result.response.text();
+
+        // Check if response appears truncated (incomplete JSON)
+        const trimmed = responseText.trim();
+        if (!trimmed.endsWith('}') && !trimmed.endsWith(']')) {
+          logger.warn('Analysis response appears truncated', {
+            responseLength: responseText.length,
+            lastChars: responseText.substring(responseText.length - 100),
+            finishReason: result.response.candidates?.[0]?.finishReason,
+          });
+
+          if (retryCount < 2) {
+            logger.info(`Retrying analysis (attempt ${retryCount + 2})...`);
+            // Wait a bit before retry
+            await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+            return attemptAnalysis(retryCount + 1);
+          }
+        }
+
+        return result;
+      } catch (error) {
+        if (retryCount < 2) {
+          logger.warn(`Analysis failed, retrying (attempt ${retryCount + 2})...`, {
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+          await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+          return attemptAnalysis(retryCount + 1);
+        }
+        throw error;
+      }
+    };
+
     // Run both calls in parallel
     const [analysisResult, formattingResult] = await Promise.all([
-      analysisModel.generateContent(analysisPrompt),
+      attemptAnalysis(),
       formattingModel.generateContent(formattingPrompt).catch((error) => {
         logger.error('Formatting call failed, will use raw content', {
           error: error instanceof Error ? error.message : 'Unknown error',
@@ -372,10 +410,25 @@ export class GeminiService {
         vocabularyCount: analysis.vocabulary?.length || 0,
       });
     } catch (error) {
+      // Check if the response appears truncated
+      const trimmed = analysisResponseText.trim();
+      const isTruncated = !trimmed.endsWith('}') && !trimmed.endsWith(']');
+      const finishReason = analysisResult.response.candidates?.[0]?.finishReason;
+
       logger.error('Failed to parse content analysis response', {
+        responseLength: analysisResponseText.length,
         responseText: analysisResponseText.substring(0, 1000),
+        lastChars: analysisResponseText.substring(analysisResponseText.length - 200),
+        isTruncated,
+        finishReason,
+        tokensUsed: analysisResult.response.usageMetadata?.totalTokenCount,
         error: error instanceof Error ? error.message : 'Unknown error',
       });
+
+      // Provide more specific error message
+      if (isTruncated || finishReason === 'MAX_TOKENS') {
+        throw new Error('Failed to analyze content: Response was truncated. The lesson content may be too complex.');
+      }
       throw new Error('Failed to analyze content');
     }
 
