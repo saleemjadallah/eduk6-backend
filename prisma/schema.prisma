@@ -194,6 +194,7 @@ model Lesson {
   percentComplete  Float    @default(0)
   lastAccessedAt   DateTime?
   timeSpentSeconds Int      @default(0)
+  completedAt      DateTime? // Set when user clicks "lesson completed"
 
   // Timestamps
   createdAt        DateTime @default(now())
@@ -201,6 +202,7 @@ model Lesson {
 
   @@index([childId, createdAt])
   @@index([processingStatus])
+  @@index([childId, completedAt])
 }
 
 model ChatMessage {

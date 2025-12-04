@@ -564,6 +564,88 @@ router.patch(
 );
 
 /**
+ * POST /api/lessons/:lessonId/complete
+ * Mark a lesson as completed by the user
+ */
+router.post(
+  '/:lessonId/complete',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { lessonId } = req.params;
+
+      // Get lesson to check ownership
+      const lesson = await lessonService.getById(lessonId);
+
+      if (!lesson) {
+        res.status(404).json({
+          success: false,
+          error: 'Lesson not found',
+        });
+        return;
+      }
+
+      // Verify access
+      let childId: string;
+
+      if (req.child) {
+        if (req.child.id !== lesson.childId) {
+          res.status(403).json({
+            success: false,
+            error: 'Access denied',
+          });
+          return;
+        }
+        childId = req.child.id;
+      } else if (req.parent) {
+        const child = await prisma.child.findFirst({
+          where: {
+            id: lesson.childId,
+            parentId: req.parent.id,
+          },
+        });
+
+        if (!child) {
+          res.status(403).json({
+            success: false,
+            error: 'Access denied',
+          });
+          return;
+        }
+        childId = child.id;
+      } else {
+        res.status(401).json({
+          success: false,
+          error: 'Authentication required',
+        });
+        return;
+      }
+
+      // Mark lesson as completed
+      const updatedLesson = await prisma.lesson.update({
+        where: { id: lessonId },
+        data: {
+          completedAt: new Date(),
+          percentComplete: 100,
+        },
+      });
+
+      logger.info(`Lesson ${lessonId} marked as completed by child ${childId}`);
+
+      res.json({
+        success: true,
+        data: {
+          lesson: updatedLesson,
+          completedAt: updatedLesson.completedAt,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * GET /api/lessons/:lessonId/status
  * Get processing status for a lesson
  */

@@ -29,7 +29,7 @@ router.get(
         prisma.lesson.count({
           where: {
             childId,
-            processingStatus: 'COMPLETED',
+            completedAt: { not: null }, // Count only lessons user has completed
           },
         }),
       ]);
@@ -86,7 +86,7 @@ router.get(
         prisma.lesson.count({
           where: {
             childId,
-            processingStatus: 'COMPLETED',
+            completedAt: { not: null }, // Count only lessons user has completed
           },
         }),
         xpEngine.getStats(childId),
