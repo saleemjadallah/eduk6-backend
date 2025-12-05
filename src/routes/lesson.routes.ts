@@ -172,6 +172,8 @@ router.post(
       const finalSubject = (subject as Subject | undefined) || detectedSubject;
 
       // Format content using deterministic DocumentFormatter (100% reliable)
+      // HYBRID APPROACH: If AI provided contentBlocks, use StructuredRenderer for beautiful output
+      // Otherwise, fall back to heuristic-based formatting
       const formattedContent = documentFormatter.format(content, {
         ageGroup: child.ageGroup,
         chapters: analysis.chapters,
@@ -188,11 +190,15 @@ router.post(
           difficulty: ex.difficulty,
           locationInContent: ex.locationInContent,
         })),
+        // Rich content blocks from AI for hybrid rendering
+        contentBlocks: analysis.contentBlocks,
       });
 
       logger.info('Content formatted successfully', {
         rawLength: content.length,
         formattedLength: formattedContent.length,
+        usedContentBlocks: !!(analysis.contentBlocks && analysis.contentBlocks.length > 0),
+        contentBlockCount: analysis.contentBlocks?.length || 0,
       });
 
       // Create lesson record with analyzed content

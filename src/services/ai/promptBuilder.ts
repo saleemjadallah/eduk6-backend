@@ -271,7 +271,65 @@ Return ONLY valid JSON with this structure:
     "Question the student might want to ask Jeffrey about this content",
     "Another curiosity-sparking question"
   ],
-  "confidence": 0.8
+  "confidence": 0.8,
+  "contentBlocks": [
+    // IMPORTANT: Parse the content into structured blocks for beautiful rendering.
+    // Identify each distinct element and classify it. Go through the content in order.
+
+    // Metadata at the start (if present):
+    { "type": "metadata", "gradeLevel": "5th Grade", "subject": "Mathematics", "topic": "Fractions", "duration": "60-75 minutes" },
+
+    // Section headers (major topics):
+    { "type": "header", "level": 2, "text": "What Does It Mean to Multiply Fractions?" },
+
+    // Explanatory paragraphs:
+    { "type": "explanation", "text": "When we multiply fractions, we're finding a part of a part." },
+
+    // Examples with relatable scenarios:
+    { "type": "example", "title": "Pizza Example", "content": "If you have 1/2 of a pizza and want to share 3/4 of your piece..." },
+
+    // Key concepts (highlight important ideas):
+    { "type": "keyConceptBox", "title": "Key Concept", "text": "Multiplying fractions means finding a fraction of another fraction. The word 'of' in math often means multiply." },
+
+    // Rules with steps:
+    { "type": "rule", "title": "The Simple Rule for Multiplying Fractions", "steps": ["Multiply the numerators (top numbers) together", "Multiply the denominators (bottom numbers) together", "Simplify the answer (if possible)"], "formula": "a/b × c/d = (a × c) / (b × d)" },
+
+    // Formulas (standalone):
+    { "type": "formula", "formula": "a/b × c/d = (a × c) / (b × d)", "explanation": "Multiply tops, multiply bottoms" },
+
+    // Word problems (multi-step problems with solution):
+    { "type": "wordProblem", "title": "Pizza Party!", "icon": "🍕", "problem": "Sarah has 2/3 of a pizza left. She wants to give 3/4 of what she has to her brother. What fraction of the whole pizza will her brother get?", "understand": "We need to find 3/4 of 2/3", "setup": "3/4 × 2/3", "calculate": "(3 × 2) / (4 × 3) = 6/12", "simplify": "6/12 = 1/2", "answer": "Sarah's brother gets 1/2 of the whole pizza." },
+
+    // Bullet lists:
+    { "type": "bulletList", "title": "Learning Objectives", "items": ["Multiply fractions by fractions", "Multiply fractions by whole numbers", "Simplify fraction products"] },
+
+    // Numbered lists:
+    { "type": "numberedList", "title": "Steps to Solve", "items": ["Read the problem", "Identify the fractions", "Multiply", "Simplify"] },
+
+    // Step-by-step instructions:
+    { "type": "stepByStep", "title": "How to Multiply", "steps": [{ "label": "Step 1", "content": "Multiply the numerators" }, { "label": "Step 2", "content": "Multiply the denominators" }] },
+
+    // Tips:
+    { "type": "tip", "text": "Remember: 'of' usually means multiply!" },
+
+    // Notes:
+    { "type": "note", "text": "This rule works for any two fractions." },
+
+    // Warnings:
+    { "type": "warning", "text": "Don't forget to simplify your final answer!" },
+
+    // Questions:
+    { "type": "question", "text": "What is 1/2 × 1/4?" },
+
+    // Answers:
+    { "type": "answer", "text": "1/8", "explanation": "1×1=1 for the top, 2×4=8 for the bottom" },
+
+    // Definitions:
+    { "type": "definition", "term": "Numerator", "definition": "The top number in a fraction", "example": "In 3/4, the numerator is 3" },
+
+    // Section dividers:
+    { "type": "divider", "style": "section", "label": "Practice Problems" }
+  ]
 }
 
 LANGUAGE FOR SUMMARIES AND VOCABULARY:

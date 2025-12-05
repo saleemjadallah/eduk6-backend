@@ -13,6 +13,7 @@ import { promptBuilder, LessonContext } from './promptBuilder.js';
 import { safetyFilters, SafetyValidation } from './safetyFilters.js';
 import { AgeGroup, Subject, ChatMessage, CurriculumType } from '@prisma/client';
 import { logger } from '../../utils/logger.js';
+import type { ContentBlock } from '../formatting/contentBlocks.js';
 
 // Google Cloud Translation API v2 REST endpoint
 const GOOGLE_TRANSLATE_API_URL = 'https://translation.googleapis.com/language/translate/v2';
@@ -92,6 +93,8 @@ export interface LessonAnalysis {
   }>;
   suggestedQuestions: string[];
   confidence: number;
+  // Rich structured content blocks for hybrid AI+deterministic rendering
+  contentBlocks?: ContentBlock[];
 }
 
 export interface GeneratedFlashcard {

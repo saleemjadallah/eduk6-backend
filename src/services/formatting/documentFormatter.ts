@@ -13,6 +13,9 @@
 import { AgeGroup } from '@prisma/client';
 import { logger } from '../../utils/logger.js';
 import { MathFormatter } from './mathFormatter.js';
+import { StructuredRenderer } from './structuredRenderer.js';
+import type { ContentBlock, StructuredContent } from './contentBlocks.js';
+import { validateBlocks } from './contentBlocks.js';
 
 // ============================================================================
 // TYPES
@@ -48,6 +51,8 @@ export interface DocumentFormatterOptions {
   chapters?: Chapter[];
   vocabulary?: VocabularyItem[];
   exercises?: Exercise[];
+  // Rich content blocks from AI analysis (hybrid approach)
+  contentBlocks?: ContentBlock[];
 }
 
 interface TextAnalysis {
@@ -145,19 +150,55 @@ const PATTERNS = {
 
 export class DocumentFormatter {
   private mathFormatter: MathFormatter;
+  private structuredRenderer: StructuredRenderer;
 
   constructor() {
     this.mathFormatter = new MathFormatter();
+    this.structuredRenderer = new StructuredRenderer();
   }
 
   /**
    * Main formatting method - 100% reliable, deterministic output
+   *
+   * Hybrid approach:
+   * 1. If contentBlocks are provided (from AI), use StructuredRenderer for beautiful output
+   * 2. Otherwise, fall back to heuristic-based formatting
    */
   format(rawText: string, options: DocumentFormatterOptions): string {
     if (!rawText || typeof rawText !== 'string') {
       return '';
     }
 
+    // HYBRID APPROACH: Use StructuredRenderer if AI provided content blocks
+    if (options.contentBlocks && options.contentBlocks.length > 0) {
+      const blockCount = options.contentBlocks.length;
+      try {
+        // Validate the content blocks
+        if (validateBlocks(options.contentBlocks)) {
+          logger.info('Using StructuredRenderer for AI-extracted content blocks', {
+            blockCount,
+            blockTypes: options.contentBlocks.map(b => b.type).slice(0, 10),
+          });
+
+          const structuredContent: StructuredContent = {
+            blocks: options.contentBlocks,
+          };
+
+          this.structuredRenderer.setOptions({ ageGroup: options.ageGroup });
+          return this.structuredRenderer.render(structuredContent);
+        } else {
+          logger.warn('Content blocks validation failed, falling back to heuristic formatting', {
+            blockCount,
+          });
+        }
+      } catch (error) {
+        logger.warn('StructuredRenderer failed, falling back to heuristic formatting', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+
+    // FALLBACK: Use legacy heuristic-based formatting
     try {
       return this.fullFormat(rawText, options);
     } catch (error) {
