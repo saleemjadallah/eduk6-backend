@@ -6,6 +6,7 @@ import { validateInput } from '../middleware/validateInput.js';
 import { geminiService, LessonAnalysis } from '../services/ai/geminiService.js';
 import { lessonService } from '../services/learning/lessonService.js';
 import { queueContentProcessing } from '../services/learning/contentProcessor.js';
+import { documentFormatter } from '../services/formatting/index.js';
 import { prisma } from '../config/database.js';
 import { logger } from '../utils/logger.js';
 import { genAI } from '../config/gemini.js';
@@ -170,6 +171,30 @@ router.post(
         : undefined;
       const finalSubject = (subject as Subject | undefined) || detectedSubject;
 
+      // Format content using deterministic DocumentFormatter (100% reliable)
+      const formattedContent = documentFormatter.format(content, {
+        ageGroup: child.ageGroup,
+        chapters: analysis.chapters,
+        vocabulary: analysis.vocabulary,
+        exercises: analysis.exercises?.map(ex => ({
+          id: ex.id,
+          type: ex.type,
+          questionText: ex.questionText,
+          expectedAnswer: ex.expectedAnswer,
+          acceptableAnswers: ex.acceptableAnswers,
+          hint1: ex.hint1,
+          hint2: ex.hint2,
+          explanation: ex.explanation,
+          difficulty: ex.difficulty,
+          locationInContent: ex.locationInContent,
+        })),
+      });
+
+      logger.info('Content formatted successfully', {
+        rawLength: content.length,
+        formattedLength: formattedContent.length,
+      });
+
       // Create lesson record with analyzed content
       const lesson = await lessonService.create({
         childId,
@@ -182,7 +207,7 @@ router.post(
       await lessonService.update(lesson.id, {
         summary: analysis.summary,
         gradeLevel: String(analysis.gradeLevel), // Convert to string for Prisma
-        formattedContent: analysis.formattedContent, // AI-formatted content with proper line breaks
+        formattedContent, // Deterministically formatted HTML (100% reliable)
         chapters: analysis.chapters ? JSON.parse(JSON.stringify(analysis.chapters)) : undefined,
         keyConcepts: analysis.keyConcepts,
         vocabulary: analysis.vocabulary ? JSON.parse(JSON.stringify(analysis.vocabulary)) : undefined,
