@@ -286,15 +286,9 @@ QUALITY GUIDELINES:
 - If no exercises exist in the content, return an empty array: "exercises": []`;
   }
 
-  /**
-   * Build prompt for content formatting only
-   * Uses Gemini 2.5 Flash for fast, efficient formatting
-   */
-  buildContentFormattingPrompt(content: string): string {
-    return `Format this educational content for easy reading. Add blank lines between paragraphs, sections, and before bullet points. Keep all original text exactly as-is.
-
-${content}`;
-  }
+  // NOTE: buildContentFormattingPrompt was removed - formatting is now handled by
+  // the deterministic DocumentFormatter service for 100% reliability.
+  // See: backend/src/services/formatting/documentFormatter.ts
 
   /**
    * Build prompt for quiz generation

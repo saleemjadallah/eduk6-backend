@@ -300,9 +300,10 @@ export class GeminiService {
 
   /**
    * Analyze content and extract structured lesson data
-   * Uses parallel AI calls with Gemini 2.5 Flash for both:
-   * - Analysis: metadata extraction (exercises, vocabulary, etc.)
-   * - Formatting: content structure with proper line breaks
+   * Uses Gemini 2.5 Flash for metadata extraction (exercises, vocabulary, etc.)
+   *
+   * Note: Formatting is handled separately by the deterministic DocumentFormatter
+   * service, which provides 100% reliable output without AI variability.
    */
   async analyzeContent(
     content: string,
@@ -314,15 +315,14 @@ export class GeminiService {
     }
   ): Promise<LessonAnalysis> {
     const analysisPrompt = promptBuilder.buildContentAnalysisPrompt(content, context);
-    const formattingPrompt = promptBuilder.buildContentFormattingPrompt(content);
 
-    logger.info(`Starting parallel content analysis`, {
+    logger.info(`Starting content analysis`, {
       contentLength: content.length,
       ageGroup: context.ageGroup,
       model: config.gemini.models.flash,
     });
 
-    // Use Gemini 2.5 Flash for both - stable and fast
+    // Use Gemini 2.5 Flash for analysis - stable and fast
     // Set maxOutputTokens high (65536 is the max for Flash) to prevent truncation
     // The model only generates what it needs - this just removes the ceiling
     const analysisModel = genAI.getGenerativeModel({
@@ -332,15 +332,6 @@ export class GeminiService {
         temperature: 0.3,
         maxOutputTokens: 65536,
         responseMimeType: 'application/json',
-      },
-    });
-
-    const formattingModel = genAI.getGenerativeModel({
-      model: config.gemini.models.flash, // gemini-2.5-flash
-      safetySettings: CHILD_SAFETY_SETTINGS,
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 65536,
       },
     });
 
@@ -380,16 +371,8 @@ export class GeminiService {
       }
     };
 
-    // Run both calls in parallel
-    const [analysisResult, formattingResult] = await Promise.all([
-      attemptAnalysis(),
-      formattingModel.generateContent(formattingPrompt).catch((error) => {
-        logger.error('Formatting call failed, will use raw content', {
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-        return null;
-      }),
-    ]);
+    // Run analysis (formatting is now handled by deterministic DocumentFormatter)
+    const analysisResult = await attemptAnalysis();
 
     // Process analysis result
     const analysisResponseText = analysisResult.response.text();
@@ -432,31 +415,8 @@ export class GeminiService {
       throw new Error('Failed to analyze content');
     }
 
-    // Process formatting result
-    if (formattingResult) {
-      let formattedContent = formattingResult.response.text();
-
-      logger.info(`Gemini 2.5 Flash formatting completed`, {
-        responseLength: formattedContent.length,
-        tokensUsed: formattingResult.response.usageMetadata?.totalTokenCount,
-        firstChars: formattedContent.substring(0, 150),
-        singleNewlines: (formattedContent.match(/\n/g) || []).length,
-        blankLines: (formattedContent.match(/\n\n/g) || []).length, // KEY: Must have blank lines!
-      });
-
-      // Clean up any "Here is..." intro that Gemini might add
-      formattedContent = formattedContent
-        .replace(/^["']/, '') // Remove leading quote
-        .replace(/["']$/, '') // Remove trailing quote
-        .replace(/^(Here is|Here's|The formatted content is|Below is)[^:]*:\s*/i, '') // Remove intro phrases
-        .trim();
-
-      analysis.formattedContent = formattedContent;
-    } else {
-      // Fall back to raw content if formatting failed
-      logger.warn('Using raw content as fallback - formatting call returned null');
-      analysis.formattedContent = content;
-    }
+    // Note: formattedContent is NOT set here - it will be set by the
+    // deterministic DocumentFormatter in contentProcessor.ts for 100% reliability
 
     // Validate content is child-appropriate
     const safetyCheck = await safetyFilters.validateContent(analysis, context.ageGroup);

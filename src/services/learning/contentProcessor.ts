@@ -12,10 +12,11 @@ import { LessonAnalysis } from '../ai/geminiService.js';
 import { CurriculumType } from '@prisma/client';
 import { badgeService } from '../gamification/badgeService.js';
 import { xpEngine } from '../gamification/xpEngine.js';
+import { documentFormatter } from '../formatting/index.js';
 
-// Note: We no longer use formattedContent or HTML parsing for exercises.
-// Exercises are now detected directly by the AI from the raw content.
-// The original extractedText is displayed on the frontend for full content viewing.
+// Note: Formatting is now handled by the deterministic DocumentFormatter
+// for 100% reliability. AI only extracts metadata (exercises, vocabulary, etc.)
+// The DocumentFormatter uses the extracted metadata to enhance formatting.
 
 // Job data types
 export interface ContentProcessingJobData {
@@ -130,9 +131,35 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
       subject: lesson?.subject,
     });
 
-    // 4. Update lesson with analysis metadata
-    // Note: We store extractedText as the primary content (displayed on frontend)
-    // The AI only extracts metadata (title, summary, vocabulary, exercises) to save tokens
+    // 4. Format content using deterministic DocumentFormatter (100% reliable)
+    // Uses AI-extracted metadata (chapters, vocabulary, exercises) to enhance formatting
+    const formattedContent = documentFormatter.format(extractedText, {
+      ageGroup,
+      chapters: analysis.chapters,
+      vocabulary: analysis.vocabulary,
+      exercises: analysis.exercises?.map(ex => ({
+        id: ex.id,
+        type: ex.type,
+        questionText: ex.questionText,
+        expectedAnswer: ex.expectedAnswer,
+        acceptableAnswers: ex.acceptableAnswers,
+        hint1: ex.hint1,
+        hint2: ex.hint2,
+        explanation: ex.explanation,
+        difficulty: ex.difficulty,
+        locationInContent: ex.locationInContent,
+      })),
+    });
+
+    logger.info(`Content formatted successfully`, {
+      rawLength: extractedText.length,
+      formattedLength: formattedContent.length,
+      hasChapters: !!analysis.chapters?.length,
+      hasVocabulary: !!analysis.vocabulary?.length,
+      hasExercises: !!analysis.exercises?.length,
+    });
+
+    // 5. Update lesson with analysis metadata and formatted content
     logger.info(`Updating lesson ${lessonId} with analysis results`, {
       exerciseCount: analysis.exercises?.length || 0,
       chapterCount: analysis.chapters?.length || 0,
@@ -142,8 +169,7 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
 
     await lessonService.update(lessonId, {
       extractedText, // Raw extracted text (kept for reference and Jeffrey's context)
-      // Use AI-formatted content if available, otherwise fall back to raw extractedText
-      formattedContent: analysis.formattedContent || extractedText,
+      formattedContent, // Deterministically formatted HTML (100% reliable)
       title: analysis.title || lesson?.title,
       summary: analysis.summary,
       // Convert gradeLevel to string if it's a number (Prisma expects string)
@@ -160,7 +186,7 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
 
     logger.info(`Lesson ${lessonId} updated successfully`);
 
-    // 5. Increment lesson completion count and check badges
+    // 6. Increment lesson completion count and check badges
     try {
       // Update UserProgress.lessonsCompleted
       await prisma.userProgress.upsert({
@@ -200,7 +226,7 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
       });
     }
 
-    // 6. Create interactive exercises from the analysis
+    // 7. Create interactive exercises from the analysis
     // Exercises are detected by AI from the raw content and stored separately
     try {
       const exercisesToCreate = analysis.exercises || [];
