@@ -33,6 +33,8 @@ import settingsRoutes from './routes/settings.routes.js';
 import privacyRoutes from './routes/privacy.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
 import supportRoutes from './routes/support.routes.js';
+import teacherRoutes from './routes/teacher/index.js';
+import ocrRoutes from './routes/ocr.routes.js';
 
 // Services initialization
 import { initializeContentProcessor, shutdownContentProcessor } from './services/learning/contentProcessor.js';
@@ -135,6 +137,10 @@ app.use('/api/parent/settings', settingsRoutes);
 app.use('/api/parent/privacy', privacyRoutes);
 app.use('/api/parent/reports', reportsRoutes);
 app.use('/api/support', supportRoutes);
+app.use('/api/ocr', ocrRoutes);
+
+// Teacher Portal routes
+app.use('/api/teacher', teacherRoutes);
 
 // TODO: Add remaining routes as they're implemented
 // app.use('/api/gamification', gamificationRoutes);

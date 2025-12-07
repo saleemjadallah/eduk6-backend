@@ -121,6 +121,15 @@ export interface GeneratedImage {
   mimeType: string;
 }
 
+export interface OCRResult {
+  text: string;
+  confidence: number;
+  metadata?: {
+    documentType?: string;
+    language?: string;
+  };
+}
+
 export interface TranslationResult {
   originalText: string;
   translatedText: string;
@@ -629,6 +638,101 @@ export class GeminiService {
     }
 
     throw new Error('No image data in response');
+  }
+
+  /**
+   * Extract text from an image using Gemini's vision capabilities (OCR)
+   * Optimized for educational documents: worksheets, textbooks, handwritten notes
+   */
+  async extractTextFromImage(
+    imageBase64: string,
+    mimeType: string
+  ): Promise<OCRResult> {
+    logger.info('Starting OCR extraction with Gemini Vision', {
+      mimeType,
+      imageSize: imageBase64.length,
+    });
+
+    // Use Gemini Flash for vision - fast and accurate for OCR
+    const model = genAI.getGenerativeModel({
+      model: config.gemini.models.flash,
+      safetySettings: CHILD_SAFETY_SETTINGS,
+      generationConfig: {
+        temperature: 0.1, // Very low for accurate text extraction
+        maxOutputTokens: 8000,
+      },
+    });
+
+    const prompt = `You are an expert OCR system designed to extract text from educational documents.
+
+Analyze this image and extract ALL text content exactly as it appears. This could be:
+- A worksheet or homework assignment
+- Textbook pages
+- Handwritten notes
+- Printed educational materials
+
+Instructions:
+1. Extract ALL text visible in the image
+2. Preserve the structure and layout as much as possible (use line breaks and spacing)
+3. For handwritten text, do your best to interpret it accurately
+4. Include any numbers, equations, or special characters
+5. If there are multiple columns or sections, process them in reading order (left to right, top to bottom)
+6. Include headers, titles, questions, and any instructions visible
+7. For math problems, preserve the formatting (fractions, equations, etc.)
+
+Return ONLY the extracted text, nothing else. Do not add explanations or commentary.
+If no text is visible, return "[No text detected]".`;
+
+    // Remove data URL prefix if present
+    let cleanBase64 = imageBase64;
+    if (imageBase64.includes(',')) {
+      cleanBase64 = imageBase64.split(',')[1];
+    }
+
+    try {
+      const result = await model.generateContent([
+        { text: prompt },
+        {
+          inlineData: {
+            mimeType: mimeType || 'image/jpeg',
+            data: cleanBase64,
+          },
+        },
+      ]);
+
+      const response = result.response;
+      const extractedText = response.text();
+
+      if (!extractedText || extractedText === '[No text detected]') {
+        logger.warn('No text detected in image');
+        return {
+          text: '',
+          confidence: 0,
+          metadata: {
+            documentType: 'unknown',
+          },
+        };
+      }
+
+      logger.info('OCR extraction completed', {
+        textLength: extractedText.length,
+        tokensUsed: response.usageMetadata?.totalTokenCount,
+      });
+
+      return {
+        text: extractedText.trim(),
+        confidence: 0.9, // High confidence for Gemini vision
+        metadata: {
+          documentType: 'educational',
+          language: 'en',
+        },
+      };
+    } catch (error) {
+      logger.error('OCR extraction failed', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw new Error('Failed to extract text from image');
+    }
   }
 
   /**

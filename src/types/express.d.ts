@@ -1,5 +1,5 @@
 // Express request extensions
-import { Parent, Child, AgeGroup } from '@prisma/client';
+import { Parent, Child, AgeGroup, TeacherRole } from '@prisma/client';
 
 declare global {
   namespace Express {
@@ -18,8 +18,24 @@ declare global {
         displayName: string;
       };
 
+      // Authenticated teacher
+      teacher?: {
+        id: string;
+        email: string;
+        organizationId?: string;
+        role: TeacherRole;
+      };
+
       // Session type
-      sessionType?: 'parent' | 'child';
+      sessionType?: 'parent' | 'child' | 'teacher';
+
+      // Token quota check result (set by quota middleware)
+      quotaCheck?: {
+        allowed: boolean;
+        remainingTokens: bigint;
+        estimatedCost: number;
+        warning?: string;
+      };
 
       // Request ID for logging
       requestId?: string;

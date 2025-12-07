@@ -640,6 +640,353 @@ model SafetyLog {
 }
 
 // ============================================
+// TEACHER PORTAL - ORGANIZATIONS & TEACHERS
+// ============================================
+
+model Organization {
+  id               String   @id @default(uuid())
+  name             String
+  slug             String   @unique  // For subdomain routing later
+  type             OrganizationType
+
+  // Billing & Subscription
+  stripeCustomerId String?
+  subscriptionTier OrgSubscriptionTier @default(STARTER)
+  subscriptionStatus SubscriptionStatus @default(ACTIVE)
+
+  // Token Quotas
+  monthlyTokenQuota   BigInt   @default(1000000)  // 1M tokens/month starter
+  currentMonthUsage   BigInt   @default(0)
+  quotaResetDate      DateTime @default(now())
+
+  // Relationships
+  teachers         Teacher[]
+  tokenUsageLogs   OrgTokenUsageLog[]
+
+  // Timestamps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([slug])
+}
+
+model Teacher {
+  id               String   @id @default(uuid())
+  email            String   @unique
+  passwordHash     String
+  firstName        String?
+  lastName         String?
+
+  // Email verification
+  emailVerified    Boolean  @default(false)
+  emailVerifiedAt  DateTime?
+
+  // Organization (null for independent teachers)
+  organizationId   String?
+  organization     Organization? @relation(fields: [organizationId], references: [id])
+  role             TeacherRole @default(TEACHER)
+
+  // Individual subscription (when no org)
+  subscriptionTier   TeacherSubscriptionTier @default(FREE)
+  subscriptionStatus SubscriptionStatus @default(ACTIVE)
+  stripeCustomerId   String?
+  subscriptionExpiresAt DateTime?
+
+  // Token Quotas (individual)
+  monthlyTokenQuota   BigInt   @default(100000)  // 100K tokens/month free
+  currentMonthUsage   BigInt   @default(0)
+  quotaResetDate      DateTime @default(now())
+
+  // Relationships
+  content          TeacherContent[]
+  rubrics          Rubric[]
+  gradingJobs      GradingJob[]
+  templates        ContentTemplate[]
+  tokenUsageLogs   TokenUsageLog[]
+  classrooms       Classroom[]
+
+  // Timestamps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  lastLoginAt      DateTime?
+
+  @@index([email])
+  @@index([organizationId])
+}
+
+// ============================================
+// TEACHER PORTAL - TOKEN USAGE & QUOTAS
+// ============================================
+
+model TokenUsageLog {
+  id               String   @id @default(uuid())
+  teacherId        String
+  teacher          Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  // Usage details
+  operation        TokenOperation
+  tokensUsed       Int
+  modelUsed        String   // gemini-2.5-flash, gemini-3-pro, etc.
+
+  // Context
+  resourceType     String?  // "content", "grading", "quiz", etc.
+  resourceId       String?
+
+  // Cost tracking
+  estimatedCost    Decimal? @db.Decimal(10, 6)  // USD
+
+  createdAt        DateTime @default(now())
+
+  @@index([teacherId, createdAt])
+  @@index([operation])
+}
+
+model OrgTokenUsageLog {
+  id               String   @id @default(uuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  teacherId        String
+
+  // Same fields as TokenUsageLog
+  operation        TokenOperation
+  tokensUsed       Int
+  modelUsed        String
+  resourceType     String?
+  resourceId       String?
+  estimatedCost    Decimal? @db.Decimal(10, 6)
+
+  createdAt        DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([teacherId, createdAt])
+}
+
+// ============================================
+// TEACHER PORTAL - CONTENT
+// ============================================
+
+model TeacherContent {
+  id               String   @id @default(uuid())
+  teacherId        String
+  teacher          Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  // Content metadata
+  title            String
+  description      String?  @db.Text
+  subject          Subject?
+  gradeLevel       String?  // "K", "1", "2-3", "4-6", etc.
+  contentType      TeacherContentType
+
+  // Source material
+  sourceType       SourceType?
+  originalFileUrl  String?
+  originalFileName String?
+  extractedText    String?  @db.Text
+
+  // Generated content (JSON structures)
+  lessonContent    Json?    // Structured lesson with sections
+  quizContent      Json?    // Quiz questions and answers
+  flashcardContent Json?    // Flashcard deck
+  infographicUrl   String?  // Generated infographic image
+
+  // Publishing
+  status           ContentStatus @default(DRAFT)
+  isPublic         Boolean  @default(false)
+  publishedAt      DateTime?
+
+  // Template reference
+  templateId       String?
+  template         ContentTemplate? @relation(fields: [templateId], references: [id])
+
+  // AI metadata
+  tokensUsed       Int      @default(0)
+  aiModelUsed      String?
+
+  // Timestamps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([teacherId, contentType])
+  @@index([subject, gradeLevel])
+  @@index([status])
+}
+
+model ContentTemplate {
+  id               String   @id @default(uuid())
+  teacherId        String
+  teacher          Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  name             String
+  description      String?
+  contentType      TeacherContentType
+  subject          Subject?
+  gradeLevel       String?
+
+  // Template structure
+  structure        Json     // Sections, prompts, formatting rules
+  defaultSettings  Json?    // Default AI parameters
+
+  // Usage tracking
+  usageCount       Int      @default(0)
+
+  // Relationships
+  content          TeacherContent[]
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([teacherId])
+}
+
+// ============================================
+// TEACHER PORTAL - GRADING SYSTEM
+// ============================================
+
+model Rubric {
+  id               String   @id @default(uuid())
+  teacherId        String
+  teacher          Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  name             String
+  description      String?  @db.Text
+  subject          Subject?
+  gradeLevel       String?
+
+  // Rubric structure
+  criteria         Json     // Array of {name, description, weight, levels: [{score, label, description}]}
+  maxScore         Int
+
+  // Scoring config
+  scoringType      ScoringType @default(POINTS)
+  passingThreshold Float?   // Minimum passing score/percentage
+
+  // AI grading config
+  gradingPrompt    String?  @db.Text  // Custom prompt additions
+  confidenceThreshold Float @default(0.7)  // Below this, flag for review
+
+  // Usage
+  usageCount       Int      @default(0)
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  gradingJobs      GradingJob[]
+
+  @@index([teacherId])
+  @@index([subject])
+}
+
+model GradingJob {
+  id               String   @id @default(uuid())
+  teacherId        String
+  teacher          Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  rubricId         String
+  rubric           Rubric   @relation(fields: [rubricId], references: [id])
+
+  // Job metadata
+  name             String
+  description      String?
+  status           GradingJobStatus @default(PENDING)
+
+  // Batch info
+  totalSubmissions Int      @default(0)
+  gradedCount      Int      @default(0)
+  errorCount       Int      @default(0)
+
+  // Processing
+  startedAt        DateTime?
+  completedAt      DateTime?
+  processingError  String?
+
+  // Token usage
+  totalTokensUsed  Int      @default(0)
+
+  // Relationships
+  submissions      GradingSubmission[]
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([teacherId, status])
+  @@index([rubricId])
+}
+
+model GradingSubmission {
+  id               String   @id @default(uuid())
+  gradingJobId     String
+  gradingJob       GradingJob @relation(fields: [gradingJobId], references: [id], onDelete: Cascade)
+
+  // Submission identification
+  studentIdentifier String  // Anonymous ID or name (teacher choice)
+
+  // Source
+  fileUrl          String?
+  fileName         String?
+  extractedText    String?  @db.Text
+
+  // AI Grading Results
+  status           SubmissionStatus @default(PENDING)
+
+  // Scoring (per criteria)
+  criteriaScores   Json?    // {criterionId: {score, feedback, confidence}}
+  totalScore       Float?
+  percentageScore  Float?
+  letterGrade      String?
+
+  // AI Feedback
+  overallFeedback  String?  @db.Text
+  strengths        String[] // Key strengths identified
+  improvements     String[] // Areas for improvement
+
+  // Confidence & Review
+  confidenceScore  Float?   // 0-1, AI's confidence in grading
+  flaggedForReview Boolean  @default(false)
+  flagReason       String?
+
+  // Teacher Override
+  teacherReviewed  Boolean  @default(false)
+  teacherOverride  Json?    // {criterionId: {score, feedback}}
+  teacherNotes     String?  @db.Text
+  finalizedAt      DateTime?
+
+  // Token usage
+  tokensUsed       Int      @default(0)
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([gradingJobId, status])
+  @@index([flaggedForReview])
+}
+
+// ============================================
+// TEACHER PORTAL - CLASSROOM (Future Integration)
+// ============================================
+
+model Classroom {
+  id               String   @id @default(uuid())
+  teacherId        String
+  teacher          Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  name             String
+  subject          Subject?
+  gradeLevel       String?
+
+  // Access code for students/parents
+  accessCode       String   @unique
+  isActive         Boolean  @default(true)
+
+  // Future: Link to Child accounts via Parent consent
+  // students         ClassroomStudent[]
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([teacherId])
+  @@index([accessCode])
+}
+
+// ============================================
 // ENUMS
 // ============================================
 
@@ -821,4 +1168,88 @@ enum ExerciseDifficulty {
 enum NoteContentFormat {
   PLAIN
   RICH_TEXT
+}
+
+// ============================================
+// TEACHER PORTAL ENUMS
+// ============================================
+
+enum OrganizationType {
+  SCHOOL
+  DISTRICT
+  TUTORING_CENTER
+  HOMESCHOOL_COOP
+  OTHER
+}
+
+enum OrgSubscriptionTier {
+  STARTER      // 10 teachers, 1M tokens/month
+  PROFESSIONAL // 50 teachers, 5M tokens/month
+  ENTERPRISE   // Unlimited teachers, custom tokens
+}
+
+enum TeacherSubscriptionTier {
+  FREE         // 100K tokens/month
+  BASIC        // 500K tokens/month
+  PROFESSIONAL // 2M tokens/month
+}
+
+enum TeacherRole {
+  TEACHER
+  DEPARTMENT_HEAD
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum TeacherContentType {
+  LESSON
+  QUIZ
+  FLASHCARD_DECK
+  INFOGRAPHIC
+  WORKSHEET
+  STUDY_GUIDE
+}
+
+enum ContentStatus {
+  DRAFT
+  REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum TokenOperation {
+  CONTENT_ANALYSIS
+  LESSON_GENERATION
+  QUIZ_GENERATION
+  FLASHCARD_GENERATION
+  INFOGRAPHIC_GENERATION
+  GRADING_SINGLE
+  GRADING_BATCH
+  FEEDBACK_GENERATION
+  CHAT
+}
+
+enum ScoringType {
+  POINTS
+  PERCENTAGE
+  LETTER_GRADE
+  PASS_FAIL
+}
+
+enum GradingJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  PARTIALLY_COMPLETED
+}
+
+enum SubmissionStatus {
+  PENDING
+  PROCESSING
+  GRADED
+  FLAGGED
+  REVIEWED
+  FINALIZED
+  ERROR
 }

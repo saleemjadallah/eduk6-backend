@@ -56,6 +56,12 @@ export class RateLimitError extends AppError {
   }
 }
 
+export class PaymentRequiredError extends AppError {
+  constructor(message: string = 'Payment required or quota exceeded') {
+    super(message, 402);
+  }
+}
+
 // Error handler middleware
 export function errorHandler(
   err: Error,
