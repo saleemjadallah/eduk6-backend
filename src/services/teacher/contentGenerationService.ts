@@ -6,6 +6,8 @@ import { Subject, TeacherContentType, TokenOperation } from '@prisma/client';
 import { quotaService } from './quotaService.js';
 import { contentService } from './contentService.js';
 import { logger } from '../../utils/logger.js';
+import { uploadFile } from '../storage/storageService.js';
+import { v4 as uuidv4 } from 'uuid';
 
 // ============================================
 // TYPES
@@ -117,6 +119,20 @@ export interface GeneratedStudyGuide {
   }>;
   reviewQuestions?: string[];
   studyTips?: string[];
+  tokensUsed: number;
+}
+
+export interface GenerateInfographicInput {
+  topic: string;
+  keyPoints: string[];
+  style?: 'educational' | 'colorful' | 'minimalist' | 'professional';
+  gradeLevel?: string;
+  subject?: string;
+}
+
+export interface GeneratedInfographic {
+  imageUrl: string;
+  title: string;
   tokensUsed: number;
 }
 
@@ -418,6 +434,146 @@ export const contentGenerationService = {
         responseText: responseText.substring(0, 500),
       });
       throw new Error('Failed to analyze content');
+    }
+  },
+
+  /**
+   * Generate an educational infographic image
+   * Uses Gemini image generation model
+   */
+  async generateInfographic(
+    teacherId: string,
+    contentId: string,
+    input: GenerateInfographicInput
+  ): Promise<GeneratedInfographic> {
+    // Check quota
+    const estimatedTokens = 1000;
+    await quotaService.enforceQuota(teacherId, TokenOperation.INFOGRAPHIC_GENERATION, estimatedTokens);
+
+    logger.info('Generating infographic', { teacherId, contentId, topic: input.topic });
+
+    // Build a detailed prompt for the infographic
+    const styleDescriptions: Record<string, string> = {
+      educational: 'clean, professional educational style with clear sections, icons, and easy-to-read typography',
+      colorful: 'vibrant, colorful, and engaging with bold colors and fun illustrations suitable for students',
+      minimalist: 'clean, minimal design with lots of white space and simple icons',
+      professional: 'corporate, professional look with muted colors and structured layout',
+    };
+
+    const style = input.style || 'educational';
+    const gradeDescription = input.gradeLevel
+      ? `appropriate for grade ${input.gradeLevel} students`
+      : 'appropriate for elementary/middle school students';
+
+    const keyPointsFormatted = input.keyPoints.map((point, i) => `${i + 1}. ${point}`).join('\n');
+
+    const prompt = `Create an educational infographic about "${input.topic}".
+
+STYLE: ${styleDescriptions[style]}
+AUDIENCE: ${gradeDescription}
+${input.subject ? `SUBJECT: ${input.subject}` : ''}
+
+KEY INFORMATION TO INCLUDE:
+${keyPointsFormatted}
+
+REQUIREMENTS:
+- Create a visually appealing vertical infographic layout
+- Include clear section headers and organized content
+- Use appropriate icons and illustrations
+- Make text large and readable
+- Use a cohesive color scheme
+- Include the title "${input.topic}" prominently at the top
+- Add visual representations of the key concepts
+- Make it engaging and educational for students
+
+Do NOT include any inappropriate or scary imagery. Keep it child-friendly and educational.`;
+
+    try {
+      // Use Gemini image generation model
+      const model = genAI.getGenerativeModel({
+        model: config.gemini.models.image,
+        generationConfig: {
+          // @ts-expect-error - image generation specific config
+          responseModalities: ['image', 'text'],
+        },
+      });
+
+      const result = await model.generateContent(prompt);
+      const response = result.response;
+      const tokensUsed = response.usageMetadata?.totalTokenCount || estimatedTokens;
+
+      // Extract image from response
+      let imageData: Buffer | null = null;
+      let mimeType = 'image/png';
+
+      for (const candidate of response.candidates || []) {
+        for (const part of candidate.content?.parts || []) {
+          // inlineData exists on image generation responses
+          const inlineData = (part as { inlineData?: { data: string; mimeType?: string } }).inlineData;
+          if (inlineData?.data) {
+            imageData = Buffer.from(inlineData.data, 'base64');
+            mimeType = inlineData.mimeType || 'image/png';
+            break;
+          }
+        }
+        if (imageData) break;
+      }
+
+      if (!imageData) {
+        throw new Error('No image generated in response');
+      }
+
+      // Upload to R2
+      const filename = `infographic-${uuidv4()}.png`;
+      const storagePath = `teacher/${teacherId}/infographics/${filename}`;
+
+      const uploadResult = await uploadFile(
+        'aiContent',
+        storagePath,
+        imageData,
+        mimeType,
+        {
+          teacherId,
+          contentId,
+          topic: input.topic,
+        }
+      );
+
+      // Record usage
+      await quotaService.recordUsage({
+        teacherId,
+        operation: TokenOperation.INFOGRAPHIC_GENERATION,
+        tokensUsed,
+        modelUsed: config.gemini.models.image,
+        resourceType: 'infographic',
+        resourceId: contentId,
+      });
+
+      // Update content with infographic URL if contentId provided
+      if (contentId) {
+        await contentService.updateContent(contentId, teacherId, {
+          infographicUrl: uploadResult.publicUrl,
+        });
+        await contentService.recordAIUsage(
+          contentId,
+          teacherId,
+          tokensUsed,
+          config.gemini.models.image,
+          TokenOperation.INFOGRAPHIC_GENERATION
+        );
+      }
+
+      return {
+        imageUrl: uploadResult.publicUrl,
+        title: input.topic,
+        tokensUsed,
+      };
+    } catch (error) {
+      logger.error('Failed to generate infographic', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        topic: input.topic,
+      });
+      throw new Error('Failed to generate infographic. Please try again.');
     }
   },
 };

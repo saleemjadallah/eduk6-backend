@@ -401,6 +401,14 @@ const analyzeContentSchema = z.object({
   extractKeyTerms: z.boolean().optional(),
 });
 
+const generateInfographicSchema = z.object({
+  topic: z.string().min(1, 'Topic is required').max(255),
+  keyPoints: z.array(z.string()).min(3, 'At least 3 key points required').max(10),
+  style: z.enum(['educational', 'colorful', 'minimalist', 'professional']).optional(),
+  gradeLevel: z.string().max(20).optional(),
+  subject: z.string().max(50).optional(),
+});
+
 // ============================================
 // AI GENERATION ROUTES
 // ============================================
@@ -597,6 +605,48 @@ router.post(
         success: true,
         data: result,
         message: 'Content analyzed successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /api/teacher/content/:id/generate/infographic
+ * Generate an infographic from content
+ */
+router.post(
+  '/:id/generate/infographic',
+  authenticateTeacher,
+  requireTeacher,
+  validateInput(generateInfographicSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Verify content ownership
+      const content = await contentService.getContentById(
+        req.params.id,
+        req.teacher!.id
+      );
+
+      if (!content) {
+        res.status(404).json({
+          success: false,
+          error: 'Content not found',
+        });
+        return;
+      }
+
+      const result = await contentGenerationService.generateInfographic(
+        req.teacher!.id,
+        req.params.id,
+        req.body
+      );
+
+      res.json({
+        success: true,
+        data: result,
+        message: 'Infographic generated successfully',
       });
     } catch (error) {
       next(error);
