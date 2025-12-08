@@ -17,6 +17,15 @@ const router = Router();
 // SCHEMAS
 // ============================================
 
+const demoChatSchema = z.object({
+  message: z.string().min(1, 'Message is required').max(500, 'Message too long for demo'),
+  conversationHistory: z.array(z.object({
+    role: z.enum(['user', 'assistant']),
+    content: z.string(),
+  })).optional(),
+  sessionId: z.string().optional(),
+});
+
 const chatMessageSchema = z.object({
   message: z.string().min(1, 'Message is required').max(2000),
   childId: z.string().optional().nullable(),
@@ -61,6 +70,91 @@ const translateSchema = z.object({
 // ============================================
 // ROUTES
 // ============================================
+
+/**
+ * POST /api/chat/demo
+ * Landing page demo chat - no authentication required
+ * Limited to simple educational Q&A for prospective users
+ */
+router.post(
+  '/demo',
+  validateInput(demoChatSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { message, conversationHistory, sessionId } = req.body;
+
+      logger.info('Demo chat request', {
+        sessionId,
+        messageLength: message.length,
+        historyLength: conversationHistory?.length || 0,
+      });
+
+      // Build a simple, engaging prompt for demo users
+      const systemPrompt = `You are Jeffrey, a friendly AI learning buddy for kids! This is a demo conversation on a landing page, so keep your responses:
+
+- Short and engaging (2-3 sentences max)
+- Educational but fun
+- Encouraging them to sign up for the full experience
+- Safe and appropriate for all ages
+
+Your goal is to:
+1. Answer their question helpfully
+2. Show how fun and helpful you can be
+3. Subtly hint that there's more to explore with a full account
+
+Personality: Warm, enthusiastic, encouraging. Use a few emojis to be friendly (but not too many).
+
+IMPORTANT: Never mention being an AI or having limitations. Just be Jeffrey - a helpful learning buddy who makes learning fun!`;
+
+      // Build conversation history
+      const history = conversationHistory?.map((msg: { role: string; content: string }) => ({
+        role: msg.role === 'user' ? 'user' : 'model',
+        parts: [{ text: msg.content }],
+      })) || [];
+
+      const model = genAI.getGenerativeModel({
+        model: config.gemini.models.flash,
+        systemInstruction: systemPrompt,
+        generationConfig: {
+          temperature: 0.8,
+          maxOutputTokens: 200, // Keep responses short for demo
+        },
+      });
+
+      // Start chat with history
+      const chat = model.startChat({
+        history: history as any,
+      });
+
+      // Send the message
+      const result = await chat.sendMessage(message);
+      const response = result.response.text();
+
+      logger.info('Demo chat response generated', {
+        sessionId,
+        responseLength: response.length,
+      });
+
+      res.json({
+        success: true,
+        data: {
+          reply: response,
+          role: 'assistant',
+        },
+      });
+    } catch (error) {
+      logger.error('Demo chat error', { error });
+      // Return a friendly fallback response instead of an error
+      res.json({
+        success: true,
+        data: {
+          reply: "That's a great question! I'd love to help you learn about that. Sign up to chat with me more! 🌟",
+          role: 'assistant',
+        },
+      });
+    }
+  }
+);
 
 /**
  * POST /api/chat
