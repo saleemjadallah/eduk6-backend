@@ -697,6 +697,9 @@ model Teacher {
   currentMonthUsage   BigInt   @default(0)
   quotaResetDate      DateTime @default(now())
 
+  // Google Drive integration
+  googleDriveTokens  Json?
+
   // Relationships
   content          TeacherContent[]
   rubrics          Rubric[]
