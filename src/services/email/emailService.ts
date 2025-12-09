@@ -12,7 +12,7 @@ const templates = {
    * Welcome email for new parents
    */
   welcome: (parentName: string) => ({
-    subject: 'Welcome to OrbitLearn! Your Learning Adventure Begins',
+    subject: 'Welcome to OrbitLearn! Your Learning Adventure Begins 🚀',
     html: `
 <!DOCTYPE html>
 <html>
@@ -21,45 +21,76 @@ const templates = {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Welcome to OrbitLearn!</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa;">
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    <!-- Header with Logo -->
     <tr>
-      <td style="background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%); border-radius: 20px 20px 0 0; padding: 40px; text-align: center;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 32px;">Welcome to OrbitLearn!</h1>
-        <p style="color: rgba(255,255,255,0.9); margin-top: 10px; font-size: 18px;">Where Learning is an Adventure!</p>
+      <td style="background: linear-gradient(135deg, #7C3AED 0%, #2DD4BF 100%); border-radius: 24px 24px 0 0; padding: 40px; text-align: center;">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 120px; height: 120px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);">
+        <h1 style="color: #ffffff; margin: 0; font-size: 32px; font-weight: 700;">Welcome to OrbitLearn!</h1>
+        <p style="color: rgba(255,255,255,0.95); margin-top: 10px; font-size: 18px;">Where Learning is an Adventure!</p>
       </td>
     </tr>
     <tr>
-      <td style="background-color: #ffffff; padding: 40px; border-radius: 0 0 20px 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-        <h2 style="color: #1a1a2e; margin-top: 0;">Hi ${parentName}!</h2>
+      <td style="background-color: #ffffff; padding: 40px; border-radius: 0 0 24px 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+        <h2 style="color: #1e1b4b; margin-top: 0; font-size: 24px;">Hi ${parentName}! 👋</h2>
 
-        <p style="color: #4a4a4a; line-height: 1.6; font-size: 16px;">
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
           Thank you for joining OrbitLearn! We're thrilled to have you and your family as part of our learning community.
         </p>
 
-        <div style="background-color: #f0f9ff; border-left: 4px solid #6366F1; padding: 20px; margin: 24px 0; border-radius: 8px;">
-          <h3 style="color: #4338CA; margin-top: 0;">Meet Jeffrey, Your Child's AI Tutor!</h3>
-          <p style="color: #4a4a4a; margin-bottom: 0;">
-            Jeffrey is a friendly, patient AI tutor who adapts to each child's learning style. He makes education fun with interactive lessons, games, and personalized encouragement!
+        <!-- Jeffrey Introduction Box -->
+        <div style="background: linear-gradient(135deg, #EDE9FE 0%, #CCFBF1 100%); border-radius: 16px; padding: 24px; margin: 28px 0; text-align: center;">
+          <img src="${config.frontendUrl}/assets/images/jeffrey-avatar.png" alt="Jeffrey" style="width: 80px; height: 80px; border-radius: 50%; border: 4px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.15); margin-bottom: 16px;">
+          <h3 style="color: #5B21B6; margin: 0 0 12px 0; font-size: 20px;">Meet Jeffrey, Your Child's AI Tutor!</h3>
+          <p style="color: #4b5563; margin: 0; line-height: 1.6;">
+            Jeffrey is a friendly, patient AI tutor who adapts to each child's learning style. With his lavender skin and warm smile, he makes education fun with interactive lessons and personalized encouragement from kindergarten through middle school!
           </p>
         </div>
 
-        <h3 style="color: #1a1a2e;">Getting Started:</h3>
-        <ol style="color: #4a4a4a; line-height: 1.8;">
-          <li><strong>Add your children</strong> - Set up profiles for each child</li>
-          <li><strong>Upload lesson content</strong> - PDFs, images, or YouTube videos</li>
-          <li><strong>Watch them learn!</strong> - Jeffrey will guide them through interactive lessons</li>
-        </ol>
+        <h3 style="color: #1e1b4b; font-size: 18px;">Getting Started:</h3>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 20px 0;">
+          <tr>
+            <td style="padding: 12px 0;">
+              <table role="presentation" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="background: #7C3AED; color: white; width: 32px; height: 32px; border-radius: 50%; text-align: center; font-weight: bold; font-size: 16px; vertical-align: middle;">1</td>
+                  <td style="padding-left: 16px; color: #4b5563; font-size: 15px;"><strong>Add your children</strong> - Set up profiles for each child</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 0;">
+              <table role="presentation" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="background: #2DD4BF; color: white; width: 32px; height: 32px; border-radius: 50%; text-align: center; font-weight: bold; font-size: 16px; vertical-align: middle;">2</td>
+                  <td style="padding-left: 16px; color: #4b5563; font-size: 15px;"><strong>Upload lesson content</strong> - PDFs, images, or YouTube videos</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 0;">
+              <table role="presentation" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="background: #F59E0B; color: white; width: 32px; height: 32px; border-radius: 50%; text-align: center; font-weight: bold; font-size: 16px; vertical-align: middle;">3</td>
+                  <td style="padding-left: 16px; color: #4b5563; font-size: 15px;"><strong>Watch them learn!</strong> - Jeffrey will guide them through interactive lessons</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
 
-        <div style="text-align: center; margin: 32px 0;">
-          <a href="${config.frontendUrl}/dashboard" style="background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 30px; font-weight: bold; font-size: 16px; display: inline-block;">
-            Start Learning Now
+        <div style="text-align: center; margin: 36px 0;">
+          <a href="${config.frontendUrl}/dashboard" style="background: linear-gradient(135deg, #7C3AED 0%, #2DD4BF 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);">
+            Start Learning Now 🚀
           </a>
         </div>
 
-        <p style="color: #4a4a4a; font-size: 14px; border-top: 1px solid #e5e7eb; padding-top: 20px; margin-bottom: 0;">
+        <p style="color: #6b7280; font-size: 14px; border-top: 1px solid #e5e7eb; padding-top: 24px; margin-bottom: 0; text-align: center;">
           Questions? Reply to this email - we're here to help!<br>
-          <span style="color: #9ca3af;">- The OrbitLearn Team</span>
+          <span style="color: #9ca3af;">- The OrbitLearn Team 💜</span>
         </p>
       </td>
     </tr>
@@ -75,7 +106,7 @@ Hi ${parentName}!
 Thank you for joining OrbitLearn! We're thrilled to have you and your family as part of our learning community.
 
 Meet Jeffrey, Your Child's AI Tutor!
-Jeffrey is a friendly, patient AI tutor who adapts to each child's learning style. He makes education fun with interactive lessons, games, and personalized encouragement!
+Jeffrey is a friendly, patient AI tutor who adapts to each child's learning style. With his lavender skin and warm smile, he makes education fun with interactive lessons and personalized encouragement from kindergarten through middle school!
 
 Getting Started:
 1. Add your children - Set up profiles for each child
@@ -98,23 +129,26 @@ Questions? Reply to this email - we're here to help!
         title: 'Verify Your Email',
         message: 'Please use the code below to verify your email address.',
         action: 'email verification',
+        emoji: '✉️',
       },
       reset_password: {
         title: 'Reset Your Password',
         message: 'You requested to reset your password. Use the code below to proceed.',
         action: 'password reset',
+        emoji: '🔐',
       },
       login: {
         title: 'Login Verification',
         message: 'Use the code below to complete your login.',
         action: 'login verification',
+        emoji: '🔑',
       },
     };
 
-    const { title, message, action } = purposes[purpose];
+    const { title, message, action, emoji } = purposes[purpose];
 
     return {
-      subject: `${title} - OrbitLearn`,
+      subject: `${emoji} ${title} - OrbitLearn`,
       html: `
 <!DOCTYPE html>
 <html>
@@ -123,38 +157,43 @@ Questions? Reply to this email - we're here to help!
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${title}</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa;">
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    <!-- Header with Logo -->
     <tr>
-      <td style="background: linear-gradient(135deg, #FFD93D 0%, #FF6B6B 100%); border-radius: 20px 20px 0 0; padding: 30px; text-align: center;">
-        <h1 style="color: #1a1a2e; margin: 0; font-size: 28px;">${title}</h1>
+      <td style="background: linear-gradient(135deg, #7C3AED 0%, #2DD4BF 100%); border-radius: 24px 24px 0 0; padding: 30px; text-align: center;">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">${title}</h1>
       </td>
     </tr>
     <tr>
-      <td style="background-color: #ffffff; padding: 40px; border-radius: 0 0 20px 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-        <p style="color: #4a4a4a; line-height: 1.6; font-size: 16px; text-align: center;">
+      <td style="background-color: #ffffff; padding: 40px; border-radius: 0 0 24px 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px; text-align: center;">
           ${message}
         </p>
 
-        <div style="background-color: #f0f9ff; border-radius: 12px; padding: 30px; margin: 24px 0; text-align: center;">
-          <p style="color: #6b7280; margin: 0 0 10px 0; font-size: 14px;">Your verification code:</p>
-          <div style="font-size: 42px; font-weight: bold; letter-spacing: 8px; color: #1e40af; font-family: monospace;">
+        <!-- OTP Code Box -->
+        <div style="background: linear-gradient(135deg, #EDE9FE 0%, #CCFBF1 100%); border-radius: 16px; padding: 32px; margin: 28px 0; text-align: center;">
+          <p style="color: #6b7280; margin: 0 0 12px 0; font-size: 14px;">Your verification code:</p>
+          <div style="font-size: 44px; font-weight: bold; letter-spacing: 10px; color: #5B21B6; font-family: 'Courier New', monospace; background: #ffffff; padding: 16px 24px; border-radius: 12px; display: inline-block; box-shadow: 0 2px 8px rgba(91, 33, 182, 0.15);">
             ${otp}
           </div>
         </div>
 
         <p style="color: #6b7280; font-size: 14px; text-align: center;">
-          This code expires in <strong>10 minutes</strong>.
+          ⏱️ This code expires in <strong>10 minutes</strong>.
         </p>
 
-        <div style="background-color: #fef3c7; border-radius: 8px; padding: 16px; margin-top: 24px;">
-          <p style="color: #92400e; margin: 0; font-size: 14px;">
-            <strong>Security tip:</strong> Never share this code with anyone. OrbitLearn will never ask for your code via phone or text.
+        <!-- Security Tip -->
+        <div style="background-color: #FEF3C7; border-radius: 12px; padding: 16px 20px; margin-top: 24px; border-left: 4px solid #F59E0B;">
+          <p style="color: #92400E; margin: 0; font-size: 14px;">
+            <strong>🔒 Security tip:</strong> Never share this code with anyone. OrbitLearn will never ask for your code via phone or text.
           </p>
         </div>
 
-        <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
-          If you didn't request this ${action}, please ignore this email or contact support if you have concerns.
+        <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 28px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+          If you didn't request this ${action}, please ignore this email or contact support if you have concerns.<br><br>
+          <span style="color: #a78bfa;">- The OrbitLearn Team 💜</span>
         </p>
       </td>
     </tr>
@@ -174,6 +213,8 @@ This code expires in 10 minutes.
 Security tip: Never share this code with anyone. OrbitLearn will never ask for your code via phone or text.
 
 If you didn't request this ${action}, please ignore this email or contact support if you have concerns.
+
+- The OrbitLearn Team
       `,
     };
   },
@@ -182,7 +223,7 @@ If you didn't request this ${action}, please ignore this email or contact suppor
    * Child added notification email
    */
   childAdded: (parentName: string, childName: string) => ({
-    subject: `${childName}'s Profile is Ready! - OrbitLearn`,
+    subject: `🎉 ${childName}'s Profile is Ready! - OrbitLearn`,
     html: `
 <!DOCTYPE html>
 <html>
@@ -191,41 +232,76 @@ If you didn't request this ${action}, please ignore this email or contact suppor
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Child Profile Created</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa;">
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    <!-- Header with Logo -->
     <tr>
-      <td style="background: linear-gradient(135deg, #34D399 0%, #3B82F6 100%); border-radius: 20px 20px 0 0; padding: 30px; text-align: center;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 28px;">${childName}'s Profile is Ready!</h1>
+      <td style="background: linear-gradient(135deg, #2DD4BF 0%, #7C3AED 100%); border-radius: 24px 24px 0 0; padding: 30px; text-align: center;">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">🎉 ${childName}'s Profile is Ready!</h1>
       </td>
     </tr>
     <tr>
-      <td style="background-color: #ffffff; padding: 40px; border-radius: 0 0 20px 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-        <p style="color: #4a4a4a; line-height: 1.6; font-size: 16px;">
-          Hi ${parentName},
+      <td style="background-color: #ffffff; padding: 40px; border-radius: 0 0 24px 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
+          Hi ${parentName}! 👋
         </p>
 
-        <p style="color: #4a4a4a; line-height: 1.6; font-size: 16px;">
-          Great news! <strong>${childName}</strong>'s learning profile has been created and they're ready to start their educational adventure with Jeffrey!
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
+          Great news! <strong>${childName}</strong>'s learning profile has been created and they're ready to start their educational adventure!
         </p>
 
-        <div style="background-color: #ecfdf5; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;">
-          <p style="color: #065f46; margin: 0; font-size: 16px;">
-            Jeffrey is excited to meet ${childName} and help them explore fun lessons!
+        <!-- Jeffrey Excited Box -->
+        <div style="background: linear-gradient(135deg, #CCFBF1 0%, #EDE9FE 100%); border-radius: 16px; padding: 24px; margin: 28px 0; text-align: center;">
+          <img src="${config.frontendUrl}/assets/images/jeffrey-avatar.png" alt="Jeffrey" style="width: 70px; height: 70px; border-radius: 50%; border: 4px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.15); margin-bottom: 12px;">
+          <p style="color: #065f46; margin: 0; font-size: 16px; font-weight: 500;">
+            Jeffrey is excited to meet <strong>${childName}</strong> and help them explore fun lessons! 🚀
           </p>
         </div>
 
-        <h3 style="color: #1a1a2e;">Next Steps:</h3>
-        <ul style="color: #4a4a4a; line-height: 1.8;">
-          <li>Upload your first lesson for ${childName}</li>
-          <li>Let ${childName} chat with Jeffrey</li>
-          <li>Track their progress in your parent dashboard</li>
-        </ul>
+        <h3 style="color: #1e1b4b; font-size: 18px;">Next Steps:</h3>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 20px 0;">
+          <tr>
+            <td style="padding: 10px 0;">
+              <table role="presentation" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="color: #2DD4BF; font-size: 20px; vertical-align: middle; padding-right: 12px;">📚</td>
+                  <td style="color: #4b5563; font-size: 15px;">Upload your first lesson for ${childName}</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0;">
+              <table role="presentation" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="color: #7C3AED; font-size: 20px; vertical-align: middle; padding-right: 12px;">💬</td>
+                  <td style="color: #4b5563; font-size: 15px;">Let ${childName} chat with Jeffrey</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0;">
+              <table role="presentation" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="color: #F59E0B; font-size: 20px; vertical-align: middle; padding-right: 12px;">📊</td>
+                  <td style="color: #4b5563; font-size: 15px;">Track their progress in your parent dashboard</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
 
         <div style="text-align: center; margin: 32px 0;">
-          <a href="${config.frontendUrl}/dashboard/children" style="background: linear-gradient(135deg, #34D399 0%, #3B82F6 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 30px; font-weight: bold; font-size: 16px; display: inline-block;">
-            View ${childName}'s Profile
+          <a href="${config.frontendUrl}/dashboard/children" style="background: linear-gradient(135deg, #2DD4BF 0%, #7C3AED 100%); color: #ffffff; text-decoration: none; padding: 16px 36px; border-radius: 50px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 14px rgba(45, 212, 191, 0.4);">
+            View ${childName}'s Profile ✨
           </a>
         </div>
+
+        <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+          <span style="color: #a78bfa;">- The OrbitLearn Team 💜</span>
+        </p>
       </td>
     </tr>
   </table>
@@ -247,6 +323,8 @@ Next Steps:
 - Track their progress in your parent dashboard
 
 View profile at: ${config.frontendUrl}/dashboard/children
+
+- The OrbitLearn Team
     `,
   }),
 
@@ -264,7 +342,7 @@ View profile at: ${config.frontendUrl}/dashboard/children
       badgesEarned: string[];
     }
   ) => ({
-    subject: `${childName}'s Weekly Learning Report - OrbitLearn`,
+    subject: `📊 ${childName}'s Weekly Learning Report - OrbitLearn`,
     html: `
 <!DOCTYPE html>
 <html>
@@ -273,67 +351,80 @@ View profile at: ${config.frontendUrl}/dashboard/children
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Weekly Progress Report</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa;">
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    <!-- Header with Logo -->
     <tr>
-      <td style="background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%); border-radius: 20px 20px 0 0; padding: 30px; text-align: center;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 28px;">${childName}'s Weekly Report</h1>
-        <p style="color: rgba(255,255,255,0.9); margin-top: 5px;">Great progress this week!</p>
+      <td style="background: linear-gradient(135deg, #7C3AED 0%, #EC4899 100%); border-radius: 24px 24px 0 0; padding: 30px; text-align: center;">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">${childName}'s Weekly Report 📊</h1>
+        <p style="color: rgba(255,255,255,0.95); margin-top: 8px; font-size: 16px;">Great progress this week!</p>
       </td>
     </tr>
     <tr>
-      <td style="background-color: #ffffff; padding: 40px; border-radius: 0 0 20px 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-        <p style="color: #4a4a4a; line-height: 1.6; font-size: 16px;">
-          Hi ${parentName},
+      <td style="background-color: #ffffff; padding: 40px; border-radius: 0 0 24px 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
+          Hi ${parentName}! 👋
         </p>
 
-        <p style="color: #4a4a4a; line-height: 1.6; font-size: 16px;">
-          Here's what ${childName} accomplished this week with Jeffrey:
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
+          Here's what <strong>${childName}</strong> accomplished this week with Jeffrey:
         </p>
 
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 24px 0;">
+        <!-- Stats Grid -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 28px 0;">
           <tr>
-            <td style="background-color: #fef3c7; border-radius: 12px; padding: 20px; text-align: center; width: 48%;">
-              <div style="font-size: 32px; font-weight: bold; color: #d97706;">${stats.lessonsCompleted}</div>
-              <div style="color: #92400e; font-size: 14px;">Lessons Completed</div>
+            <td style="background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); border-radius: 16px; padding: 20px; text-align: center; width: 48%;">
+              <div style="font-size: 36px; font-weight: bold; color: #D97706;">📚 ${stats.lessonsCompleted}</div>
+              <div style="color: #92400E; font-size: 14px; font-weight: 600; margin-top: 4px;">Lessons Completed</div>
             </td>
             <td style="width: 4%;"></td>
-            <td style="background-color: #dbeafe; border-radius: 12px; padding: 20px; text-align: center; width: 48%;">
-              <div style="font-size: 32px; font-weight: bold; color: #2563eb;">${stats.timeSpent}</div>
-              <div style="color: #1e40af; font-size: 14px;">Learning Time</div>
+            <td style="background: linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%); border-radius: 16px; padding: 20px; text-align: center; width: 48%;">
+              <div style="font-size: 36px; font-weight: bold; color: #2563EB;">⏱️ ${stats.timeSpent}</div>
+              <div style="color: #1E40AF; font-size: 14px; font-weight: 600; margin-top: 4px;">Learning Time</div>
             </td>
           </tr>
           <tr><td colspan="3" style="height: 12px;"></td></tr>
           <tr>
-            <td style="background-color: #dcfce7; border-radius: 12px; padding: 20px; text-align: center; width: 48%;">
-              <div style="font-size: 32px; font-weight: bold; color: #16a34a;">${stats.xpEarned}</div>
-              <div style="color: #166534; font-size: 14px;">XP Earned</div>
+            <td style="background: linear-gradient(135deg, #CCFBF1 0%, #99F6E4 100%); border-radius: 16px; padding: 20px; text-align: center; width: 48%;">
+              <div style="font-size: 36px; font-weight: bold; color: #0D9488;">⭐ ${stats.xpEarned}</div>
+              <div style="color: #115E59; font-size: 14px; font-weight: 600; margin-top: 4px;">XP Earned</div>
             </td>
             <td style="width: 4%;"></td>
-            <td style="background-color: #fce7f3; border-radius: 12px; padding: 20px; text-align: center; width: 48%;">
-              <div style="font-size: 32px; font-weight: bold; color: #db2777;">${stats.streak}</div>
-              <div style="color: #9d174d; font-size: 14px;">Day Streak</div>
+            <td style="background: linear-gradient(135deg, #EDE9FE 0%, #DDD6FE 100%); border-radius: 16px; padding: 20px; text-align: center; width: 48%;">
+              <div style="font-size: 36px; font-weight: bold; color: #7C3AED;">🔥 ${stats.streak}</div>
+              <div style="color: #5B21B6; font-size: 14px; font-weight: 600; margin-top: 4px;">Day Streak</div>
             </td>
           </tr>
         </table>
 
         ${stats.badgesEarned.length > 0 ? `
-        <div style="background-color: #f0fdf4; border-radius: 12px; padding: 20px; margin: 24px 0;">
-          <h3 style="color: #166534; margin-top: 0;">New Badges Earned!</h3>
-          <p style="color: #4a4a4a; margin-bottom: 0;">
-            ${stats.badgesEarned.join(', ')}
+        <!-- Badges Section -->
+        <div style="background: linear-gradient(135deg, #CCFBF1 0%, #EDE9FE 100%); border-radius: 16px; padding: 24px; margin: 24px 0; text-align: center;">
+          <h3 style="color: #065F46; margin: 0 0 12px 0; font-size: 18px;">🏆 New Badges Earned!</h3>
+          <p style="color: #4b5563; margin: 0; font-size: 15px;">
+            ${stats.badgesEarned.join(' • ')}
           </p>
         </div>
         ` : ''}
 
+        <!-- Jeffrey Encouragement -->
+        <div style="background-color: #F5F3FF; border-radius: 16px; padding: 20px; margin: 24px 0; text-align: center; border: 2px dashed #C4B5FD;">
+          <img src="${config.frontendUrl}/assets/images/jeffrey-avatar.png" alt="Jeffrey" style="width: 50px; height: 50px; border-radius: 50%; margin-bottom: 10px;">
+          <p style="color: #5B21B6; margin: 0; font-size: 15px; font-style: italic;">
+            "Keep up the amazing work, ${childName}! Every lesson brings you closer to your goals!" 🌟
+          </p>
+        </div>
+
         <div style="text-align: center; margin: 32px 0;">
-          <a href="${config.frontendUrl}/dashboard/progress" style="background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 30px; font-weight: bold; font-size: 16px; display: inline-block;">
-            View Full Report
+          <a href="${config.frontendUrl}/dashboard/progress" style="background: linear-gradient(135deg, #7C3AED 0%, #EC4899 100%); color: #ffffff; text-decoration: none; padding: 16px 36px; border-radius: 50px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);">
+            View Full Report 📈
           </a>
         </div>
 
         <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
-          Keep up the great work! Every lesson brings ${childName} closer to their learning goals.
+          Keep up the great work! Every lesson brings ${childName} closer to their learning goals.<br><br>
+          <span style="color: #a78bfa;">- The OrbitLearn Team 💜</span>
         </p>
       </td>
     </tr>
@@ -354,9 +445,13 @@ Here's what ${childName} accomplished this week with Jeffrey:
 - Day Streak: ${stats.streak}
 ${stats.badgesEarned.length > 0 ? `- New Badges: ${stats.badgesEarned.join(', ')}` : ''}
 
+"Keep up the amazing work, ${childName}! Every lesson brings you closer to your goals!" - Jeffrey
+
 View full report at: ${config.frontendUrl}/dashboard/progress
 
 Keep up the great work! Every lesson brings ${childName} closer to their learning goals.
+
+- The OrbitLearn Team
     `,
   }),
 };
