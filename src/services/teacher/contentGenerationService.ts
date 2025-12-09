@@ -969,7 +969,7 @@ ${content.substring(0, 8000)}
 
 ANALYSIS TASKS:
 ${options.detectSubject !== false ? '- Detect the subject area (MATH, SCIENCE, ENGLISH, SOCIAL_STUDIES, ART, MUSIC, OTHER)' : ''}
-${options.detectGradeLevel !== false ? '- Determine appropriate grade level (K, 1, 2, 3, 4, 5, 6, or range like "3-4")' : ''}
+${options.detectGradeLevel !== false ? '- Determine appropriate grade level (K, 1, 2, 3, 4, 5, 6, 7, 8, or range like "3-4")' : ''}
 ${options.extractKeyTerms !== false ? '- Extract key terms and their definitions' : ''}
 - Provide a brief summary
 - Suggest what types of content could be created from this (LESSON, QUIZ, FLASHCARD_DECK, STUDY_GUIDE, WORKSHEET)

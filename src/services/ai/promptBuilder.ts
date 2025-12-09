@@ -238,7 +238,7 @@ Return ONLY valid JSON with this structure:
   "title": "A concise, engaging title for this lesson",
   "summary": "${isYoung ? 'A 2-3 sentence summary using very simple words' : 'A 3-5 sentence summary that captures the key learning objectives'}",
   "subject": "One of: MATH, SCIENCE, ENGLISH, ARABIC, ISLAMIC_STUDIES, SOCIAL_STUDIES, ART, MUSIC, OTHER",
-  "gradeLevel": "Estimated grade level (K, 1, 2, 3, 4, 5, or 6)",
+  "gradeLevel": "Estimated grade level (K, 1, 2, 3, 4, 5, 6, 7, or 8)",
   "chapters": [
     {
       "title": "Section/chapter title if the content has clear sections",

@@ -7,7 +7,7 @@ import { AgeGroup, LearningStyle, CurriculumType } from '@prisma/client';
 
 const router = Router();
 
-// Helper to map age to AgeGroup (YOUNG: 4-7, OLDER: 8-12)
+// Helper to map age to AgeGroup (YOUNG: 4-7, OLDER: 8-14)
 function getAgeGroup(age: number): AgeGroup {
   if (age >= 4 && age <= 7) return 'YOUNG';
   return 'OLDER';
@@ -69,12 +69,12 @@ router.post(
         throw new ValidationError('Display name must be 50 characters or less');
       }
 
-      if (!age || typeof age !== 'number' || age < 4 || age > 12) {
-        throw new ValidationError('Age must be between 4 and 12');
+      if (!age || typeof age !== 'number' || age < 4 || age > 14) {
+        throw new ValidationError('Age must be between 4 and 14');
       }
 
-      if (grade === undefined || grade === null || grade < 0 || grade > 6) {
-        throw new ValidationError('Grade must be between 0 (Pre-K) and 6');
+      if (grade === undefined || grade === null || grade < 0 || grade > 8) {
+        throw new ValidationError('Grade must be between 0 (Pre-K) and 8');
       }
 
       // Check parent's subscription limit

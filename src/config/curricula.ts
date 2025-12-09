@@ -1,5 +1,5 @@
 // Curriculum Configuration for Jeffrey AI Tutor
-// Based on educational systems research for K-6 teaching characteristics
+// Based on educational systems research for K-8 teaching characteristics
 
 import { CurriculumType, AgeGroup } from '@prisma/client';
 
@@ -81,6 +81,20 @@ export const GRADE_LEVEL_CONFIGS: Record<number, GradeLevelConfig> = {
     instructionStyle: 'Discussed concepts with Socratic questioning',
     workingMemoryChunks: 7,
     optimalSessionMinutes: 40,
+  },
+  7: {
+    maxSentenceLength: 22,
+    vocabularyTier: 'technical',
+    instructionStyle: 'Independent learning with Socratic questioning and critical analysis',
+    workingMemoryChunks: 8,
+    optimalSessionMinutes: 45,
+  },
+  8: {
+    maxSentenceLength: 25,
+    vocabularyTier: 'technical',
+    instructionStyle: 'Self-directed learning with analytical discussion and abstract reasoning',
+    workingMemoryChunks: 9,
+    optimalSessionMinutes: 50,
   },
 };
 
@@ -313,8 +327,8 @@ export function getCurriculumConfig(curriculumType: CurriculumType): CurriculumC
  * Get grade level configuration
  */
 export function getGradeLevelConfig(gradeLevel: number): GradeLevelConfig {
-  // Clamp grade level to valid range (0-6)
-  const clampedGrade = Math.max(0, Math.min(6, gradeLevel));
+  // Clamp grade level to valid range (0-8)
+  const clampedGrade = Math.max(0, Math.min(8, gradeLevel));
   return GRADE_LEVEL_CONFIGS[clampedGrade];
 }
 
