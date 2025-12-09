@@ -15,6 +15,10 @@ import {
   switchToChildSchema,
   verifyCCConsentSchema,
   verifyKBQConsentSchema,
+  resetChildPinSchema,
+  unlockChildPinSchema,
+  resetKBQSchema,
+  resetKBQViaCCSchema,
 } from '../schemas/auth.schema.js';
 
 const router = Router();
@@ -625,6 +629,216 @@ router.post(
           passed: result.success,
           consentId: result.consentId,
         },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ============================================
+// PIN RECOVERY (Forgot PIN)
+// ============================================
+
+/**
+ * GET /api/auth/children/:childId/pin-status
+ * Get PIN lockout status for a child
+ */
+router.get(
+  '/children/:childId/pin-status',
+  authenticate,
+  requireParent,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { childId } = req.params;
+      const status = await authService.getChildPinStatus(req.parent!.id, childId);
+
+      res.json({
+        success: true,
+        data: status,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /api/auth/children/:childId/reset-pin
+ * Reset child PIN (requires parent password)
+ */
+router.post(
+  '/children/:childId/reset-pin',
+  authenticate,
+  requireParent,
+  authRateLimit,
+  validateInput(resetChildPinSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { childId } = req.params;
+      const { password, newPin } = req.body;
+
+      await authService.resetChildPin(req.parent!.id, childId, password, newPin);
+
+      res.json({
+        success: true,
+        message: 'PIN reset successfully.',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /api/auth/children/:childId/unlock-pin
+ * Unlock child PIN (clear lockout, requires parent password)
+ */
+router.post(
+  '/children/:childId/unlock-pin',
+  authenticate,
+  requireParent,
+  authRateLimit,
+  validateInput(unlockChildPinSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { childId } = req.params;
+      const { password } = req.body;
+
+      await authService.unlockChildPin(req.parent!.id, childId, password);
+
+      res.json({
+        success: true,
+        message: 'PIN unlocked successfully.',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ============================================
+// KBQ RECOVERY (Forgot Security Questions)
+// ============================================
+
+/**
+ * GET /api/auth/kbq/status
+ * Check if parent has KBQ set up
+ */
+router.get(
+  '/kbq/status',
+  authenticate,
+  requireParent,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const hasKBQ = await consentService.hasKBQSetup(req.parent!.id);
+
+      res.json({
+        success: true,
+        data: { hasKBQ },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /api/auth/kbq/all-questions
+ * Get all available KBQ questions (for reset flow)
+ */
+router.get(
+  '/kbq/all-questions',
+  authenticate,
+  requireParent,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const questions = consentService.getAllKBQQuestions();
+
+      res.json({
+        success: true,
+        data: { questions },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /api/auth/kbq/reset
+ * Reset KBQ answers (requires parent password)
+ */
+router.post(
+  '/kbq/reset',
+  authenticate,
+  requireParent,
+  authRateLimit,
+  validateInput(resetKBQSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { password, answers } = req.body;
+
+      await consentService.resetKBQAnswers(req.parent!.id, password, answers);
+
+      res.json({
+        success: true,
+        message: 'Security questions reset successfully.',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /api/auth/kbq/reset/initiate-cc
+ * Initiate KBQ reset via credit card (for when password is forgotten)
+ */
+router.post(
+  '/kbq/reset/initiate-cc',
+  authenticate,
+  requireParent,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await consentService.initiateKBQResetViaCreditCard(
+        req.parent!.id,
+        req.ip,
+        req.headers['user-agent']
+      );
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /api/auth/kbq/reset/complete-cc
+ * Complete KBQ reset after credit card verification
+ */
+router.post(
+  '/kbq/reset/complete-cc',
+  authenticate,
+  requireParent,
+  validateInput(resetKBQViaCCSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { paymentIntentId, answers } = req.body;
+
+      await consentService.completeKBQResetViaCreditCard(
+        req.parent!.id,
+        paymentIntentId,
+        answers
+      );
+
+      res.json({
+        success: true,
+        message: 'Security questions reset successfully.',
       });
     } catch (error) {
       next(error);

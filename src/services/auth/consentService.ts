@@ -350,4 +350,161 @@ export const consentService = {
 
     return consent !== null;
   },
+
+  /**
+   * Check if parent has KBQ answers set up
+   */
+  async hasKBQSetup(parentId: string): Promise<boolean> {
+    const parent = await prisma.parent.findUnique({
+      where: { id: parentId },
+      select: { kbqAnswers: true },
+    });
+
+    return !!(parent?.kbqAnswers && typeof parent.kbqAnswers === 'object' && Object.keys(parent.kbqAnswers as object).length > 0);
+  },
+
+  /**
+   * Reset KBQ answers (requires password verification)
+   * This allows parents to set up new security questions if they forgot their answers
+   */
+  async resetKBQAnswers(
+    parentId: string,
+    password: string,
+    newAnswers: Array<{ questionId: string; answer: string }>
+  ): Promise<{ success: boolean }> {
+    // Validate new answers
+    if (newAnswers.length < 3) {
+      throw new ValidationError('At least 3 security questions are required');
+    }
+
+    // Get parent and verify password
+    const parent = await prisma.parent.findUnique({
+      where: { id: parentId },
+      select: { passwordHash: true, email: true, firstName: true },
+    });
+
+    if (!parent) {
+      throw new ValidationError('Parent account not found');
+    }
+
+    // Verify password for re-authentication
+    const isPasswordValid = await bcrypt.compare(password, parent.passwordHash);
+    if (!isPasswordValid) {
+      throw new ForbiddenError('Invalid password');
+    }
+
+    // Hash and store new answers
+    const hashedAnswers: Record<string, string> = {};
+
+    for (const { questionId, answer } of newAnswers) {
+      const question = KBQ_QUESTIONS.find(q => q.id === questionId);
+      if (!question) {
+        throw new ValidationError(`Unknown question: ${questionId}`);
+      }
+
+      if (!question.validation.test(answer)) {
+        throw new ValidationError(`Invalid answer format for: ${question.question}`);
+      }
+
+      // Hash the answer (case-insensitive, trimmed)
+      const normalizedAnswer = answer.toLowerCase().trim();
+      hashedAnswers[questionId] = await bcrypt.hash(normalizedAnswer, KBQ_SALT_ROUNDS);
+    }
+
+    // Update stored answers
+    await prisma.parent.update({
+      where: { id: parentId },
+      data: { kbqAnswers: hashedAnswers },
+    });
+
+    logger.info(`KBQ answers reset for parent ${parentId}`);
+
+    return { success: true };
+  },
+
+  /**
+   * Initiate KBQ reset via credit card verification
+   * Returns Stripe PaymentIntent for $0.50 verification charge
+   */
+  async initiateKBQResetViaCreditCard(
+    parentId: string,
+    ipAddress?: string,
+    userAgent?: string
+  ): Promise<{ clientSecret: string; resetToken: string }> {
+    // Create a reset token that will be used after CC verification
+    const resetToken = `kbq_reset_${parentId}_${Date.now()}`;
+
+    // TODO: Create actual Stripe PaymentIntent
+    // For now, return placeholder
+    const clientSecret = `pi_kbq_reset_${parentId}`;
+
+    logger.info(`KBQ reset initiated via credit card for parent ${parentId}`);
+
+    return { clientSecret, resetToken };
+  },
+
+  /**
+   * Complete KBQ reset after credit card verification
+   */
+  async completeKBQResetViaCreditCard(
+    parentId: string,
+    paymentIntentId: string,
+    newAnswers: Array<{ questionId: string; answer: string }>
+  ): Promise<{ success: boolean }> {
+    // Validate new answers
+    if (newAnswers.length < 3) {
+      throw new ValidationError('At least 3 security questions are required');
+    }
+
+    // TODO: Verify payment intent with Stripe
+    // For now, proceed with reset
+
+    // Hash and store new answers
+    const hashedAnswers: Record<string, string> = {};
+
+    for (const { questionId, answer } of newAnswers) {
+      const question = KBQ_QUESTIONS.find(q => q.id === questionId);
+      if (!question) {
+        throw new ValidationError(`Unknown question: ${questionId}`);
+      }
+
+      if (!question.validation.test(answer)) {
+        throw new ValidationError(`Invalid answer format for: ${question.question}`);
+      }
+
+      const normalizedAnswer = answer.toLowerCase().trim();
+      hashedAnswers[questionId] = await bcrypt.hash(normalizedAnswer, KBQ_SALT_ROUNDS);
+    }
+
+    // Get parent email for notification
+    const parent = await prisma.parent.findUnique({
+      where: { id: parentId },
+      select: { email: true, firstName: true },
+    });
+
+    // Update stored answers
+    await prisma.parent.update({
+      where: { id: parentId },
+      data: { kbqAnswers: hashedAnswers },
+    });
+
+    logger.info(`KBQ answers reset via credit card for parent ${parentId}`);
+
+    return { success: true };
+  },
+
+  /**
+   * Get all available KBQ questions (for reset flow)
+   */
+  getAllKBQQuestions(): Array<{
+    id: string;
+    question: string;
+    hint?: string;
+  }> {
+    return KBQ_QUESTIONS.map(q => ({
+      id: q.id,
+      question: q.question,
+      hint: q.hint,
+    }));
+  },
 };

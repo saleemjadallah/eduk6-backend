@@ -454,6 +454,94 @@ Keep up the great work! Every lesson brings ${childName} closer to their learnin
 - The OrbitLearn Team
     `,
   }),
+
+  /**
+   * Security alert email for sensitive account changes
+   */
+  securityAlert: (parentName: string, alertType: string, details: string) => ({
+    subject: `🔒 Security Alert: ${alertType} - OrbitLearn`,
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Security Alert</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    <!-- Header with Logo -->
+    <tr>
+      <td style="background: linear-gradient(135deg, #EF4444 0%, #F59E0B 100%); border-radius: 24px 24px 0 0; padding: 30px; text-align: center;">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">🔒 Security Alert</h1>
+      </td>
+    </tr>
+    <tr>
+      <td style="background-color: #ffffff; padding: 40px; border-radius: 0 0 24px 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
+          Hi ${parentName}! 👋
+        </p>
+
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
+          We're letting you know about a security-related change on your OrbitLearn account:
+        </p>
+
+        <!-- Alert Box -->
+        <div style="background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); border-radius: 16px; padding: 24px; margin: 28px 0; border-left: 4px solid #F59E0B;">
+          <h3 style="color: #92400E; margin: 0 0 12px 0; font-size: 18px;">${alertType}</h3>
+          <p style="color: #78350F; margin: 0; font-size: 15px;">
+            ${details}
+          </p>
+          <p style="color: #92400E; margin-top: 16px; margin-bottom: 0; font-size: 13px;">
+            <strong>Time:</strong> ${new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })}
+          </p>
+        </div>
+
+        <!-- Security Note -->
+        <div style="background-color: #FEE2E2; border-radius: 12px; padding: 16px 20px; margin-top: 24px; border-left: 4px solid #EF4444;">
+          <p style="color: #991B1B; margin: 0; font-size: 14px;">
+            <strong>⚠️ Didn't make this change?</strong><br>
+            If you didn't authorize this action, please secure your account immediately by changing your password and contacting our support team.
+          </p>
+        </div>
+
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${config.frontendUrl}/parent/settings" style="background: linear-gradient(135deg, #7C3AED 0%, #2DD4BF 100%); color: #ffffff; text-decoration: none; padding: 16px 36px; border-radius: 50px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);">
+            Review Account Settings 🔐
+          </a>
+        </div>
+
+        <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+          This is an automated security notification. If you have any questions, please contact our support team.<br><br>
+          <span style="color: #a78bfa;">- The OrbitLearn Security Team 🛡️</span>
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `,
+    text: `
+Security Alert: ${alertType}
+
+Hi ${parentName},
+
+We're letting you know about a security-related change on your OrbitLearn account:
+
+${alertType}
+${details}
+
+Time: ${new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })}
+
+Didn't make this change?
+If you didn't authorize this action, please secure your account immediately by changing your password and contacting our support team.
+
+Review your account settings at: ${config.frontendUrl}/parent/settings
+
+- The OrbitLearn Security Team
+    `,
+  }),
 };
 
 export const emailService = {
@@ -604,6 +692,44 @@ export const emailService = {
       return true;
     } catch (error) {
       logger.error('Error sending weekly progress email', { error, email });
+      return false;
+    }
+  },
+
+  /**
+   * Send security alert for sensitive account changes
+   */
+  async sendSecurityAlert(
+    email: string,
+    parentName: string,
+    alertType: string,
+    details: string
+  ): Promise<boolean> {
+    if (config.email.skipEmails || !resend) {
+      logger.info(`[Email] Skipped security alert to ${email}: ${alertType}`);
+      return true;
+    }
+
+    try {
+      const template = templates.securityAlert(parentName, alertType, details);
+
+      const { error } = await resend.emails.send({
+        from: `OrbitLearn Security <${config.email.fromEmail}>`,
+        to: email,
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
+      });
+
+      if (error) {
+        logger.error('Failed to send security alert email', { error, email, alertType });
+        return false;
+      }
+
+      logger.info(`Security alert email sent to ${email}: ${alertType}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending security alert email', { error, email });
       return false;
     }
   },

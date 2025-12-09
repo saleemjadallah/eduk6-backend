@@ -693,4 +693,153 @@ export const authService = {
 
     logger.info(`Account deleted: ${parentId}`);
   },
+
+  /**
+   * Reset child PIN (requires parent password confirmation)
+   * This allows parents to reset the PIN if they forgot it
+   */
+  async resetChildPin(
+    parentId: string,
+    childId: string,
+    parentPassword: string,
+    newPin: string
+  ): Promise<{ success: boolean }> {
+    // Validate new PIN format
+    if (!/^\d{4}$/.test(newPin)) {
+      throw new ValidationError('PIN must be exactly 4 digits');
+    }
+
+    // Get parent and verify password
+    const parent = await prisma.parent.findUnique({
+      where: { id: parentId },
+      select: { passwordHash: true, email: true, firstName: true },
+    });
+
+    if (!parent) {
+      throw new NotFoundError('Parent account not found');
+    }
+
+    // Verify parent password for re-authentication
+    const isPasswordValid = await bcrypt.compare(parentPassword, parent.passwordHash);
+    if (!isPasswordValid) {
+      throw new UnauthorizedError('Invalid password');
+    }
+
+    // Verify child belongs to parent
+    const child = await prisma.child.findFirst({
+      where: { id: childId, parentId },
+      select: { id: true, displayName: true },
+    });
+
+    if (!child) {
+      throw new NotFoundError('Child profile not found');
+    }
+
+    // Update the PIN and reset any lockout
+    await prisma.child.update({
+      where: { id: childId },
+      data: {
+        pin: newPin,
+        pinAttempts: 0,
+        pinLockedUntil: null,
+      },
+    });
+
+    logger.info(`PIN reset for child ${childId} by parent ${parentId}`);
+
+    // Send security notification email (async)
+    emailService.sendSecurityAlert(
+      parent.email,
+      parent.firstName || 'there',
+      'PIN Reset',
+      `The PIN for ${child.displayName}'s profile was reset.`
+    ).catch(err => {
+      logger.error('Failed to send PIN reset notification', { error: err, parentId });
+    });
+
+    return { success: true };
+  },
+
+  /**
+   * Unlock child PIN (clear lockout without changing PIN)
+   * Used when child is locked out but parent knows the PIN
+   */
+  async unlockChildPin(
+    parentId: string,
+    childId: string,
+    parentPassword: string
+  ): Promise<{ success: boolean }> {
+    // Get parent and verify password
+    const parent = await prisma.parent.findUnique({
+      where: { id: parentId },
+      select: { passwordHash: true },
+    });
+
+    if (!parent) {
+      throw new NotFoundError('Parent account not found');
+    }
+
+    // Verify parent password
+    const isPasswordValid = await bcrypt.compare(parentPassword, parent.passwordHash);
+    if (!isPasswordValid) {
+      throw new UnauthorizedError('Invalid password');
+    }
+
+    // Verify child belongs to parent
+    const child = await prisma.child.findFirst({
+      where: { id: childId, parentId },
+    });
+
+    if (!child) {
+      throw new NotFoundError('Child profile not found');
+    }
+
+    // Clear lockout
+    await prisma.child.update({
+      where: { id: childId },
+      data: {
+        pinAttempts: 0,
+        pinLockedUntil: null,
+      },
+    });
+
+    logger.info(`PIN unlocked for child ${childId} by parent ${parentId}`);
+
+    return { success: true };
+  },
+
+  /**
+   * Get child PIN lockout status
+   */
+  async getChildPinStatus(
+    parentId: string,
+    childId: string
+  ): Promise<{
+    isLocked: boolean;
+    attempts: number;
+    lockedUntil: Date | null;
+    remainingMinutes: number | null;
+  }> {
+    // Verify child belongs to parent
+    const child = await prisma.child.findFirst({
+      where: { id: childId, parentId },
+      select: { pinAttempts: true, pinLockedUntil: true },
+    });
+
+    if (!child) {
+      throw new NotFoundError('Child profile not found');
+    }
+
+    const isLocked = child.pinLockedUntil ? child.pinLockedUntil > new Date() : false;
+    const remainingMinutes = isLocked && child.pinLockedUntil
+      ? Math.ceil((child.pinLockedUntil.getTime() - Date.now()) / (1000 * 60))
+      : null;
+
+    return {
+      isLocked,
+      attempts: child.pinAttempts,
+      lockedUntil: child.pinLockedUntil,
+      remainingMinutes,
+    };
+  },
 };

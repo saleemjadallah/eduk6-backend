@@ -53,6 +53,33 @@ export const verifyKBQConsentSchema = z.object({
   })).min(3).max(5),
 });
 
+// PIN reset schemas
+export const resetChildPinSchema = z.object({
+  password: z.string().min(1, 'Password is required'),
+  newPin: z.string().length(4, 'PIN must be 4 digits').regex(/^\d{4}$/, 'PIN must be numeric'),
+});
+
+export const unlockChildPinSchema = z.object({
+  password: z.string().min(1, 'Password is required'),
+});
+
+// KBQ reset schemas
+export const resetKBQSchema = z.object({
+  password: z.string().min(1, 'Password is required'),
+  answers: z.array(z.object({
+    questionId: z.string().min(1),
+    answer: z.string().min(1),
+  })).min(3).max(5),
+});
+
+export const resetKBQViaCCSchema = z.object({
+  paymentIntentId: z.string().min(1),
+  answers: z.array(z.object({
+    questionId: z.string().min(1),
+    answer: z.string().min(1),
+  })).min(3).max(5),
+});
+
 // Type exports
 export type SignupInput = z.infer<typeof signupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
@@ -64,3 +91,7 @@ export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type SwitchToChildInput = z.infer<typeof switchToChildSchema>;
 export type VerifyCCConsentInput = z.infer<typeof verifyCCConsentSchema>;
 export type VerifyKBQConsentInput = z.infer<typeof verifyKBQConsentSchema>;
+export type ResetChildPinInput = z.infer<typeof resetChildPinSchema>;
+export type UnlockChildPinInput = z.infer<typeof unlockChildPinSchema>;
+export type ResetKBQInput = z.infer<typeof resetKBQSchema>;
+export type ResetKBQViaCCInput = z.infer<typeof resetKBQViaCCSchema>;
