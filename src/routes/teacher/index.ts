@@ -4,6 +4,7 @@ import authRoutes from './auth.routes.js';
 import quotaRoutes from './quota.routes.js';
 import contentRoutes from './content.routes.js';
 import exportRoutes from './export.routes.js';
+import subscriptionRoutes from './subscription.routes.js';
 
 const router = Router();
 
@@ -12,6 +13,7 @@ router.use('/auth', authRoutes);
 router.use('/quota', quotaRoutes);
 router.use('/content', contentRoutes);
 router.use('/export', exportRoutes);
+router.use('/subscription', subscriptionRoutes);
 
 // Future routes will be added here:
 // router.use('/rubrics', rubricRoutes);

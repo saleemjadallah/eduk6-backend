@@ -1,57 +1,145 @@
 // Token Quota Management Service
 import { prisma } from '../../config/database.js';
-import { TokenOperation } from '@prisma/client';
+import { TokenOperation, TeacherSubscriptionTier } from '@prisma/client';
 import { logger } from '../../utils/logger.js';
 import { PaymentRequiredError } from '../../middleware/errorHandler.js';
 
-// Token cost estimates per 1K tokens (based on Gemini pricing)
+// =============================================================================
+// TOKEN COSTS (Updated December 2025 - Google Gemini API Pricing)
+// =============================================================================
+// These are BLENDED costs (input + output) per 1K tokens
+// Assuming typical 25% input, 75% output distribution for educational content
+// Source: https://ai.google.dev/gemini-api/docs/pricing (Updated Dec 5, 2025)
 const TOKEN_COSTS = {
-  'gemini-2.5-flash': 0.000075,        // $0.075 per 1M tokens
-  'gemini-2.5-flash-lite': 0.000025,   // $0.025 per 1M tokens
-  'gemini-3-pro': 0.00125,             // $1.25 per 1M tokens
-  'gemini-3-pro-preview': 0.00125,     // $1.25 per 1M tokens
-  'gemini-3-pro-image-preview': 0.002, // $2 per 1M tokens (images)
-  default: 0.001,                       // Default fallback
+  // Gemini 2.5 Flash: $0.30/1M input, $2.50/1M output → ~$1.85/1M blended
+  'gemini-2.5-flash': 0.00185,
+
+  // Gemini 2.5 Flash-Lite: $0.10/1M input, $0.40/1M output → ~$0.325/1M blended
+  'gemini-2.5-flash-lite': 0.000325,
+
+  // Gemini 3 Pro Preview: $2.00/1M input, $12.00/1M output → ~$9.50/1M blended
+  'gemini-3-pro': 0.0095,
+  'gemini-3-pro-preview': 0.0095,
+
+  // Gemini 3 Pro Image: $120/1M output tokens (images only, ~$0.134 per 1K/2K image)
+  'gemini-3-pro-image-preview': 0.12,
+
+  // Gemini 2.0 Flash (legacy): $0.10/1M input, $0.40/1M output → ~$0.325/1M blended
+  'gemini-2.0-flash': 0.000325,
+
+  // Default fallback
+  default: 0.002,
 };
 
-// Estimated tokens per operation (for pre-flight checks)
+// =============================================================================
+// OPERATION TOKEN ESTIMATES (for pre-flight quota checks)
+// =============================================================================
+// These estimates include both input and output tokens
 const OPERATION_ESTIMATES: Record<TokenOperation, number> = {
-  CONTENT_ANALYSIS: 5000,
-  LESSON_GENERATION: 3000,
-  QUIZ_GENERATION: 1500,
-  FLASHCARD_GENERATION: 1000,
-  INFOGRAPHIC_GENERATION: 500,
-  GRADING_SINGLE: 3000,
-  GRADING_BATCH: 3000, // Per submission
-  FEEDBACK_GENERATION: 1000,
-  CHAT: 500,
+  CONTENT_ANALYSIS: 5000,        // ~2K input + ~3K output
+  LESSON_GENERATION: 8000,       // Guide: ~5.5K, Full: ~12K (use average)
+  QUIZ_GENERATION: 3000,         // ~1K input + ~2K output (10 questions)
+  FLASHCARD_GENERATION: 2500,    // ~800 input + ~1.5K output (20 cards)
+  INFOGRAPHIC_GENERATION: 1600,  // ~500 input + ~1.1K output tokens
+  GRADING_SINGLE: 4000,          // ~2K input + ~2K output
+  GRADING_BATCH: 4000,           // Per submission
+  FEEDBACK_GENERATION: 1500,     // ~500 input + ~1K output
+  CHAT: 800,                     // ~300 input + ~500 output
 };
+
+// =============================================================================
+// CREDIT SYSTEM CONFIGURATION
+// =============================================================================
+// 1 Credit = 1,000 tokens (simplified for user understanding)
+const TOKENS_PER_CREDIT = 1000;
+
+// Monthly credit allocations by subscription tier
+const TIER_CREDITS: Record<TeacherSubscriptionTier, number> = {
+  FREE: 100,           // 100K tokens
+  BASIC: 500,          // 500K tokens
+  PROFESSIONAL: 2000,  // 2M tokens
+};
+
+// Maximum rollover cap (2x monthly allocation)
+const ROLLOVER_MULTIPLIER = 2;
 
 export interface QuotaCheckResult {
   allowed: boolean;
   remainingTokens: bigint;
+  remainingCredits: number;
   estimatedCost: number;
   quotaResetDate: Date;
   warning?: string;
   percentUsed: number;
 }
 
+export interface CreditBalance {
+  subscription: number;      // Current month subscription credits
+  rollover: number;          // Rolled over from previous month
+  bonus: number;             // From credit pack purchases
+  total: number;             // Total available
+  used: number;              // Used this month
+  remaining: number;         // Total - Used
+}
+
 export interface UsageStats {
   currentMonth: {
     tokensUsed: bigint;
+    creditsUsed: number;
     operationBreakdown: Record<TokenOperation, number>;
     costEstimate: number;
   };
   history: Array<{
     date: Date;
     tokensUsed: number;
+    creditsUsed: number;
     operation: TokenOperation;
   }>;
+}
+
+// =============================================================================
+// CREDIT CONVERSION UTILITIES
+// =============================================================================
+
+/**
+ * Convert tokens to credits (rounds up)
+ */
+export function tokensToCredits(tokens: number | bigint): number {
+  return Math.ceil(Number(tokens) / TOKENS_PER_CREDIT);
+}
+
+/**
+ * Convert credits to tokens
+ */
+export function creditsToTokens(credits: number): number {
+  return credits * TOKENS_PER_CREDIT;
+}
+
+/**
+ * Get credit allocation for a subscription tier
+ */
+export function getTierCredits(tier: TeacherSubscriptionTier): number {
+  return TIER_CREDITS[tier] || TIER_CREDITS.FREE;
+}
+
+/**
+ * Get rollover cap for a subscription tier
+ */
+export function getRolloverCap(tier: TeacherSubscriptionTier): number {
+  return getTierCredits(tier) * ROLLOVER_MULTIPLIER;
+}
+
+/**
+ * Get estimated credits for an operation
+ */
+export function getOperationCredits(operation: TokenOperation): number {
+  return tokensToCredits(OPERATION_ESTIMATES[operation] || 1000);
 }
 
 export const quotaService = {
   /**
    * Check if an operation is allowed within the quota
+   * Now includes rollover credits and bonus credits
    */
   async checkQuota(
     teacherId: string,
@@ -98,24 +186,35 @@ export const quotaService = {
       return this.checkQuota(teacherId, operation, estimatedTokens);
     }
 
-    const remaining = monthlyLimit - currentUsage;
-    const allowed = remaining >= BigInt(estimate);
-    const percentUsed = Number((currentUsage * BigInt(100)) / monthlyLimit);
+    // Calculate total available tokens including rollover and bonus credits
+    // For now, these fields might not exist yet in the database
+    const rolledOverTokens = BigInt((teacher as any).rolledOverCredits || 0) * BigInt(TOKENS_PER_CREDIT);
+    const bonusTokens = BigInt((teacher as any).bonusCredits || 0) * BigInt(TOKENS_PER_CREDIT);
 
-    // Calculate cost estimate
+    const totalAvailable = monthlyLimit + rolledOverTokens + bonusTokens;
+    const remaining = totalAvailable - currentUsage;
+    const allowed = remaining >= BigInt(estimate);
+
+    // Calculate percent used of subscription credits only (for display)
+    const percentUsed = monthlyLimit > BigInt(0)
+      ? Number((currentUsage * BigInt(100)) / monthlyLimit)
+      : 100;
+
+    // Calculate cost estimate using the appropriate model
     const costPerToken = TOKEN_COSTS.default / 1000;
     const estimatedCost = estimate * costPerToken;
 
     let warning: string | undefined;
     if (percentUsed >= 90) {
-      warning = 'You have used over 90% of your monthly token quota.';
+      warning = 'You have used over 90% of your monthly credit quota. Consider purchasing a credit pack.';
     } else if (percentUsed >= 75) {
-      warning = 'You have used over 75% of your monthly token quota.';
+      warning = 'You have used over 75% of your monthly credit quota.';
     }
 
     return {
       allowed,
       remainingTokens: remaining,
+      remainingCredits: tokensToCredits(remaining),
       estimatedCost,
       quotaResetDate: resetDate,
       warning,
@@ -270,19 +369,21 @@ export const quotaService = {
     return {
       currentMonth: {
         tokensUsed: currentUsage,
+        creditsUsed: tokensToCredits(currentUsage),
         operationBreakdown: operationBreakdown as Record<TokenOperation, number>,
         costEstimate: totalCost,
       },
       history: logs.map(log => ({
         date: log.createdAt,
         tokensUsed: log.tokensUsed,
+        creditsUsed: tokensToCredits(log.tokensUsed),
         operation: log.operation,
       })),
     };
   },
 
   /**
-   * Get quota info for display
+   * Get quota info for display (with credit balance)
    */
   async getQuotaInfo(teacherId: string) {
     const teacher = await prisma.teacher.findUnique({
@@ -314,9 +415,33 @@ export const quotaService = {
     const resetDate = isOrgMember
       ? teacher.organization!.quotaResetDate
       : teacher.quotaResetDate;
+    const tier = isOrgMember
+      ? 'FREE' as TeacherSubscriptionTier // Org members use org tier
+      : teacher.subscriptionTier;
+
+    // Get rollover and bonus credits (if fields exist)
+    const rolloverCredits = (teacher as any).rolledOverCredits || 0;
+    const bonusCredits = (teacher as any).bonusCredits || 0;
+
+    // Calculate credit balance
+    const subscriptionCredits = tokensToCredits(monthlyLimit);
+    const totalCredits = subscriptionCredits + rolloverCredits + bonusCredits;
+    const usedCredits = tokensToCredits(used);
+    const remainingCredits = totalCredits - usedCredits;
+
+    const creditBalance: CreditBalance = {
+      subscription: subscriptionCredits,
+      rollover: rolloverCredits,
+      bonus: bonusCredits,
+      total: totalCredits,
+      used: usedCredits,
+      remaining: Math.max(0, remainingCredits),
+    };
 
     const remaining = monthlyLimit - used;
-    const percentUsed = Number((used * BigInt(100)) / monthlyLimit);
+    const percentUsed = monthlyLimit > BigInt(0)
+      ? Number((used * BigInt(100)) / monthlyLimit)
+      : 0;
 
     return {
       isOrgMember,
@@ -324,6 +449,7 @@ export const quotaService = {
       subscriptionTier: isOrgMember
         ? teacher.organization!.subscriptionTier
         : teacher.subscriptionTier,
+      // Legacy quota info (tokens)
       quota: {
         monthlyLimit: monthlyLimit.toString(),
         used: used.toString(),
@@ -331,16 +457,30 @@ export const quotaService = {
         percentUsed,
         resetDate,
       },
+      // New credit balance info
+      credits: creditBalance,
+      // Trial info (if applicable)
+      trialEndsAt: (teacher as any).trialEndsAt || null,
+      isInTrial: (teacher as any).trialEndsAt ? new Date() < new Date((teacher as any).trialEndsAt) : false,
     };
   },
 
   /**
-   * Reset quota for new month
+   * Get credit balance for a teacher
+   */
+  async getCreditBalance(teacherId: string): Promise<CreditBalance> {
+    const info = await this.getQuotaInfo(teacherId);
+    return info.credits;
+  },
+
+  /**
+   * Reset quota for new month (with rollover calculation)
    */
   async resetQuota(teacherId: string, organizationId?: string | null): Promise<void> {
     const nextMonth = getNextMonthStart();
 
     if (organizationId) {
+      // For organizations, just reset (no rollover for now)
       await prisma.organization.update({
         where: { id: organizationId },
         data: {
@@ -349,6 +489,47 @@ export const quotaService = {
         },
       });
     } else {
+      // For individual teachers, calculate rollover
+      const teacher = await prisma.teacher.findUnique({
+        where: { id: teacherId },
+        select: {
+          monthlyTokenQuota: true,
+          currentMonthUsage: true,
+          subscriptionTier: true,
+        },
+      });
+
+      if (teacher) {
+        // Calculate unused credits from this month
+        const unusedTokens = teacher.monthlyTokenQuota - teacher.currentMonthUsage;
+        const unusedCredits = Math.max(0, tokensToCredits(unusedTokens));
+
+        // Cap rollover at 1x monthly allocation (per plan config)
+        const tierCredits = getTierCredits(teacher.subscriptionTier);
+        const rolloverCap = tierCredits; // Cap at 1 month's worth
+        const newRolloverCredits = Math.min(unusedCredits, rolloverCap);
+
+        await prisma.teacher.update({
+          where: { id: teacherId },
+          data: {
+            currentMonthUsage: 0,
+            quotaResetDate: nextMonth,
+            // Only update if the field exists (after migration)
+            ...(typeof (teacher as any).rolledOverCredits !== 'undefined' && {
+              rolledOverCredits: newRolloverCredits,
+            }),
+          },
+        });
+
+        logger.info(`Quota reset for teacher ${teacherId}`, {
+          unusedCredits,
+          rolloverCap,
+          newRolloverCredits,
+        });
+        return;
+      }
+
+      // Fallback if teacher not found (shouldn't happen)
       await prisma.teacher.update({
         where: { id: teacherId },
         data: {
@@ -434,13 +615,145 @@ export const quotaService = {
 
     if (!check.allowed) {
       throw new PaymentRequiredError(
-        'Token quota exceeded. Please upgrade your plan or wait for quota reset.'
+        'Credit quota exceeded. Please purchase a credit pack or upgrade your plan.'
       );
     }
 
     return check;
   },
+
+  // =============================================================================
+  // CREDIT PACK & SUBSCRIPTION MANAGEMENT
+  // =============================================================================
+
+  /**
+   * Add bonus credits from a credit pack purchase
+   */
+  async addBonusCredits(teacherId: string, credits: number): Promise<void> {
+    // This will work after the migration adds the bonusCredits field
+    try {
+      await prisma.teacher.update({
+        where: { id: teacherId },
+        data: {
+          bonusCredits: { increment: credits },
+        } as any, // Cast to any until migration adds the field
+      });
+
+      logger.info(`Added ${credits} bonus credits to teacher ${teacherId}`);
+    } catch (error) {
+      // If field doesn't exist yet, log warning
+      logger.warn(`Could not add bonus credits - field may not exist yet`, {
+        teacherId,
+        credits,
+        error,
+      });
+      throw error;
+    }
+  },
+
+  /**
+   * Update subscription tier and adjust quota accordingly
+   */
+  async updateSubscriptionTier(
+    teacherId: string,
+    newTier: TeacherSubscriptionTier,
+    options?: {
+      stripeSubscriptionId?: string;
+      trialEndsAt?: Date;
+    }
+  ): Promise<void> {
+    const tierCredits = getTierCredits(newTier);
+    const newTokenQuota = creditsToTokens(tierCredits);
+
+    const updateData: any = {
+      subscriptionTier: newTier,
+      monthlyTokenQuota: newTokenQuota,
+    };
+
+    if (options?.stripeSubscriptionId) {
+      updateData.stripeSubscriptionId = options.stripeSubscriptionId;
+    }
+
+    if (options?.trialEndsAt) {
+      updateData.trialEndsAt = options.trialEndsAt;
+    }
+
+    await prisma.teacher.update({
+      where: { id: teacherId },
+      data: updateData,
+    });
+
+    logger.info(`Updated subscription tier for teacher ${teacherId}`, {
+      newTier,
+      tierCredits,
+      newTokenQuota,
+    });
+  },
+
+  /**
+   * Start a trial period for a teacher
+   */
+  async startTrial(
+    teacherId: string,
+    tier: TeacherSubscriptionTier,
+    trialDays: number = 7
+  ): Promise<Date> {
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
+
+    await this.updateSubscriptionTier(teacherId, tier, { trialEndsAt });
+
+    logger.info(`Started ${trialDays}-day trial for teacher ${teacherId}`, {
+      tier,
+      trialEndsAt,
+    });
+
+    return trialEndsAt;
+  },
+
+  /**
+   * Check if a teacher's trial has expired
+   */
+  async checkTrialExpiry(teacherId: string): Promise<boolean> {
+    const teacher = await prisma.teacher.findUnique({
+      where: { id: teacherId },
+      select: {
+        subscriptionTier: true,
+      },
+    });
+
+    if (!teacher) {
+      throw new Error('Teacher not found');
+    }
+
+    const trialEndsAt = (teacher as any).trialEndsAt;
+    if (!trialEndsAt) {
+      return false; // No trial set
+    }
+
+    const hasExpired = new Date() > new Date(trialEndsAt);
+
+    if (hasExpired && teacher.subscriptionTier !== 'FREE') {
+      // Trial expired, revert to FREE tier
+      await this.updateSubscriptionTier(teacherId, 'FREE');
+      logger.info(`Trial expired for teacher ${teacherId}, reverted to FREE tier`);
+      return true;
+    }
+
+    return false;
+  },
+
+  /**
+   * Get operation cost estimate in credits
+   */
+  getOperationCreditCost(operation: TokenOperation): number {
+    return getOperationCredits(operation);
+  },
 };
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
 
 /**
  * Get the start of next month for quota reset
@@ -449,5 +762,13 @@ function getNextMonthStart(): Date {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth() + 1, 1);
 }
+
+// Export credit utilities for use in other services
+export {
+  TOKENS_PER_CREDIT,
+  TIER_CREDITS,
+  TOKEN_COSTS,
+  OPERATION_ESTIMATES,
+};
 
 export default quotaService;

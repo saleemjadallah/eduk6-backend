@@ -133,22 +133,33 @@ export const stripeService = {
 
   /**
    * Construct and verify Stripe webhook event
+   * @param payload - Raw request body
+   * @param signature - Stripe signature header
+   * @param webhookType - Which webhook secret to use: 'default', 'consent', or 'teacher'
    */
   constructWebhookEvent(
     payload: string | Buffer,
     signature: string,
-    useConsentSecret: boolean = false
+    webhookType: 'default' | 'consent' | 'teacher' = 'default'
   ): Stripe.Event {
     if (!stripe) {
       throw new Error('Stripe is not configured');
     }
 
-    const secret = useConsentSecret
-      ? config.stripe.webhookSecretCC
-      : config.stripe.webhookSecret;
+    let secret: string | undefined;
+    switch (webhookType) {
+      case 'consent':
+        secret = config.stripe.webhookSecretCC;
+        break;
+      case 'teacher':
+        secret = config.stripe.webhookSecretTeacher;
+        break;
+      default:
+        secret = config.stripe.webhookSecret;
+    }
 
     if (!secret) {
-      throw new Error('Stripe webhook secret is not configured');
+      throw new Error(`Stripe webhook secret for '${webhookType}' is not configured`);
     }
 
     return stripe.webhooks.constructEvent(payload, signature, secret);

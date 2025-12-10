@@ -687,15 +687,23 @@ model Teacher {
   role             TeacherRole @default(TEACHER)
 
   // Individual subscription (when no org)
-  subscriptionTier   TeacherSubscriptionTier @default(FREE)
-  subscriptionStatus SubscriptionStatus @default(ACTIVE)
-  stripeCustomerId   String?
+  subscriptionTier      TeacherSubscriptionTier @default(FREE)
+  subscriptionStatus    SubscriptionStatus @default(ACTIVE)
+  stripeCustomerId      String?
+  stripeSubscriptionId  String?              // Active Stripe subscription ID
   subscriptionExpiresAt DateTime?
 
+  // Trial period
+  trialEndsAt           DateTime?            // When trial period ends (null = no trial)
+
   // Token Quotas (individual)
-  monthlyTokenQuota   BigInt   @default(100000)  // 100K tokens/month free
-  currentMonthUsage   BigInt   @default(0)
-  quotaResetDate      DateTime @default(now())
+  monthlyTokenQuota     BigInt   @default(100000)  // 100K tokens/month free (100 credits)
+  currentMonthUsage     BigInt   @default(0)
+  quotaResetDate        DateTime @default(now())
+
+  // Credit System (December 2025)
+  rolledOverCredits     Int      @default(0)       // Credits rolled over from previous month
+  bonusCredits          Int      @default(0)       // Credits from credit pack purchases (never expire)
 
   // Google Drive integration
   googleDriveTokens  Json?

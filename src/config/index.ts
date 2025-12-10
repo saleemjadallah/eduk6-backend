@@ -87,6 +87,7 @@ export const config = {
     secretKey: process.env.STRIPE_SECRET_KEY,
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
     webhookSecretCC: process.env.STRIPE_WEBHOOK_SECRET_CC, // For credit card consent verification
+    webhookSecretTeacher: process.env.STRIPE_WEBHOOK_SECRET_TEACHER, // For teacher subscription events
   },
 
   // Logging

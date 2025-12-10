@@ -7,11 +7,22 @@ import puppeteer from 'puppeteer';
 import { TeacherContent, Subject } from '@prisma/client';
 
 // Types for content structures
+interface ActivityObject {
+  name?: string;
+  description?: string;
+  materials?: string[];
+  duration?: number;
+  discussionQuestions?: string[];
+}
+
 interface LessonSection {
   title: string;
   content: string;
   duration?: number;
-  activities?: string[];
+  activities?: (string | ActivityObject)[];
+  teachingTips?: string[];
+  visualAids?: string[];
+  realWorldConnections?: string[];
 }
 
 interface VocabularyItem {
@@ -28,6 +39,13 @@ interface AssessmentQuestion {
   explanation?: string;
 }
 
+interface PracticeExercise {
+  question: string;
+  type?: string;
+  hint?: string;
+  answer?: string;
+}
+
 interface LessonContent {
   title: string;
   summary?: string;
@@ -36,8 +54,17 @@ interface LessonContent {
   vocabulary?: VocabularyItem[];
   assessment?: {
     questions: AssessmentQuestion[];
+    totalPoints?: number;
+    passingScore?: number;
+    scoringGuide?: string;
   };
   teacherNotes?: string;
+  practiceExercises?: PracticeExercise[];
+  summaryPoints?: string[];
+  reviewQuestions?: string[];
+  additionalResources?: string[];
+  prerequisites?: string[];
+  nextSteps?: string;
 }
 
 interface QuizQuestion {
@@ -550,9 +577,36 @@ function generateLessonHTML(
             ${section.activities && section.activities.length > 0 ? `
               <div class="activities">
                 <h4>📝 Activities</h4>
-                <ul>
-                  ${section.activities.map(act => `<li>${act}</li>`).join('')}
-                </ul>
+                ${section.activities.map(act => {
+                  if (typeof act === 'string') {
+                    return `<ul><li>${act}</li></ul>`;
+                  }
+                  // Handle activity object format from full lessons
+                  const actObj = act as ActivityObject;
+                  return `
+                    <div class="activity-item" style="margin-bottom: 12px; padding: 12px; background: white; border-radius: 8px;">
+                      ${actObj.name ? `<div style="font-weight: 600; margin-bottom: 4px;">${actObj.name}</div>` : ''}
+                      ${actObj.description ? `<div style="margin-bottom: 8px;">${actObj.description}</div>` : ''}
+                      ${actObj.duration ? `<div style="font-size: 9pt; color: #6B7280;">⏱ ${actObj.duration} min</div>` : ''}
+                      ${actObj.materials && actObj.materials.length > 0 ? `
+                        <div style="margin-top: 8px;">
+                          <div style="font-size: 9pt; font-weight: 500; color: #4B5563;">Materials:</div>
+                          <ul style="margin: 4px 0 0 16px; font-size: 10pt;">
+                            ${actObj.materials.map(m => `<li>${m}</li>`).join('')}
+                          </ul>
+                        </div>
+                      ` : ''}
+                      ${actObj.discussionQuestions && actObj.discussionQuestions.length > 0 ? `
+                        <div style="margin-top: 8px;">
+                          <div style="font-size: 9pt; font-weight: 500; color: #4B5563;">Discussion Questions:</div>
+                          <ul style="margin: 4px 0 0 16px; font-size: 10pt;">
+                            ${actObj.discussionQuestions.map(q => `<li>${q}</li>`).join('')}
+                          </ul>
+                        </div>
+                      ` : ''}
+                    </div>
+                  `;
+                }).join('')}
               </div>
             ` : ''}
           </div>
@@ -609,6 +663,88 @@ function generateLessonHTML(
             ` : ''}
           </div>
         `).join('')}
+      </div>
+    `;
+  }
+
+  // Practice Exercises (for full lessons)
+  if (lessonData.practiceExercises && lessonData.practiceExercises.length > 0) {
+    html += `
+      <div class="section">
+        <h2 class="section-title"><span class="icon">✏️</span> Practice Exercises</h2>
+        ${lessonData.practiceExercises.map((ex, i) => `
+          <div class="question-card">
+            <div class="question-text">
+              <span class="number">${i + 1}</span>
+              ${ex.question}
+            </div>
+            ${ex.hint ? `<div style="font-size: 10pt; color: #6B7280; margin-top: 8px;">💡 Hint: ${ex.hint}</div>` : ''}
+            ${options.includeAnswers && ex.answer ? `
+              <div class="answer-section">
+                <div class="label">Answer:</div>
+                <div class="answer">${ex.answer}</div>
+              </div>
+            ` : ''}
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  // Summary Points (for full lessons)
+  if (lessonData.summaryPoints && lessonData.summaryPoints.length > 0) {
+    html += `
+      <div class="section">
+        <h2 class="section-title"><span class="icon">📌</span> Key Takeaways</h2>
+        <ul class="objectives-list">
+          ${lessonData.summaryPoints.map(point => `<li>${point}</li>`).join('')}
+        </ul>
+      </div>
+    `;
+  }
+
+  // Review Questions (for full lessons)
+  if (lessonData.reviewQuestions && lessonData.reviewQuestions.length > 0) {
+    html += `
+      <div class="section">
+        <h2 class="section-title"><span class="icon">❓</span> Review Questions</h2>
+        <ol style="padding-left: 20px;">
+          ${lessonData.reviewQuestions.map(q => `<li style="margin-bottom: 12px;">${q}</li>`).join('')}
+        </ol>
+      </div>
+    `;
+  }
+
+  // Prerequisites and Next Steps (for full lessons)
+  if (lessonData.prerequisites || lessonData.nextSteps) {
+    html += `
+      <div class="section" style="background: #F9FAFB; border-radius: 12px; padding: 16px; margin-top: 20px;">
+        ${lessonData.prerequisites && lessonData.prerequisites.length > 0 ? `
+          <div style="margin-bottom: 12px;">
+            <h3 style="font-size: 11pt; color: #4B5563; margin-bottom: 8px;">📚 Prerequisites</h3>
+            <ul style="margin-left: 16px; color: #6B7280; font-size: 10pt;">
+              ${lessonData.prerequisites.map(p => `<li>${p}</li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+        ${lessonData.nextSteps ? `
+          <div>
+            <h3 style="font-size: 11pt; color: #4B5563; margin-bottom: 8px;">➡️ What's Next</h3>
+            <p style="color: #6B7280; font-size: 10pt;">${lessonData.nextSteps}</p>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  // Additional Resources (for full lessons)
+  if (lessonData.additionalResources && lessonData.additionalResources.length > 0) {
+    html += `
+      <div class="section">
+        <h2 class="section-title"><span class="icon">🔗</span> Additional Resources</h2>
+        <ul style="padding-left: 20px;">
+          ${lessonData.additionalResources.map(r => `<li style="margin-bottom: 8px;">${r}</li>`).join('')}
+        </ul>
       </div>
     `;
   }
