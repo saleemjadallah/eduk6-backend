@@ -1,11 +1,12 @@
 // Teacher Content routes - CRUD operations for lessons, quizzes, flashcards
 import { Router, Request, Response, NextFunction } from 'express';
-import { contentService } from '../../services/teacher/index.js';
+import { contentService, quotaService } from '../../services/teacher/index.js';
 import { contentGenerationService } from '../../services/teacher/contentGenerationService.js';
+import { geminiService } from '../../services/ai/geminiService.js';
 import { authenticateTeacher, requireTeacher } from '../../middleware/teacherAuth.js';
 import { validateInput } from '../../middleware/validateInput.js';
 import { z } from 'zod';
-import { TeacherContentType, ContentStatus, Subject, SourceType } from '@prisma/client';
+import { TeacherContentType, ContentStatus, Subject, SourceType, TokenOperation } from '@prisma/client';
 
 const router = Router();
 
@@ -408,6 +409,82 @@ const generateInfographicSchema = z.object({
   gradeLevel: z.string().max(20).optional(),
   subject: z.string().max(50).optional(),
 });
+
+// ============================================
+// PDF ANALYSIS ROUTES
+// ============================================
+
+const analyzePDFSchema = z.object({
+  pdfBase64: z.string().min(100, 'PDF data is required'),
+  filename: z.string().max(255).optional(),
+});
+
+/**
+ * POST /api/teacher/content/analyze-pdf
+ * Analyze a PDF document and extract educational content
+ * Uses Gemini's native PDF processing capabilities
+ */
+router.post(
+  '/analyze-pdf',
+  authenticateTeacher,
+  requireTeacher,
+  validateInput(analyzePDFSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { pdfBase64, filename } = req.body;
+
+      // Check file size (base64 is ~33% larger than original)
+      // 10MB PDF = ~13.3MB base64
+      const maxBase64Size = 14 * 1024 * 1024; // ~14MB base64 = ~10MB PDF
+      if (pdfBase64.length > maxBase64Size) {
+        res.status(400).json({
+          success: false,
+          error: 'PDF file too large',
+          message: 'PDF files must be under 10MB. Please compress your PDF or split it into smaller files.',
+        });
+        return;
+      }
+
+      // Check quota before processing
+      const estimatedTokens = 4000; // PDF analysis uses roughly 4000 tokens
+      await quotaService.enforceQuota(
+        req.teacher!.id,
+        TokenOperation.CONTENT_ANALYSIS,
+        estimatedTokens
+      );
+
+      // Analyze the PDF
+      const result = await geminiService.analyzePDF(pdfBase64);
+
+      // Record usage
+      await quotaService.recordUsage({
+        teacherId: req.teacher!.id,
+        operation: TokenOperation.CONTENT_ANALYSIS,
+        tokensUsed: result.tokensUsed,
+        modelUsed: 'gemini-2.5-flash',
+        resourceType: 'pdf_analysis',
+      });
+
+      res.json({
+        success: true,
+        data: {
+          extractedText: result.extractedText,
+          suggestedTitle: result.suggestedTitle,
+          summary: result.summary,
+          detectedSubject: result.detectedSubject,
+          detectedGradeLevel: result.detectedGradeLevel,
+          keyTopics: result.keyTopics,
+          vocabulary: result.vocabulary,
+          tokensUsed: result.tokensUsed,
+          filename: filename || 'document.pdf',
+        },
+        message: 'PDF analyzed successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 // ============================================
 // AI GENERATION ROUTES

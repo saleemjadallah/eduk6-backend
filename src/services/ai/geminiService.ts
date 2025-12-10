@@ -138,6 +138,17 @@ export interface TranslationResult {
   simpleExplanation?: string; // Kid-friendly explanation of the word/phrase
 }
 
+export interface PDFAnalysisResult {
+  extractedText: string;
+  suggestedTitle: string;
+  summary: string;
+  detectedSubject: string | null;
+  detectedGradeLevel: string | null;
+  keyTopics: string[];
+  vocabulary: Array<{ term: string; definition: string }>;
+  tokensUsed: number;
+}
+
 export interface DetectedExercise {
   type: 'FILL_IN_BLANK' | 'MATH_PROBLEM' | 'SHORT_ANSWER' | 'MULTIPLE_CHOICE' | 'TRUE_FALSE';
   questionText: string;
@@ -732,6 +743,101 @@ If no text is visible, return "[No text detected]".`;
         error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw new Error('Failed to extract text from image');
+    }
+  }
+
+  /**
+   * Analyze a PDF document using Gemini's native PDF capabilities
+   * Extracts text and educational metadata for content generation
+   */
+  async analyzePDF(pdfBase64: string): Promise<PDFAnalysisResult> {
+    logger.info('Starting PDF analysis with Gemini', {
+      pdfSize: pdfBase64.length,
+    });
+
+    // Use Gemini Flash for PDF analysis
+    const model = genAI.getGenerativeModel({
+      model: config.gemini.models.flash,
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 8000,
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const prompt = `You are an expert educator analyzing a PDF document to extract educational content.
+
+Analyze this PDF and extract:
+1. ALL text content from the document
+2. A suggested title for teaching this content
+3. A brief summary (2-3 sentences)
+4. The subject area (MATH, SCIENCE, ENGLISH, SOCIAL_STUDIES, ART, MUSIC, or OTHER)
+5. The appropriate grade level (K, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, or a range like "3-5")
+6. Key topics covered (3-8 topics)
+7. Important vocabulary terms with definitions (5-15 terms)
+
+Return JSON with this exact structure:
+{
+  "extractedText": "Full text content from the PDF...",
+  "suggestedTitle": "Title for the lesson",
+  "summary": "Brief summary of what this content covers...",
+  "detectedSubject": "SCIENCE",
+  "detectedGradeLevel": "5",
+  "keyTopics": ["topic1", "topic2", "topic3"],
+  "vocabulary": [
+    {"term": "word1", "definition": "definition1"},
+    {"term": "word2", "definition": "definition2"}
+  ]
+}
+
+If the PDF is unreadable or contains no educational content, still return the JSON structure with empty/null values where appropriate.`;
+
+    // Clean base64 - remove data URL prefix if present
+    let cleanBase64 = pdfBase64;
+    if (pdfBase64.includes(',')) {
+      cleanBase64 = pdfBase64.split(',')[1];
+    }
+
+    try {
+      const result = await model.generateContent([
+        { text: prompt },
+        {
+          inlineData: {
+            mimeType: 'application/pdf',
+            data: cleanBase64,
+          },
+        },
+      ]);
+
+      const response = result.response;
+      const responseText = response.text();
+      const tokensUsed = response.usageMetadata?.totalTokenCount || 3000;
+
+      const jsonText = this.extractJSON(responseText);
+      const analysis = JSON.parse(jsonText);
+
+      logger.info('PDF analysis completed', {
+        textLength: analysis.extractedText?.length || 0,
+        subject: analysis.detectedSubject,
+        gradeLevel: analysis.detectedGradeLevel,
+        tokensUsed,
+      });
+
+      return {
+        extractedText: analysis.extractedText || '',
+        suggestedTitle: analysis.suggestedTitle || 'Untitled Document',
+        summary: analysis.summary || '',
+        detectedSubject: analysis.detectedSubject || null,
+        detectedGradeLevel: analysis.detectedGradeLevel || null,
+        keyTopics: analysis.keyTopics || [],
+        vocabulary: analysis.vocabulary || [],
+        tokensUsed,
+      };
+    } catch (error) {
+      logger.error('PDF analysis failed', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw new Error('Failed to analyze PDF. The file may be corrupted or unreadable.');
     }
   }
 
