@@ -39,6 +39,7 @@
     "pdf-parse": "^1.1.1",
     "puppeteer": "^24.32.0",
     "resend": "^6.5.2",
+    "stripe": "^20.0.0",
     "uuid": "^10.0.0",
     "winston": "^3.14.2",
     "youtube-transcript": "^1.2.1",

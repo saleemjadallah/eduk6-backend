@@ -4,6 +4,7 @@ import { prisma } from '../../config/database.js';
 import { ConsentMethod, ConsentStatus } from '@prisma/client';
 import { ValidationError, ForbiddenError } from '../../middleware/errorHandler.js';
 import { logger } from '../../utils/logger.js';
+import { stripeService } from '../stripe/index.js';
 
 const KBQ_SALT_ROUNDS = 10;
 
@@ -101,7 +102,22 @@ export const consentService = {
     parentId: string,
     ipAddress?: string,
     userAgent?: string
-  ): Promise<{ clientSecret: string; consentId: string }> {
+  ): Promise<{ clientSecret: string; consentId: string; paymentIntentId: string }> {
+    // Check if Stripe is configured
+    if (!stripeService.isConfigured()) {
+      throw new ValidationError('Credit card verification is not available at this time');
+    }
+
+    // Get parent email for receipt
+    const parent = await prisma.parent.findUnique({
+      where: { id: parentId },
+      select: { email: true },
+    });
+
+    if (!parent) {
+      throw new ValidationError('Parent account not found');
+    }
+
     // Create pending consent record
     const consent = await prisma.consent.create({
       data: {
@@ -113,11 +129,31 @@ export const consentService = {
       },
     });
 
-    // TODO: Create Stripe PaymentIntent for $0.50 charge
-    // For now, return placeholder
-    const clientSecret = `pi_placeholder_${consent.id}`;
+    try {
+      // Create Stripe PaymentIntent for $0.50 verification charge
+      const { clientSecret, paymentIntentId } = await stripeService.createConsentPaymentIntent(
+        parentId,
+        consent.id,
+        parent.email
+      );
 
-    return { clientSecret, consentId: consent.id };
+      // Update consent with payment intent ID
+      await prisma.consent.update({
+        where: { id: consent.id },
+        data: {
+          verificationData: { paymentIntentId },
+        },
+      });
+
+      logger.info('Credit card consent initiated', { parentId, consentId: consent.id, paymentIntentId });
+
+      return { clientSecret, consentId: consent.id, paymentIntentId };
+    } catch (error) {
+      // Clean up consent record on failure
+      await prisma.consent.delete({ where: { id: consent.id } });
+      logger.error('Failed to initiate credit card consent', { error, parentId });
+      throw error;
+    }
   },
 
   /**
@@ -129,6 +165,7 @@ export const consentService = {
   ): Promise<ConsentVerificationResult> {
     const consent = await prisma.consent.findUnique({
       where: { id: consentId },
+      include: { parent: { select: { email: true, firstName: true } } },
     });
 
     if (!consent) {
@@ -139,18 +176,73 @@ export const consentService = {
       throw new ForbiddenError('Consent already processed');
     }
 
-    // TODO: Verify payment intent with Stripe
-    // For now, just mark as verified
+    // Verify payment intent with Stripe
+    const verification = await stripeService.verifyPaymentIntent(paymentIntentId);
 
+    if (!verification.success) {
+      logger.warn('Credit card consent verification failed - payment not successful', {
+        consentId,
+        paymentIntentId,
+        status: verification.status,
+      });
+      throw new ValidationError(`Payment verification failed. Status: ${verification.status}`);
+    }
+
+    // Verify metadata matches
+    if (verification.metadata?.consentId !== consentId) {
+      logger.warn('Credit card consent verification failed - consent ID mismatch', {
+        consentId,
+        paymentIntentId,
+        metadataConsentId: verification.metadata?.consentId,
+      });
+      throw new ValidationError('Payment verification failed. Consent ID mismatch.');
+    }
+
+    // Mark consent as verified
     const updatedConsent = await prisma.consent.update({
       where: { id: consentId },
       data: {
         status: 'VERIFIED',
-        verificationData: { paymentIntentId },
+        verificationData: {
+          paymentIntentId,
+          verifiedAt: new Date().toISOString(),
+          stripeStatus: verification.status,
+        },
         consentGivenAt: new Date(),
         // Consent is valid for 1 year
         expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
       },
+    });
+
+    // Refund the verification charge (best effort - don't fail if refund fails)
+    try {
+      const { refundId } = await stripeService.refundConsentCharge(paymentIntentId);
+      logger.info('Consent verification charge refunded', { consentId, paymentIntentId, refundId });
+
+      // Update consent with refund info
+      await prisma.consent.update({
+        where: { id: consentId },
+        data: {
+          verificationData: {
+            ...(updatedConsent.verificationData as object),
+            refundId,
+            refundedAt: new Date().toISOString(),
+          },
+        },
+      });
+    } catch (refundError) {
+      // Log but don't fail - consent is verified, we'll handle refund manually if needed
+      logger.error('Failed to refund consent verification charge', {
+        error: refundError,
+        consentId,
+        paymentIntentId,
+      });
+    }
+
+    logger.info('Credit card consent verified successfully', {
+      consentId,
+      parentId: consent.parentId,
+      paymentIntentId,
     });
 
     return {
@@ -430,17 +522,72 @@ export const consentService = {
     parentId: string,
     ipAddress?: string,
     userAgent?: string
-  ): Promise<{ clientSecret: string; resetToken: string }> {
+  ): Promise<{ clientSecret: string; resetToken: string; paymentIntentId: string }> {
+    // Check if Stripe is configured
+    if (!stripeService.isConfigured()) {
+      throw new ValidationError('Credit card verification is not available at this time');
+    }
+
+    // Get parent email for receipt
+    const parent = await prisma.parent.findUnique({
+      where: { id: parentId },
+      select: { email: true },
+    });
+
+    if (!parent) {
+      throw new ValidationError('Parent account not found');
+    }
+
     // Create a reset token that will be used after CC verification
     const resetToken = `kbq_reset_${parentId}_${Date.now()}`;
 
-    // TODO: Create actual Stripe PaymentIntent
-    // For now, return placeholder
-    const clientSecret = `pi_kbq_reset_${parentId}`;
+    // Create a temporary consent record for tracking the KBQ reset
+    const consent = await prisma.consent.create({
+      data: {
+        parentId,
+        method: 'CREDIT_CARD',
+        status: 'PENDING',
+        ipAddress,
+        userAgent,
+        verificationData: {
+          type: 'kbq_reset',
+          resetToken,
+        },
+      },
+    });
 
-    logger.info(`KBQ reset initiated via credit card for parent ${parentId}`);
+    try {
+      // Create Stripe PaymentIntent for $0.50 verification charge
+      const { clientSecret, paymentIntentId } = await stripeService.createConsentPaymentIntent(
+        parentId,
+        consent.id,
+        parent.email
+      );
 
-    return { clientSecret, resetToken };
+      // Update consent with payment intent ID
+      await prisma.consent.update({
+        where: { id: consent.id },
+        data: {
+          verificationData: {
+            type: 'kbq_reset',
+            resetToken,
+            paymentIntentId,
+          },
+        },
+      });
+
+      logger.info(`KBQ reset initiated via credit card for parent ${parentId}`, {
+        consentId: consent.id,
+        paymentIntentId,
+      });
+
+      return { clientSecret, resetToken, paymentIntentId };
+    } catch (error) {
+      // Clean up consent record on failure
+      await prisma.consent.delete({ where: { id: consent.id } });
+      logger.error('Failed to initiate KBQ reset via credit card', { error, parentId });
+      throw error;
+    }
   },
 
   /**
@@ -456,8 +603,27 @@ export const consentService = {
       throw new ValidationError('At least 3 security questions are required');
     }
 
-    // TODO: Verify payment intent with Stripe
-    // For now, proceed with reset
+    // Verify payment intent with Stripe
+    const verification = await stripeService.verifyPaymentIntent(paymentIntentId);
+
+    if (!verification.success) {
+      logger.warn('KBQ reset credit card verification failed - payment not successful', {
+        parentId,
+        paymentIntentId,
+        status: verification.status,
+      });
+      throw new ValidationError(`Payment verification failed. Status: ${verification.status}`);
+    }
+
+    // Verify the payment intent was for this parent
+    if (verification.metadata?.parentId !== parentId) {
+      logger.warn('KBQ reset credit card verification failed - parent ID mismatch', {
+        parentId,
+        paymentIntentId,
+        metadataParentId: verification.metadata?.parentId,
+      });
+      throw new ValidationError('Payment verification failed. Parent ID mismatch.');
+    }
 
     // Hash and store new answers
     const hashedAnswers: Record<string, string> = {};
@@ -487,6 +653,18 @@ export const consentService = {
       where: { id: parentId },
       data: { kbqAnswers: hashedAnswers },
     });
+
+    // Refund the verification charge (best effort)
+    try {
+      const { refundId } = await stripeService.refundConsentCharge(paymentIntentId);
+      logger.info('KBQ reset verification charge refunded', { parentId, paymentIntentId, refundId });
+    } catch (refundError) {
+      logger.error('Failed to refund KBQ reset verification charge', {
+        error: refundError,
+        parentId,
+        paymentIntentId,
+      });
+    }
 
     logger.info(`KBQ answers reset via credit card for parent ${parentId}`);
 

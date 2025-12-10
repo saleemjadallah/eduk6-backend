@@ -1,6 +1,7 @@
 // Authentication routes
 import { Router, Request, Response, NextFunction } from 'express';
 import { authService, consentService } from '../services/auth/index.js';
+import { prisma } from '../config/database.js';
 import { authenticate, requireParent } from '../middleware/auth.js';
 import { validateInput } from '../middleware/validateInput.js';
 import { authRateLimit, emailRateLimit } from '../middleware/rateLimit.js';
@@ -501,7 +502,11 @@ router.post(
 
       res.json({
         success: true,
-        data: { clientSecret: result.clientSecret },
+        data: {
+          clientSecret: result.clientSecret,
+          consentId: result.consentId,
+          paymentIntentId: result.paymentIntentId,
+        },
       });
     } catch (error) {
       next(error);
@@ -520,15 +525,35 @@ router.post(
   validateInput(verifyCCConsentSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // Get pending consent for this parent
-      const { paymentIntentId } = req.body;
+      const { paymentIntentId, consentId } = req.body;
 
-      // Find the pending consent
-      const pendingConsent = await consentService.getConsentStatus(req.parent!.id);
+      // If consentId is provided, use it directly
+      // Otherwise, find the pending consent by payment intent ID
+      let actualConsentId = consentId;
 
-      // For now, use a simplified flow
+      if (!actualConsentId) {
+        // Find pending consent for this parent with matching paymentIntentId
+        const pendingConsent = await prisma.consent.findFirst({
+          where: {
+            parentId: req.parent!.id,
+            status: 'PENDING',
+            method: 'CREDIT_CARD',
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        if (!pendingConsent) {
+          return res.status(400).json({
+            success: false,
+            error: 'No pending consent verification found',
+          });
+        }
+
+        actualConsentId = pendingConsent.id;
+      }
+
       const result = await consentService.verifyCreditCardConsent(
-        'placeholder', // Would be actual consent ID
+        actualConsentId,
         paymentIntentId
       );
 

@@ -86,6 +86,7 @@ export const config = {
   stripe: {
     secretKey: process.env.STRIPE_SECRET_KEY,
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+    webhookSecretCC: process.env.STRIPE_WEBHOOK_SECRET_CC, // For credit card consent verification
   },
 
   // Logging

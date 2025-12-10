@@ -35,6 +35,7 @@ import reportsRoutes from './routes/reports.routes.js';
 import supportRoutes from './routes/support.routes.js';
 import teacherRoutes from './routes/teacher/index.js';
 import ocrRoutes from './routes/ocr.routes.js';
+import webhookRoutes from './routes/webhook.routes.js';
 
 // Services initialization
 import { initializeContentProcessor, shutdownContentProcessor } from './services/learning/contentProcessor.js';
@@ -84,7 +85,11 @@ app.use(cors({
 app.use(attachRequestId);
 app.use(requestLogger);
 
-// Body parsing
+// Stripe webhooks need raw body for signature verification
+// Must be registered BEFORE express.json() middleware
+app.use('/api/webhooks/stripe-consent', express.raw({ type: 'application/json' }), webhookRoutes);
+
+// Body parsing (for all other routes)
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
