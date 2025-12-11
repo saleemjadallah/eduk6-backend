@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { authenticateTeacher, requireTeacher } from '../../middleware/teacherAuth.js';
 import { prisma } from '../../config/database.js';
 import { exportContent, exportMultipleContent, ExportOptions } from '../../services/teacher/exportService.js';
-import { generateLessonPPTX, PPTXExportOptions } from '../../services/teacher/pptxService.js';
+import { generateLessonPPTX, PresentonExportOptions } from '../../services/teacher/presentonService.js';
 import * as googleDriveService from '../../services/teacher/googleDriveService.js';
 
 const router = Router();
@@ -89,7 +89,7 @@ router.get('/:contentId', async (req: Request, res: Response) => {
 });
 
 /**
- * Export single content to PowerPoint
+ * Export single content to PowerPoint using Presenton API
  * GET /api/teacher/export/:contentId/pptx
  */
 router.get('/:contentId/pptx', async (req: Request, res: Response) => {
@@ -98,13 +98,20 @@ router.get('/:contentId/pptx', async (req: Request, res: Response) => {
     const teacherId = req.teacher!.id;
 
     // Parse query params for PPTX options
-    const options: PPTXExportOptions = {
-      theme: (req.query.theme as 'professional' | 'colorful') || 'professional',
+    // Map frontend theme options to Presenton themes
+    const themeMap: Record<string, PresentonExportOptions['theme']> = {
+      'professional': 'professional-blue',
+      'colorful': 'mint-blue',
+    };
+    const frontendTheme = (req.query.theme as string) || 'professional';
+
+    const options: PresentonExportOptions = {
+      theme: themeMap[frontendTheme] || 'professional-blue',
       slideStyle: (req.query.slideStyle as 'focused' | 'dense') || 'focused',
       includeAnswers: req.query.includeAnswers !== 'false',
       includeTeacherNotes: req.query.includeTeacherNotes !== 'false',
       includeInfographic: req.query.includeInfographic !== 'false',
-      aspectRatio: (req.query.aspectRatio as '16:9' | '4:3') || '16:9',
+      language: (req.query.language as string) || 'English',
     };
 
     // Verify content exists and belongs to teacher
@@ -130,7 +137,7 @@ router.get('/:contentId/pptx', async (req: Request, res: Response) => {
       });
     }
 
-    // Generate PPTX
+    // Generate PPTX using Presenton API
     const result = await generateLessonPPTX(content, options);
 
     // Set response headers
