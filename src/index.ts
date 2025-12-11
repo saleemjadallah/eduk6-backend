@@ -34,6 +34,7 @@ import privacyRoutes from './routes/privacy.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
 import supportRoutes from './routes/support.routes.js';
 import teacherRoutes from './routes/teacher/index.js';
+import parentSubscriptionRoutes from './routes/parent/index.js';
 import ocrRoutes from './routes/ocr.routes.js';
 import webhookRoutes from './routes/webhook.routes.js';
 import contactRoutes from './routes/contact.routes.js';
@@ -91,6 +92,7 @@ app.use(requestLogger);
 // Must be registered BEFORE express.json() middleware
 app.use('/api/webhooks/stripe-consent', express.raw({ type: 'application/json' }), webhookRoutes);
 app.use('/api/webhooks/stripe-subscription', express.raw({ type: 'application/json' }), webhookRoutes);
+app.use('/api/webhooks/stripe-family', express.raw({ type: 'application/json' }), webhookRoutes);
 
 // Body parsing (for all other routes)
 app.use(express.json({ limit: '10mb' }));
@@ -150,6 +152,9 @@ app.use('/api/contact', contactRoutes);
 
 // Teacher Portal routes
 app.use('/api/teacher', teacherRoutes);
+
+// Parent Portal routes (subscription management)
+app.use('/api/parent', parentSubscriptionRoutes);
 
 // TODO: Add remaining routes as they're implemented
 // app.use('/api/gamification', gamificationRoutes);

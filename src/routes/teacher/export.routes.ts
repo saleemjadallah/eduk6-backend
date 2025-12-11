@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { authenticateTeacher, requireTeacher } from '../../middleware/teacherAuth.js';
 import { prisma } from '../../config/database.js';
 import { exportContent, exportMultipleContent, ExportOptions } from '../../services/teacher/exportService.js';
+import { generateLessonPPTX, PPTXExportOptions } from '../../services/teacher/pptxService.js';
 import * as googleDriveService from '../../services/teacher/googleDriveService.js';
 
 const router = Router();
@@ -83,6 +84,66 @@ router.get('/:contentId', async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       error: 'Failed to export content',
+    });
+  }
+});
+
+/**
+ * Export single content to PowerPoint
+ * GET /api/teacher/export/:contentId/pptx
+ */
+router.get('/:contentId/pptx', async (req: Request, res: Response) => {
+  try {
+    const { contentId } = req.params;
+    const teacherId = req.teacher!.id;
+
+    // Parse query params for PPTX options
+    const options: PPTXExportOptions = {
+      theme: (req.query.theme as 'professional' | 'colorful') || 'professional',
+      slideStyle: (req.query.slideStyle as 'focused' | 'dense') || 'focused',
+      includeAnswers: req.query.includeAnswers !== 'false',
+      includeTeacherNotes: req.query.includeTeacherNotes !== 'false',
+      includeInfographic: req.query.includeInfographic !== 'false',
+      aspectRatio: (req.query.aspectRatio as '16:9' | '4:3') || '16:9',
+    };
+
+    // Verify content exists and belongs to teacher
+    const content = await prisma.teacherContent.findFirst({
+      where: {
+        id: contentId,
+        teacherId,
+      },
+    });
+
+    if (!content) {
+      return res.status(404).json({
+        success: false,
+        error: 'Content not found',
+      });
+    }
+
+    // Only lessons can be exported to PPTX
+    if (content.contentType !== 'LESSON') {
+      return res.status(400).json({
+        success: false,
+        error: 'Only lessons can be exported to PowerPoint format',
+      });
+    }
+
+    // Generate PPTX
+    const result = await generateLessonPPTX(content, options);
+
+    // Set response headers
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
+    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+
+    // Send file
+    return res.send(result.data);
+  } catch (error) {
+    console.error('PPTX export error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to export PowerPoint',
     });
   }
 });

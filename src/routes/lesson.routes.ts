@@ -7,6 +7,7 @@ import { geminiService, LessonAnalysis } from '../services/ai/geminiService.js';
 import { lessonService } from '../services/learning/lessonService.js';
 import { queueContentProcessing } from '../services/learning/contentProcessor.js';
 import { documentFormatter } from '../services/formatting/index.js';
+import { parentUsageService } from '../services/parent/usageService.js';
 import { prisma } from '../config/database.js';
 import { logger } from '../utils/logger.js';
 import { genAI } from '../config/gemini.js';
@@ -150,6 +151,17 @@ router.post(
         return;
       }
 
+      // Check lesson usage limits for FREE tier parents
+      const canCreateLesson = await parentUsageService.canCreateLesson(child.parentId);
+      if (!canCreateLesson) {
+        res.status(402).json({
+          success: false,
+          error: 'Monthly lesson limit reached. Please upgrade your subscription to create more lessons.',
+          code: 'LESSON_LIMIT_REACHED',
+        });
+        return;
+      }
+
       logger.info(`Analyzing content for child ${childId}`, {
         contentLength: content.length,
         sourceType,
@@ -226,6 +238,9 @@ router.post(
 
       // Get updated lesson
       const updatedLesson = await lessonService.getById(lesson.id);
+
+      // Record lesson creation for usage tracking (after successful creation)
+      await parentUsageService.recordLessonCreation(child.parentId);
 
       res.json({
         success: true,

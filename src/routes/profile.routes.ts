@@ -4,6 +4,7 @@ import { authenticate, requireParent, authorizeChildAccess } from '../middleware
 import { prisma } from '../config/database.js';
 import { ValidationError, NotFoundError } from '../middleware/errorHandler.js';
 import { AgeGroup, LearningStyle, CurriculumType } from '@prisma/client';
+import { getChildLimitForTier } from '../config/stripeProductsFamily.js';
 
 const router = Router();
 
@@ -87,15 +88,8 @@ router.post(
         throw new NotFoundError('Parent not found');
       }
 
-      // Subscription limits
-      const maxChildren: Record<string, number> = {
-        FREE: 1,
-        FAMILY: 2,
-        ANNUAL: 2,
-        FAMILY_PLUS: 4,
-      };
-
-      const limit = maxChildren[parent.subscriptionTier] || 1;
+      // Get subscription-based child limit from centralized config
+      const limit = getChildLimitForTier(parent.subscriptionTier);
       if (parent.children.length >= limit) {
         throw new ValidationError(
           `Your subscription allows up to ${limit} child profile${limit > 1 ? 's' : ''}. Please upgrade to add more.`

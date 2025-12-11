@@ -3,12 +3,14 @@
  * Handles webhook events from Stripe for:
  * - Consent verification (parent/child)
  * - Teacher subscriptions
+ * - Family/parent subscriptions
  * - Credit pack purchases
  */
 
 import { Router, Request, Response } from 'express';
 import { stripeService } from '../services/stripe/index.js';
 import { subscriptionService } from '../services/stripe/subscriptionService.js';
+import { familySubscriptionService } from '../services/parent/subscriptionService.js';
 import { consentService } from '../services/auth/consentService.js';
 import { logger } from '../utils/logger.js';
 import Stripe from 'stripe';
@@ -242,6 +244,139 @@ router.post('/stripe-subscription', async (req: Request, res: Response) => {
     res.status(200).json({ received: true });
   } catch (error) {
     logger.error('Error processing Stripe subscription webhook', { error, eventType: event.type });
+    res.status(200).json({ received: true, error: 'Processing error logged' });
+  }
+});
+
+/**
+ * Stripe webhook for family/parent subscriptions
+ * POST /api/webhooks/stripe-family
+ *
+ * Handles:
+ * - checkout.session.completed (subscription purchase)
+ * - customer.subscription.created
+ * - customer.subscription.updated
+ * - customer.subscription.deleted
+ * - invoice.payment_failed
+ */
+router.post('/stripe-family', async (req: Request, res: Response) => {
+  const signature = req.headers['stripe-signature'] as string;
+
+  if (!signature) {
+    logger.warn('Stripe family webhook received without signature');
+    return res.status(400).json({ error: 'Missing stripe-signature header' });
+  }
+
+  let event: Stripe.Event;
+
+  try {
+    // Construct and verify the event using the family webhook secret
+    event = stripeService.constructWebhookEvent(
+      req.body,
+      signature,
+      'family' // Use family subscription webhook secret
+    );
+  } catch (err: any) {
+    logger.error('Stripe family webhook signature verification failed', { error: err.message });
+    return res.status(400).json({ error: `Webhook signature verification failed: ${err.message}` });
+  }
+
+  logger.info('Stripe family webhook received', { type: event.type, id: event.id });
+
+  try {
+    switch (event.type) {
+      // ==========================================================================
+      // CHECKOUT EVENTS
+      // ==========================================================================
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session;
+
+        logger.info('Family checkout session completed', {
+          sessionId: session.id,
+          mode: session.mode,
+          metadata: session.metadata,
+        });
+
+        await familySubscriptionService.handleCheckoutCompleted(session);
+        break;
+      }
+
+      // ==========================================================================
+      // SUBSCRIPTION EVENTS
+      // ==========================================================================
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated': {
+        const subscription = event.data.object as Stripe.Subscription;
+
+        logger.info('Family subscription created/updated', {
+          subscriptionId: subscription.id,
+          status: subscription.status,
+          metadata: subscription.metadata,
+        });
+
+        await familySubscriptionService.handleSubscriptionCreated(subscription);
+        break;
+      }
+
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object as Stripe.Subscription;
+
+        logger.info('Family subscription deleted', {
+          subscriptionId: subscription.id,
+          metadata: subscription.metadata,
+        });
+
+        await familySubscriptionService.handleSubscriptionDeleted(subscription);
+        break;
+      }
+
+      // ==========================================================================
+      // INVOICE EVENTS
+      // ==========================================================================
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice;
+        // Stripe API returns subscription as string or Subscription object
+        // Using 'as any' due to Stripe SDK type inconsistencies
+        const invoiceAny = invoice as any;
+        const subscriptionId = typeof invoiceAny.subscription === 'string'
+          ? invoiceAny.subscription
+          : invoiceAny.subscription?.id;
+
+        logger.warn('Family invoice payment failed', {
+          invoiceId: invoice.id,
+          subscriptionId,
+          customerId: invoice.customer,
+        });
+
+        await familySubscriptionService.handlePaymentFailed(invoice);
+        break;
+      }
+
+      case 'invoice.paid': {
+        const invoice = event.data.object as Stripe.Invoice;
+        // Stripe API returns subscription as string or Subscription object
+        // Using 'as any' due to Stripe SDK type inconsistencies
+        const invoiceAny = invoice as any;
+        const subscriptionId = typeof invoiceAny.subscription === 'string'
+          ? invoiceAny.subscription
+          : invoiceAny.subscription?.id;
+
+        logger.info('Family invoice paid', {
+          invoiceId: invoice.id,
+          subscriptionId,
+          amountPaid: invoice.amount_paid,
+        });
+        // Subscription update handled by customer.subscription.updated
+        break;
+      }
+
+      default:
+        logger.debug('Unhandled Stripe family event type', { type: event.type });
+    }
+
+    res.status(200).json({ received: true });
+  } catch (error) {
+    logger.error('Error processing Stripe family webhook', { error, eventType: event.type });
     res.status(200).json({ received: true, error: 'Processing error logged' });
   }
 });

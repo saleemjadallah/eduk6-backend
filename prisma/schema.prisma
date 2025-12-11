@@ -35,15 +35,18 @@ model Parent {
   consents         Consent[]
 
   // Subscription
-  subscriptionTier   SubscriptionTier   @default(FREE)
-  subscriptionStatus SubscriptionStatus @default(ACTIVE)
-  stripeCustomerId   String?
+  subscriptionTier      SubscriptionTier   @default(FREE)
+  subscriptionStatus    SubscriptionStatus @default(ACTIVE)
+  stripeCustomerId      String?
+  stripeSubscriptionId  String?            // Active Stripe subscription ID
   subscriptionExpiresAt DateTime?
+  trialEndsAt           DateTime?          // Trial period end date
 
   // Relationships
   children         Child[]
   noteComments     NoteComment[]
   privacyPreferences ParentPrivacyPreferences?
+  lessonUsage      ParentLessonUsage[]
 
   // Timestamps
   createdAt        DateTime @default(now())
@@ -140,6 +143,24 @@ model Consent {
   updatedAt        DateTime @updatedAt
 
   @@index([parentId, status])
+}
+
+// Parent lesson usage tracking (for FREE tier limits)
+model ParentLessonUsage {
+  id               String   @id @default(uuid())
+  parentId         String
+  parent           Parent   @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  // Monthly tracking
+  month            DateTime @db.Date  // First day of the month (for grouping)
+  lessonsCreated   Int      @default(0)
+
+  // Timestamps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([parentId, month])
+  @@index([parentId, month])
 }
 
 // ============================================
