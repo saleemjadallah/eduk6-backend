@@ -160,11 +160,12 @@ export const contentGenerationService = {
     const prompt = isFullLesson ? buildFullLessonPrompt(input) : buildLessonPrompt(input);
 
     // Use Gemini 3 Pro for lesson generation - better reasoning and content quality
+    // Full lessons require much higher token limits for comprehensive content
     const model = genAI.getGenerativeModel({
       model: config.gemini.models.pro,
       generationConfig: {
         temperature: isFullLesson ? 0.75 : 0.7, // Slightly higher creativity for full lessons
-        maxOutputTokens: isFullLesson ? 16000 : 8000, // More tokens for full lessons
+        maxOutputTokens: isFullLesson ? 65536 : 16000, // Max tokens for full lessons to prevent truncation
         responseMimeType: 'application/json',
       },
     });
@@ -187,10 +188,29 @@ export const contentGenerationService = {
 
       return { ...lesson, tokensUsed };
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const responseLength = responseText.length;
+      const isTruncated = errorMessage.includes('truncated') || responseText.endsWith('...');
+
       logger.error('Failed to parse generated lesson', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        responseText: responseText.substring(0, 500),
+        error: errorMessage,
+        responseLength,
+        tokensUsed,
+        isTruncated,
+        lessonType: input.lessonType || 'guide',
+        topic: input.topic,
+        // Log more of the response for debugging truncation issues
+        responseStart: responseText.substring(0, 300),
+        responseEnd: responseText.substring(Math.max(0, responseLength - 300)),
       });
+
+      // Provide more specific error message
+      if (isTruncated || errorMessage.includes('Unexpected end')) {
+        throw new Error(
+          'The lesson content was too large and got truncated. ' +
+          'Try reducing the complexity of your request or generating a simpler lesson first.'
+        );
+      }
       throw new Error('Failed to generate lesson content');
     }
   },
@@ -594,20 +614,79 @@ function extractJSON(text: string): string {
   // Try to extract JSON from markdown code blocks
   const jsonBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (jsonBlockMatch) {
-    return jsonBlockMatch[1].trim();
+    const extracted = jsonBlockMatch[1].trim();
+    try {
+      JSON.parse(extracted);
+      return extracted;
+    } catch {
+      // Code block content is also invalid, continue
+    }
   }
 
   // Try to find JSON object or array
   const jsonArrayMatch = text.match(/\[[\s\S]*\]/);
   const jsonObjectMatch = text.match(/\{[\s\S]*\}/);
 
+  let candidate = '';
   if (jsonArrayMatch && jsonObjectMatch) {
-    return jsonArrayMatch[0].length > jsonObjectMatch[0].length
+    candidate = jsonArrayMatch[0].length > jsonObjectMatch[0].length
       ? jsonArrayMatch[0]
       : jsonObjectMatch[0];
+  } else {
+    candidate = jsonArrayMatch?.[0] || jsonObjectMatch?.[0] || text;
   }
 
-  return jsonArrayMatch?.[0] || jsonObjectMatch?.[0] || text;
+  // Try to parse the candidate
+  try {
+    JSON.parse(candidate);
+    return candidate;
+  } catch (error) {
+    // Check if the JSON appears to be truncated (common issue with large responses)
+    const openBraces = (candidate.match(/\{/g) || []).length;
+    const closeBraces = (candidate.match(/\}/g) || []).length;
+    const openBrackets = (candidate.match(/\[/g) || []).length;
+    const closeBrackets = (candidate.match(/\]/g) || []).length;
+
+    if (openBraces > closeBraces || openBrackets > closeBrackets) {
+      // JSON is truncated - try to repair by closing brackets
+      logger.warn('Detected truncated JSON response, attempting repair', {
+        openBraces,
+        closeBraces,
+        openBrackets,
+        closeBrackets,
+        textLength: text.length,
+      });
+
+      // Try to repair truncated JSON by closing unclosed brackets/braces
+      let repaired = candidate;
+      // Remove incomplete key-value pairs at the end
+      repaired = repaired.replace(/,\s*"[^"]*"?\s*:?\s*"?[^"]*$/, '');
+      repaired = repaired.replace(/,\s*$/, '');
+
+      // Add missing closing brackets
+      for (let i = 0; i < openBrackets - closeBrackets; i++) {
+        repaired += ']';
+      }
+      for (let i = 0; i < openBraces - closeBraces; i++) {
+        repaired += '}';
+      }
+
+      try {
+        JSON.parse(repaired);
+        logger.info('Successfully repaired truncated JSON');
+        return repaired;
+      } catch {
+        // Repair failed, throw descriptive error
+        throw new Error(
+          `JSON response was truncated (${openBraces} open braces, ${closeBraces} close braces). ` +
+          `Response may have hit token limits. Original length: ${text.length} chars.`
+        );
+      }
+    }
+
+    // Not a truncation issue, return original for standard error handling
+    return candidate;
+  }
 }
 
 function buildLessonPrompt(input: GenerateLessonInput): string {
