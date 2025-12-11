@@ -36,6 +36,7 @@ import supportRoutes from './routes/support.routes.js';
 import teacherRoutes from './routes/teacher/index.js';
 import ocrRoutes from './routes/ocr.routes.js';
 import webhookRoutes from './routes/webhook.routes.js';
+import contactRoutes from './routes/contact.routes.js';
 
 // Services initialization
 import { initializeContentProcessor, shutdownContentProcessor } from './services/learning/contentProcessor.js';
@@ -145,6 +146,7 @@ app.use('/api/parent/privacy', privacyRoutes);
 app.use('/api/parent/reports', reportsRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/ocr', ocrRoutes);
+app.use('/api/contact', contactRoutes);
 
 // Teacher Portal routes
 app.use('/api/teacher', teacherRoutes);
