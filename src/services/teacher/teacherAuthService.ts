@@ -103,16 +103,16 @@ export const teacherAuthService = {
       },
     });
 
-    // Send welcome email (async, don't block signup)
-    emailService.sendWelcomeEmail(
+    // Send welcome email (async, don't block signup) - using teacher-specific green theme
+    emailService.sendTeacherWelcomeEmail(
       teacher.email,
       teacher.firstName || 'Teacher'
     ).catch(err => {
       logger.error('Failed to send teacher welcome email', { error: err, teacherId: teacher.id });
     });
 
-    // Send email verification OTP
-    otpService.createAndSend(teacher.email, 'verify_email').catch(err => {
+    // Send email verification OTP - using teacher-specific green theme
+    otpService.createAndSendForTeacher(teacher.email, 'verify_email').catch(err => {
       logger.error('Failed to send teacher verification OTP', { error: err, teacherId: teacher.id });
     });
 
@@ -309,7 +309,7 @@ export const teacherAuthService = {
   },
 
   /**
-   * Send email verification OTP
+   * Send email verification OTP (teacher-specific green theme)
    */
   async sendVerificationOtp(email: string): Promise<{ success: boolean; error?: string }> {
     const teacher = await prisma.teacher.findUnique({
@@ -325,7 +325,7 @@ export const teacherAuthService = {
       return { success: false, error: 'Email is already verified' };
     }
 
-    return otpService.createAndSend(email, 'verify_email');
+    return otpService.createAndSendForTeacher(email, 'verify_email');
   },
 
   /**
@@ -396,7 +396,7 @@ export const teacherAuthService = {
   },
 
   /**
-   * Request password reset
+   * Request password reset (teacher-specific green theme)
    */
   async requestPasswordReset(email: string): Promise<{ success: boolean; error?: string }> {
     const teacher = await prisma.teacher.findUnique({
@@ -408,7 +408,7 @@ export const teacherAuthService = {
       return { success: true };
     }
 
-    return otpService.createAndSend(email, 'reset_password');
+    return otpService.createAndSendForTeacher(email, 'reset_password');
   },
 
   /**

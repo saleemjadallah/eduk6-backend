@@ -456,6 +456,216 @@ Keep up the great work! Every lesson brings ${childName} closer to their learnin
   }),
 
   /**
+   * Welcome email for new teachers (green color scheme)
+   */
+  teacherWelcome: (teacherName: string) => ({
+    subject: 'Welcome to OrbitLearn for Educators! 🎓',
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to OrbitLearn for Educators!</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    <!-- Header with Logo - Green Theme -->
+    <tr>
+      <td style="background: linear-gradient(135deg, #059669 0%, #10B981 50%, #34D399 100%); border-radius: 24px 24px 0 0; padding: 40px; text-align: center;">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 120px; height: 120px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);">
+        <h1 style="color: #ffffff; margin: 0; font-size: 32px; font-weight: 700;">Welcome to OrbitLearn!</h1>
+        <p style="color: rgba(255,255,255,0.95); margin-top: 10px; font-size: 18px;">Empowering Educators with AI</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="background-color: #ffffff; padding: 40px; border-radius: 0 0 24px 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+        <h2 style="color: #064E3B; margin-top: 0; font-size: 24px;">Hi ${teacherName}! 👋</h2>
+
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
+          Thank you for joining OrbitLearn! We're excited to have you as part of our educator community. Our platform is designed to help you create engaging educational content and streamline your grading workflow.
+        </p>
+
+        <!-- AI Features Box -->
+        <div style="background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%); border-radius: 16px; padding: 24px; margin: 28px 0; text-align: center;">
+          <h3 style="color: #065F46; margin: 0 0 12px 0; font-size: 20px;">Powerful AI Tools at Your Fingertips</h3>
+          <p style="color: #047857; margin: 0; line-height: 1.6;">
+            Create lessons, quizzes, and flashcards in minutes. Our AI helps you focus on what matters most - teaching and inspiring students.
+          </p>
+        </div>
+
+        <h3 style="color: #064E3B; font-size: 18px;">What You Can Do:</h3>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 20px 0;">
+          <tr>
+            <td style="padding: 12px 0;">
+              <table role="presentation" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="background: #059669; color: white; width: 32px; height: 32px; border-radius: 50%; text-align: center; font-weight: bold; font-size: 16px; vertical-align: middle;">1</td>
+                  <td style="padding-left: 16px; color: #4b5563; font-size: 15px;"><strong>Generate Content</strong> - Create AI-powered lessons, quizzes & flashcards</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 0;">
+              <table role="presentation" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="background: #10B981; color: white; width: 32px; height: 32px; border-radius: 50%; text-align: center; font-weight: bold; font-size: 16px; vertical-align: middle;">2</td>
+                  <td style="padding-left: 16px; color: #4b5563; font-size: 15px;"><strong>Grade Efficiently</strong> - Upload papers and get AI-assisted grading</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 0;">
+              <table role="presentation" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="background: #34D399; color: white; width: 32px; height: 32px; border-radius: 50%; text-align: center; font-weight: bold; font-size: 16px; vertical-align: middle;">3</td>
+                  <td style="padding-left: 16px; color: #4b5563; font-size: 15px;"><strong>Save Time</strong> - Focus on teaching while AI handles the rest</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+
+        <div style="text-align: center; margin: 36px 0;">
+          <a href="${config.frontendUrl}/teacher/dashboard" style="background: linear-gradient(135deg, #059669 0%, #10B981 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 14px rgba(5, 150, 105, 0.4);">
+            Go to Dashboard 🎓
+          </a>
+        </div>
+
+        <p style="color: #6b7280; font-size: 14px; border-top: 1px solid #e5e7eb; padding-top: 24px; margin-bottom: 0; text-align: center;">
+          Questions? Reply to this email - we're here to help!<br>
+          <span style="color: #10B981;">- The OrbitLearn Team 💚</span>
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `,
+    text: `
+Welcome to OrbitLearn for Educators!
+
+Hi ${teacherName}!
+
+Thank you for joining OrbitLearn! We're excited to have you as part of our educator community. Our platform is designed to help you create engaging educational content and streamline your grading workflow.
+
+Powerful AI Tools at Your Fingertips
+Create lessons, quizzes, and flashcards in minutes. Our AI helps you focus on what matters most - teaching and inspiring students.
+
+What You Can Do:
+1. Generate Content - Create AI-powered lessons, quizzes & flashcards
+2. Grade Efficiently - Upload papers and get AI-assisted grading
+3. Save Time - Focus on teaching while AI handles the rest
+
+Get started at: ${config.frontendUrl}/teacher/dashboard
+
+Questions? Reply to this email - we're here to help!
+- The OrbitLearn Team
+    `,
+  }),
+
+  /**
+   * OTP verification email for teachers (green color scheme)
+   */
+  teacherOtp: (otp: string, purpose: 'verify_email' | 'reset_password' | 'login') => {
+    const purposes = {
+      verify_email: {
+        title: 'Verify Your Email',
+        message: 'Please use the code below to verify your email address.',
+        action: 'email verification',
+        emoji: '✉️',
+      },
+      reset_password: {
+        title: 'Reset Your Password',
+        message: 'You requested to reset your password. Use the code below to proceed.',
+        action: 'password reset',
+        emoji: '🔐',
+      },
+      login: {
+        title: 'Login Verification',
+        message: 'Use the code below to complete your login.',
+        action: 'login verification',
+        emoji: '🔑',
+      },
+    };
+
+    const { title, message, action, emoji } = purposes[purpose];
+
+    return {
+      subject: `${emoji} ${title} - OrbitLearn for Educators`,
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    <!-- Header with Logo - Green Theme -->
+    <tr>
+      <td style="background: linear-gradient(135deg, #059669 0%, #10B981 50%, #34D399 100%); border-radius: 24px 24px 0 0; padding: 30px; text-align: center;">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">${title}</h1>
+      </td>
+    </tr>
+    <tr>
+      <td style="background-color: #ffffff; padding: 40px; border-radius: 0 0 24px 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px; text-align: center;">
+          ${message}
+        </p>
+
+        <!-- OTP Code Box - Green Theme -->
+        <div style="background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%); border-radius: 16px; padding: 32px; margin: 28px 0; text-align: center;">
+          <p style="color: #065F46; margin: 0 0 12px 0; font-size: 14px;">Your verification code:</p>
+          <div style="font-size: 44px; font-weight: bold; letter-spacing: 10px; color: #059669; font-family: 'Courier New', monospace; background: #ffffff; padding: 16px 24px; border-radius: 12px; display: inline-block; box-shadow: 0 2px 8px rgba(5, 150, 105, 0.15);">
+            ${otp}
+          </div>
+        </div>
+
+        <p style="color: #6b7280; font-size: 14px; text-align: center;">
+          ⏱️ This code expires in <strong>10 minutes</strong>.
+        </p>
+
+        <!-- Security Tip - Green Themed -->
+        <div style="background-color: #ECFDF5; border-radius: 12px; padding: 16px 20px; margin-top: 24px; border-left: 4px solid #10B981;">
+          <p style="color: #065F46; margin: 0; font-size: 14px;">
+            <strong>🔒 Security tip:</strong> Never share this code with anyone. OrbitLearn will never ask for your code via phone or text.
+          </p>
+        </div>
+
+        <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 28px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+          If you didn't request this ${action}, please ignore this email or contact support if you have concerns.<br><br>
+          <span style="color: #10B981;">- The OrbitLearn Team 💚</span>
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+      `,
+      text: `
+${title}
+
+${message}
+
+Your verification code: ${otp}
+
+This code expires in 10 minutes.
+
+Security tip: Never share this code with anyone. OrbitLearn will never ask for your code via phone or text.
+
+If you didn't request this ${action}, please ignore this email or contact support if you have concerns.
+
+- The OrbitLearn Team
+      `,
+    };
+  },
+
+  /**
    * Security alert email for sensitive account changes
    */
   securityAlert: (parentName: string, alertType: string, details: string) => ({
@@ -730,6 +940,76 @@ export const emailService = {
       return true;
     } catch (error) {
       logger.error('Error sending security alert email', { error, email });
+      return false;
+    }
+  },
+
+  /**
+   * Send welcome email to new teacher (green themed)
+   */
+  async sendTeacherWelcomeEmail(email: string, teacherName: string): Promise<boolean> {
+    if (config.email.skipEmails || !resend) {
+      logger.info(`[Email] Skipped teacher welcome email to ${email}`);
+      return true;
+    }
+
+    try {
+      const template = templates.teacherWelcome(teacherName);
+
+      const { error } = await resend.emails.send({
+        from: `OrbitLearn <${config.email.fromEmail}>`,
+        to: email,
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
+      });
+
+      if (error) {
+        logger.error('Failed to send teacher welcome email', { error, email });
+        return false;
+      }
+
+      logger.info(`Teacher welcome email sent to ${email}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending teacher welcome email', { error, email });
+      return false;
+    }
+  },
+
+  /**
+   * Send OTP verification email to teacher (green themed)
+   */
+  async sendTeacherOtpEmail(
+    email: string,
+    otp: string,
+    purpose: 'verify_email' | 'reset_password' | 'login'
+  ): Promise<boolean> {
+    if (config.email.skipEmails || !resend) {
+      logger.info(`[Email] Skipped teacher OTP email to ${email}, code: ${otp}`);
+      return true;
+    }
+
+    try {
+      const template = templates.teacherOtp(otp, purpose);
+
+      const { error } = await resend.emails.send({
+        from: `OrbitLearn <${config.email.fromEmail}>`,
+        to: email,
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
+      });
+
+      if (error) {
+        logger.error('Failed to send teacher OTP email', { error, email, purpose });
+        return false;
+      }
+
+      logger.info(`Teacher OTP email sent to ${email} for ${purpose}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending teacher OTP email', { error, email });
       return false;
     }
   },

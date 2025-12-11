@@ -88,6 +88,61 @@ export const otpService = {
   },
 
   /**
+   * Create and send OTP to teacher email (green themed)
+   */
+  async createAndSendForTeacher(
+    email: string,
+    purpose: OtpPurpose
+  ): Promise<{ success: boolean; error?: string }> {
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Check rate limiting
+    const attemptsKey = `${OTP_ATTEMPTS_PREFIX}${normalizedEmail}:${purpose}`;
+    const recentAttempts = await redis.get(attemptsKey);
+
+    if (recentAttempts && parseInt(recentAttempts) >= MAX_ATTEMPTS) {
+      logger.warn(`OTP rate limit exceeded for teacher ${normalizedEmail}`);
+      return {
+        success: false,
+        error: 'Too many OTP requests. Please try again later.',
+      };
+    }
+
+    // Generate new OTP
+    const code = this.generateCode();
+    const key = `${OTP_PREFIX}${normalizedEmail}:${purpose}`;
+
+    const otpData: StoredOtp = {
+      code,
+      purpose,
+      email: normalizedEmail,
+      createdAt: new Date().toISOString(),
+      attempts: 0,
+    };
+
+    // Store OTP in Redis
+    await redis.setex(key, OTP_EXPIRY_SECONDS, JSON.stringify(otpData));
+
+    // Increment rate limit counter
+    await redis.incr(attemptsKey);
+    await redis.expire(attemptsKey, RATE_LIMIT_WINDOW);
+
+    // Send teacher-specific email (green themed)
+    const sent = await emailService.sendTeacherOtpEmail(normalizedEmail, code, purpose);
+
+    if (!sent) {
+      return {
+        success: false,
+        error: 'Failed to send verification email. Please try again.',
+      };
+    }
+
+    logger.info(`Teacher OTP created and sent for ${purpose}`, { email: normalizedEmail });
+
+    return { success: true };
+  },
+
+  /**
    * Verify an OTP code
    */
   async verify(
@@ -208,6 +263,39 @@ export const otpService = {
 
     // Create and send new OTP
     return this.createAndSend(email, purpose);
+  },
+
+  /**
+   * Resend OTP for teacher (with cooldown check, green themed)
+   */
+  async resendForTeacher(
+    email: string,
+    purpose: OtpPurpose,
+    cooldownSeconds: number = 60
+  ): Promise<{ success: boolean; error?: string; waitSeconds?: number }> {
+    const normalizedEmail = email.toLowerCase().trim();
+    const key = `${OTP_PREFIX}${normalizedEmail}:${purpose}`;
+
+    // Check if there's an existing OTP
+    const stored = await redis.get(key);
+
+    if (stored) {
+      const otpData: StoredOtp = JSON.parse(stored);
+      const createdAt = new Date(otpData.createdAt).getTime();
+      const elapsed = (Date.now() - createdAt) / 1000;
+
+      if (elapsed < cooldownSeconds) {
+        const waitSeconds = Math.ceil(cooldownSeconds - elapsed);
+        return {
+          success: false,
+          error: `Please wait ${waitSeconds} seconds before requesting a new code.`,
+          waitSeconds,
+        };
+      }
+    }
+
+    // Create and send new OTP with teacher theme
+    return this.createAndSendForTeacher(email, purpose);
   },
 };
 
