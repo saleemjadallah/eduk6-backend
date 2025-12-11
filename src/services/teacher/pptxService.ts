@@ -5,16 +5,19 @@
 
 import { TeacherContent, Subject } from '@prisma/client';
 import { Buffer } from 'buffer';
+import { createRequire } from 'module';
 
-// Dynamic import for pptxgenjs to handle ESM/CJS compatibility
+// Use createRequire to load the CJS version of pptxgenjs
+// This avoids ESM/CJS compatibility issues in production
+const require = createRequire(import.meta.url);
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let PptxGenJS: any = null;
 
-async function getPptxGenJS() {
+function getPptxGenJS() {
   if (!PptxGenJS) {
-    // Use dynamic import to load the ESM module
-    const module = await import('pptxgenjs');
-    PptxGenJS = module.default;
+    // Load the CJS version directly
+    PptxGenJS = require('pptxgenjs');
   }
   return PptxGenJS;
 }
@@ -297,8 +300,8 @@ export async function generateLessonPPTX(
   content: TeacherContent,
   options: PPTXExportOptions
 ): Promise<{ data: Buffer; filename: string }> {
-  // Dynamically load pptxgenjs
-  const PptxGenJSClass = await getPptxGenJS();
+  // Load pptxgenjs using CJS require
+  const PptxGenJSClass = getPptxGenJS();
   const pptx = new PptxGenJSClass();
   const subject = (content.subject || 'OTHER') as Subject;
   const themeColors = getThemeColors(subject, options.theme);
