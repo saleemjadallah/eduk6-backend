@@ -5,7 +5,7 @@
 
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { requireTeacher } from '../../middleware/teacherAuth.js';
+import { authenticateTeacher, requireTeacher } from '../../middleware/teacherAuth.js';
 import { prisma } from '../../config/database.js';
 import { exportContent, exportMultipleContent, ExportOptions } from '../../services/teacher/exportService.js';
 import * as googleDriveService from '../../services/teacher/googleDriveService.js';
@@ -13,6 +13,9 @@ import * as googleDriveService from '../../services/teacher/googleDriveService.j
 const router = Router();
 
 // All routes require teacher authentication
+// authenticateTeacher verifies JWT and populates req.teacher
+// requireTeacher ensures req.teacher exists
+router.use(authenticateTeacher);
 router.use(requireTeacher);
 
 // Validation schemas
