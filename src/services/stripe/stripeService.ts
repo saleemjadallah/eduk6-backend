@@ -14,8 +14,9 @@ const stripe = config.stripe.secretKey
     })
   : null;
 
-// Consent verification amount in cents ($0.50)
-const CONSENT_VERIFICATION_AMOUNT = 50;
+// Consent verification amount in cents ($1.00 USD)
+// Note: Must be at least $1.00 to meet minimum after currency conversion
+const CONSENT_VERIFICATION_AMOUNT = 100;
 const CONSENT_VERIFICATION_CURRENCY = 'usd';
 
 export const stripeService = {
