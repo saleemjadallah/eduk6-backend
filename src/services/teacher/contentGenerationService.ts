@@ -137,6 +137,45 @@ export interface GeneratedInfographic {
 }
 
 // ============================================
+// SPLIT GENERATION TYPES
+// ============================================
+
+export interface GenerateFullLessonInput extends GenerateLessonInput {
+  includeQuiz?: boolean;
+  includeFlashcards?: boolean;
+  includeInfographic?: boolean;
+  quizQuestionCount?: number;
+  flashcardCount?: number;
+  infographicStyle?: 'educational' | 'colorful' | 'minimalist' | 'professional';
+}
+
+export type GenerationStep =
+  | 'starting'
+  | 'generating_lesson'
+  | 'generating_quiz'
+  | 'generating_flashcards'
+  | 'generating_infographic'
+  | 'completed'
+  | 'failed';
+
+export interface GenerationProgress {
+  step: GenerationStep;
+  message: string;
+  progress: number; // 0-100
+  completedSteps: string[];
+  currentData?: Partial<GeneratedFullLesson>;
+}
+
+export interface GeneratedFullLesson {
+  lesson: Omit<GeneratedLesson, 'tokensUsed'>;
+  quiz?: Omit<GeneratedQuiz, 'tokensUsed'>;
+  flashcards?: Omit<GeneratedFlashcards, 'tokensUsed'>;
+  infographic?: Omit<GeneratedInfographic, 'tokensUsed'>;
+  totalTokensUsed: number;
+  generationTime: number; // milliseconds
+}
+
+// ============================================
 // SERVICE
 // ============================================
 
@@ -594,6 +633,185 @@ Do NOT include any inappropriate or scary imagery. Keep it child-friendly and ed
         topic: input.topic,
       });
       throw new Error('Failed to generate infographic. Please try again.');
+    }
+  },
+
+  /**
+   * Generate a full lesson with optional quiz, flashcards, and infographic
+   * Uses split generation - each component is generated separately for reliability
+   * Supports progress callbacks for real-time UI updates
+   */
+  async generateFullLessonWithProgress(
+    teacherId: string,
+    input: GenerateFullLessonInput,
+    onProgress?: (progress: GenerationProgress) => void
+  ): Promise<GeneratedFullLesson> {
+    const startTime = Date.now();
+    let totalTokensUsed = 0;
+    const completedSteps: string[] = [];
+    const result: Partial<GeneratedFullLesson> = {};
+
+    // Helper to send progress updates
+    const sendProgress = (step: GenerationStep, message: string, progress: number) => {
+      if (onProgress) {
+        onProgress({
+          step,
+          message,
+          progress,
+          completedSteps: [...completedSteps],
+          currentData: { ...result } as Partial<GeneratedFullLesson>,
+        });
+      }
+    };
+
+    try {
+      // Step 1: Generate the core lesson
+      sendProgress('generating_lesson', 'Creating your lesson content...', 10);
+
+      const lessonInput: GenerateLessonInput = {
+        topic: input.topic,
+        subject: input.subject,
+        gradeLevel: input.gradeLevel,
+        curriculum: input.curriculum,
+        objectives: input.objectives,
+        duration: input.duration,
+        lessonType: input.lessonType || 'full',
+        includeActivities: input.includeActivities,
+        includeAssessment: input.includeAssessment,
+        additionalContext: input.additionalContext,
+      };
+
+      const lessonResult = await this.generateLesson(teacherId, lessonInput);
+      totalTokensUsed += lessonResult.tokensUsed;
+      const { tokensUsed: _lt, ...lessonWithoutTokens } = lessonResult;
+      result.lesson = lessonWithoutTokens;
+      completedSteps.push('lesson');
+
+      sendProgress('generating_lesson', 'Lesson created successfully!', 30);
+
+      // Create a summary of the lesson content for generating related content
+      const lessonSummary = `
+Topic: ${lessonResult.title}
+Summary: ${lessonResult.summary}
+Objectives: ${lessonResult.objectives.join(', ')}
+Key Vocabulary: ${lessonResult.vocabulary?.map(v => v.term).join(', ') || 'N/A'}
+Sections: ${lessonResult.sections.map(s => s.title).join(', ')}
+      `.trim();
+
+      // Step 2: Generate quiz if requested
+      if (input.includeQuiz) {
+        sendProgress('generating_quiz', 'Crafting quiz questions...', 40);
+
+        try {
+          const quizResult = await this.generateQuiz(teacherId, '', {
+            content: lessonSummary + '\n\n' + lessonResult.sections.map(s => s.content).join('\n\n'),
+            title: `Quiz: ${lessonResult.title}`,
+            questionCount: input.quizQuestionCount || 10,
+            questionTypes: ['multiple_choice', 'true_false', 'short_answer'],
+            difficulty: 'mixed',
+            gradeLevel: input.gradeLevel,
+          });
+          totalTokensUsed += quizResult.tokensUsed;
+          const { tokensUsed: _qt, ...quizWithoutTokens } = quizResult;
+          result.quiz = quizWithoutTokens;
+          completedSteps.push('quiz');
+
+          sendProgress('generating_quiz', 'Quiz created successfully!', 55);
+        } catch (error) {
+          logger.warn('Failed to generate quiz, continuing without it', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+          sendProgress('generating_quiz', 'Quiz generation skipped (will retry later)', 55);
+        }
+      }
+
+      // Step 3: Generate flashcards if requested
+      if (input.includeFlashcards) {
+        sendProgress('generating_flashcards', 'Building flashcard deck...', 60);
+
+        try {
+          const flashcardsResult = await this.generateFlashcards(teacherId, '', {
+            content: lessonSummary + '\n\n' + lessonResult.sections.map(s => s.content).join('\n\n'),
+            title: `Flashcards: ${lessonResult.title}`,
+            cardCount: input.flashcardCount || 15,
+            includeHints: true,
+            gradeLevel: input.gradeLevel,
+          });
+          totalTokensUsed += flashcardsResult.tokensUsed;
+          const { tokensUsed: _ft, ...flashcardsWithoutTokens } = flashcardsResult;
+          result.flashcards = flashcardsWithoutTokens;
+          completedSteps.push('flashcards');
+
+          sendProgress('generating_flashcards', 'Flashcards created successfully!', 75);
+        } catch (error) {
+          logger.warn('Failed to generate flashcards, continuing without them', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+          sendProgress('generating_flashcards', 'Flashcard generation skipped (will retry later)', 75);
+        }
+      }
+
+      // Step 4: Generate infographic if requested
+      if (input.includeInfographic) {
+        sendProgress('generating_infographic', 'Designing visual infographic...', 80);
+
+        try {
+          // Extract key points from the lesson for the infographic
+          const keyPoints = [
+            ...lessonResult.objectives.slice(0, 3),
+            ...(lessonResult.vocabulary?.slice(0, 3).map(v => `${v.term}: ${v.definition}`) || []),
+            ...(lessonResult.sections.slice(0, 2).map(s => s.title) || []),
+          ].slice(0, 6);
+
+          const infographicResult = await this.generateInfographic(teacherId, '', {
+            topic: lessonResult.title,
+            keyPoints,
+            style: input.infographicStyle || 'educational',
+            gradeLevel: input.gradeLevel,
+            subject: input.subject,
+          });
+          totalTokensUsed += infographicResult.tokensUsed;
+          const { tokensUsed: _it, ...infographicWithoutTokens } = infographicResult;
+          result.infographic = infographicWithoutTokens;
+          completedSteps.push('infographic');
+
+          sendProgress('generating_infographic', 'Infographic created successfully!', 95);
+        } catch (error) {
+          logger.warn('Failed to generate infographic, continuing without it', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+          sendProgress('generating_infographic', 'Infographic generation skipped (will retry later)', 95);
+        }
+      }
+
+      // Complete
+      const generationTime = Date.now() - startTime;
+      result.totalTokensUsed = totalTokensUsed;
+      result.generationTime = generationTime;
+
+      sendProgress('completed', 'Your lesson is ready!', 100);
+
+      logger.info('Full lesson generation completed', {
+        teacherId,
+        topic: input.topic,
+        generationTime,
+        totalTokensUsed,
+        completedSteps,
+      });
+
+      return result as GeneratedFullLesson;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      sendProgress('failed', `Generation failed: ${errorMessage}`, 0);
+
+      logger.error('Full lesson generation failed', {
+        teacherId,
+        topic: input.topic,
+        error: errorMessage,
+        completedSteps,
+      });
+
+      throw error;
     }
   },
 };

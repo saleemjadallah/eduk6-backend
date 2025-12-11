@@ -369,6 +369,27 @@ const generateLessonSchema = z.object({
   additionalContext: z.string().max(2000).optional(), // Extra notes from teacher
 });
 
+// Schema for split generation with all components
+const generateFullLessonSchema = z.object({
+  topic: z.string().min(1, 'Topic is required').max(500),
+  subject: z.nativeEnum(Subject).optional(),
+  gradeLevel: z.string().max(20).optional(),
+  curriculum: z.string().max(50).optional(),
+  objectives: z.array(z.string()).optional(),
+  duration: z.number().min(5).max(180).optional(),
+  lessonType: z.enum(['guide', 'full']).optional().default('full'),
+  includeActivities: z.boolean().optional().default(true),
+  includeAssessment: z.boolean().optional().default(true),
+  additionalContext: z.string().max(2000).optional(),
+  // Split generation options
+  includeQuiz: z.boolean().optional().default(true),
+  includeFlashcards: z.boolean().optional().default(true),
+  includeInfographic: z.boolean().optional().default(false),
+  quizQuestionCount: z.number().min(5).max(20).optional().default(10),
+  flashcardCount: z.number().min(5).max(30).optional().default(15),
+  infographicStyle: z.enum(['educational', 'colorful', 'minimalist', 'professional']).optional(),
+});
+
 const generateQuizSchema = z.object({
   content: z.string().min(50, 'Content must be at least 50 characters'),
   title: z.string().max(255).optional(),
@@ -510,6 +531,101 @@ router.post(
         success: true,
         data: result,
         message: 'Lesson generated successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /api/teacher/content/generate/full-lesson
+ * Generate a complete lesson with quiz, flashcards, and optional infographic
+ * Uses Server-Sent Events (SSE) for real-time progress updates
+ *
+ * This endpoint uses split generation - each component is generated separately
+ * for better reliability and allows the frontend to show progress updates
+ */
+router.post(
+  '/generate/full-lesson',
+  authenticateTeacher,
+  requireTeacher,
+  validateInput(generateFullLessonSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    // Set up SSE headers for streaming progress
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+    res.flushHeaders();
+
+    // Helper to send SSE events
+    const sendEvent = (event: string, data: unknown) => {
+      res.write(`event: ${event}\n`);
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    // Send initial connection event
+    sendEvent('connected', { message: 'Connected to lesson generator' });
+
+    try {
+      const result = await contentGenerationService.generateFullLessonWithProgress(
+        req.teacher!.id,
+        req.body,
+        (progress) => {
+          // Send progress updates via SSE
+          sendEvent('progress', progress);
+        }
+      );
+
+      // Send final result
+      sendEvent('complete', {
+        success: true,
+        data: result,
+        message: 'Full lesson generated successfully',
+      });
+
+      // End the stream
+      res.write('event: done\ndata: {}\n\n');
+      res.end();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      // Send error event
+      sendEvent('error', {
+        success: false,
+        error: errorMessage,
+        message: 'Failed to generate lesson',
+      });
+
+      res.write('event: done\ndata: {}\n\n');
+      res.end();
+    }
+  }
+);
+
+/**
+ * POST /api/teacher/content/generate/full-lesson-sync
+ * Same as full-lesson but returns a single JSON response (no streaming)
+ * Use this if your client doesn't support SSE
+ */
+router.post(
+  '/generate/full-lesson-sync',
+  authenticateTeacher,
+  requireTeacher,
+  validateInput(generateFullLessonSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await contentGenerationService.generateFullLessonWithProgress(
+        req.teacher!.id,
+        req.body
+        // No progress callback - just wait for the result
+      );
+
+      res.json({
+        success: true,
+        data: result,
+        message: 'Full lesson generated successfully',
       });
     } catch (error) {
       next(error);
