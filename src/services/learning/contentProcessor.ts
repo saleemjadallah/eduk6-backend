@@ -13,6 +13,7 @@ import { CurriculumType } from '@prisma/client';
 import { badgeService } from '../gamification/badgeService.js';
 import { xpEngine } from '../gamification/xpEngine.js';
 import { documentFormatter } from '../formatting/index.js';
+import { analyzePPT } from './pptProcessor.js';
 
 // Note: Formatting is now handled by the deterministic DocumentFormatter
 // for 100% reliability. AI only extracts metadata (exercises, vocabulary, etc.)
@@ -100,6 +101,9 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
     switch (sourceType) {
       case 'PDF':
         extractedText = await extractTextFromPDF(fileUrl!);
+        break;
+      case 'PPT':
+        extractedText = await extractTextFromPPT(fileUrl!);
         break;
       case 'IMAGE':
         extractedText = await extractTextFromImage(fileUrl!);
@@ -295,6 +299,57 @@ async function extractTextFromPDF(fileUrl: string): Promise<string> {
 
   // Placeholder implementation
   return 'PDF content would be extracted here';
+}
+
+/**
+ * Extract text from a PowerPoint file (PPT/PPTX)
+ * Downloads from R2, then uses Gemini's native PPT processing for text extraction
+ */
+async function extractTextFromPPT(fileUrl: string): Promise<string> {
+  logger.info(`Extracting text from PPT: ${fileUrl}`);
+
+  try {
+    // Download file from R2/CDN
+    const response = await fetch(fileUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to download PPT file: ${response.status} ${response.statusText}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const pptBuffer = Buffer.from(arrayBuffer);
+    const pptBase64 = pptBuffer.toString('base64');
+
+    // Determine MIME type from URL extension
+    const isPPTX = fileUrl.toLowerCase().endsWith('.pptx');
+    const mimeType = isPPTX
+      ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      : 'application/vnd.ms-powerpoint';
+
+    // Extract filename from URL
+    const urlPath = new URL(fileUrl).pathname;
+    const filename = urlPath.split('/').pop() || `presentation.${isPPTX ? 'pptx' : 'ppt'}`;
+
+    // Analyze PPT using Gemini's native document processing
+    const result = await analyzePPT(
+      pptBase64,
+      mimeType as 'application/vnd.ms-powerpoint' | 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      filename
+    );
+
+    logger.info(`PPT text extraction completed`, {
+      fileUrl,
+      slideCount: result.slideCount,
+      textLength: result.extractedText.length,
+    });
+
+    return result.extractedText;
+  } catch (error) {
+    logger.error(`Failed to extract text from PPT`, {
+      fileUrl,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    throw error;
+  }
 }
 
 /**

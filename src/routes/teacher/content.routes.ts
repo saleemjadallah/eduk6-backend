@@ -508,6 +508,95 @@ router.post(
 );
 
 // ============================================
+// PPT ANALYSIS ROUTES
+// ============================================
+
+const analyzePPTSchema = z.object({
+  pptBase64: z.string().min(100, 'PowerPoint data is required'),
+  filename: z.string().max(255).optional(),
+  mimeType: z.enum([
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  ]),
+});
+
+/**
+ * POST /api/teacher/content/analyze-ppt
+ * Analyze a PowerPoint document and extract educational content
+ * Converts PPT to PDF via LibreOffice, then uses Gemini for analysis
+ */
+router.post(
+  '/analyze-ppt',
+  authenticateTeacher,
+  requireTeacher,
+  validateInput(analyzePPTSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { pptBase64, filename, mimeType } = req.body;
+
+      // Check file size (base64 is ~33% larger than original)
+      // 10MB PPT = ~13.3MB base64
+      const maxBase64Size = 14 * 1024 * 1024; // ~14MB base64 = ~10MB PPT
+      if (pptBase64.length > maxBase64Size) {
+        res.status(400).json({
+          success: false,
+          error: 'PowerPoint file too large',
+          message: 'PowerPoint files must be under 10MB. Please compress your file or split it into smaller presentations.',
+        });
+        return;
+      }
+
+      // Check quota before processing (PPT uses more tokens due to conversion)
+      const estimatedTokens = 5000; // PPT analysis uses ~5000 tokens
+      await quotaService.enforceQuota(
+        req.teacher!.id,
+        TokenOperation.CONTENT_ANALYSIS,
+        estimatedTokens
+      );
+
+      // Import PPT processor dynamically to avoid startup issues if LibreOffice not installed
+      const { analyzePPT } = await import('../../services/learning/pptProcessor.js');
+
+      // Analyze the PPT
+      const result = await analyzePPT(
+        pptBase64,
+        mimeType,
+        filename || 'presentation.pptx'
+      );
+
+      // Record usage
+      await quotaService.recordUsage({
+        teacherId: req.teacher!.id,
+        operation: TokenOperation.CONTENT_ANALYSIS,
+        tokensUsed: result.tokensUsed,
+        modelUsed: 'gemini-2.5-flash',
+        resourceType: 'ppt_analysis',
+      });
+
+      res.json({
+        success: true,
+        data: {
+          extractedText: result.extractedText,
+          suggestedTitle: result.suggestedTitle,
+          summary: result.summary,
+          detectedSubject: result.detectedSubject,
+          detectedGradeLevel: result.detectedGradeLevel,
+          keyTopics: result.keyTopics,
+          vocabulary: result.vocabulary,
+          slideCount: result.slideCount,
+          originalFormat: result.originalFormat,
+          tokensUsed: result.tokensUsed,
+          filename: filename || 'presentation.pptx',
+        },
+        message: 'PowerPoint analyzed successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ============================================
 // AI GENERATION ROUTES
 // ============================================
 

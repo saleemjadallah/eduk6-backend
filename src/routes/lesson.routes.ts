@@ -27,8 +27,8 @@ const normalizeSubject = z.string().transform((val) => val.toUpperCase()).pipe(s
 const analyzeContentSchema = z.object({
   content: z.string().min(50, 'Content must be at least 50 characters'),
   childId: z.string().min(1).nullable().optional(), // Allow null, will use default child
-  sourceType: z.enum(['PDF', 'IMAGE', 'YOUTUBE', 'TEXT', 'pdf', 'image', 'youtube', 'text'])
-    .transform((val) => val.toUpperCase() as 'PDF' | 'IMAGE' | 'YOUTUBE' | 'TEXT')
+  sourceType: z.enum(['PDF', 'IMAGE', 'YOUTUBE', 'TEXT', 'PPT', 'pdf', 'image', 'youtube', 'text', 'ppt'])
+    .transform((val) => val.toUpperCase() as 'PDF' | 'IMAGE' | 'YOUTUBE' | 'TEXT' | 'PPT')
     .default('TEXT'),
   subject: z.string().transform((val) => val.toUpperCase()).pipe(subjectEnum).optional().nullable(),
   title: z.string().max(255).optional().nullable(),
@@ -37,7 +37,7 @@ const analyzeContentSchema = z.object({
 const createLessonSchema = z.object({
   childId: z.string().min(1),
   title: z.string().min(1).max(255),
-  sourceType: z.enum(['PDF', 'IMAGE', 'YOUTUBE', 'TEXT']),
+  sourceType: z.enum(['PDF', 'IMAGE', 'YOUTUBE', 'TEXT', 'PPT']),
   subject: z.enum(['MATH', 'SCIENCE', 'ENGLISH', 'ARABIC', 'ISLAMIC_STUDIES', 'SOCIAL_STUDIES', 'ART', 'MUSIC', 'OTHER']).optional(),
   originalFileUrl: z.string().url().optional(),
   originalFileName: z.string().max(255).optional(),

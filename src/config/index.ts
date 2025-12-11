@@ -49,7 +49,7 @@ export const config = {
   // Upload limits
   upload: {
     maxSizeMB: parseInt(process.env.MAX_UPLOAD_SIZE_MB || '10'),
-    allowedTypes: (process.env.ALLOWED_UPLOAD_TYPES || 'application/pdf,image/png,image/jpeg,image/webp').split(','),
+    allowedTypes: (process.env.ALLOWED_UPLOAD_TYPES || 'application/pdf,image/png,image/jpeg,image/webp,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation').split(','),
     presignedUrlExpiry: {
       upload: parseInt(process.env.PRESIGNED_URL_EXPIRY_UPLOAD || '300'),
       download: parseInt(process.env.PRESIGNED_URL_EXPIRY_DOWNLOAD || '3600'),

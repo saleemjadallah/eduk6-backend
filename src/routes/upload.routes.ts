@@ -28,6 +28,8 @@ const presignedUploadSchema = z.object({
     'image/png',
     'image/jpeg',
     'image/webp',
+    'application/vnd.ms-powerpoint',                                            // .ppt
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
   ]),
   fileSize: z.number().positive().max(10 * 1024 * 1024), // 10MB max
   lessonId: z.string().optional(),

@@ -1088,6 +1088,7 @@ enum SourceType {
   YOUTUBE
   TEXT
   CAMERA
+  PPT
 }
 
 enum ProcessingStatus {
