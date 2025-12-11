@@ -3,15 +3,21 @@
  * Generates professional PPTX presentations using PptxGenJS
  */
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-import PptxGenJSModule from 'pptxgenjs';
 import { TeacherContent, Subject } from '@prisma/client';
 import { Buffer } from 'buffer';
 
-// The library exports a class that needs to be instantiated
-// Using 'any' to handle the complex type export situation
+// Dynamic import for pptxgenjs to handle ESM/CJS compatibility
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const PptxGenJS: any = PptxGenJSModule;
+let PptxGenJS: any = null;
+
+async function getPptxGenJS() {
+  if (!PptxGenJS) {
+    // Use dynamic import to load the ESM module
+    const module = await import('pptxgenjs');
+    PptxGenJS = module.default;
+  }
+  return PptxGenJS;
+}
 
 /**
  * Fetch an image from URL and return as base64 with dimensions
@@ -291,7 +297,9 @@ export async function generateLessonPPTX(
   content: TeacherContent,
   options: PPTXExportOptions
 ): Promise<{ data: Buffer; filename: string }> {
-  const pptx = new PptxGenJS();
+  // Dynamically load pptxgenjs
+  const PptxGenJSClass = await getPptxGenJS();
+  const pptx = new PptxGenJSClass();
   const subject = (content.subject || 'OTHER') as Subject;
   const themeColors = getThemeColors(subject, options.theme);
   const lessonData = content.lessonContent as unknown as LessonContent;
