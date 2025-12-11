@@ -1011,7 +1011,12 @@ export async function exportContent(
   let html: string;
   let filename: string;
   const contentType = content.contentType;
-  const baseFilename = content.title.replace(/[^a-z0-9]/gi, '_').substring(0, 50);
+  // Clean title for filename: replace non-alphanumeric with spaces, collapse multiple spaces, trim
+  const cleanTitle = content.title
+    .replace(/[^a-z0-9\s]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .substring(0, 50);
 
   // Generate HTML based on content type
   switch (contentType) {
@@ -1019,32 +1024,32 @@ export async function exportContent(
     case 'WORKSHEET':
       const lessonData = content.lessonContent as unknown as LessonContent;
       html = generateLessonHTML(content, lessonData || { title: content.title }, opts);
-      filename = `${baseFilename}_Lesson`;
+      filename = `${cleanTitle} - Orbit Learn`;
       break;
 
     case 'QUIZ':
       const quizData = content.quizContent as unknown as QuizContent;
       html = generateQuizHTML(content, quizData || { title: content.title, questions: [] }, opts);
-      filename = `${baseFilename}_Quiz`;
+      filename = `${cleanTitle} - Orbit Learn`;
       break;
 
     case 'FLASHCARD_DECK':
       const flashcardData = content.flashcardContent as unknown as FlashcardContent;
       html = generateFlashcardHTML(content, flashcardData || { title: content.title, cards: [] }, opts);
-      filename = `${baseFilename}_Flashcards`;
+      filename = `${cleanTitle} - Orbit Learn`;
       break;
 
     case 'STUDY_GUIDE':
       const guideData = content.lessonContent as unknown as StudyGuideContent;
       html = generateStudyGuideHTML(content, guideData || { title: content.title }, opts);
-      filename = `${baseFilename}_Study_Guide`;
+      filename = `${cleanTitle} - Orbit Learn`;
       break;
 
     default:
       // Default to lesson format
       const defaultData = content.lessonContent as unknown as LessonContent;
       html = generateLessonHTML(content, defaultData || { title: content.title }, opts);
-      filename = `${baseFilename}`;
+      filename = `${cleanTitle} - Orbit Learn`;
   }
 
   // Return HTML if requested

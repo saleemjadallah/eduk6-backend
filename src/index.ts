@@ -79,6 +79,7 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Disposition'], // Allow frontend to read filename from PDF exports
 }));
 
 // Request ID and logging
