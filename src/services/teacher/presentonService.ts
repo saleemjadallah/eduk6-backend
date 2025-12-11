@@ -84,7 +84,17 @@ interface LessonContent {
 }
 
 /**
- * Format lesson content into a structured prompt for Presenton
+ * Truncate text to a maximum length
+ */
+function truncateText(text: string, maxLength: number): string {
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength - 3) + '...';
+}
+
+/**
+ * Format lesson content into a concise prompt for Presenton
+ * Keep it simple and focused to avoid API errors
  */
 function formatLessonContent(
   content: TeacherContent,
@@ -93,129 +103,81 @@ function formatLessonContent(
   const lessonData = content.lessonContent as unknown as LessonContent;
   const subject = (content.subject || 'OTHER').replace('_', ' ');
 
-  let prompt = `Create a professional educational presentation for the following lesson:\n\n`;
+  // Build a concise, structured prompt
+  const parts: string[] = [];
 
-  // Title and metadata
-  prompt += `# ${lessonData?.title || content.title}\n`;
-  prompt += `Subject: ${subject}\n`;
-  prompt += `Grade Level: ${content.gradeLevel}\n\n`;
+  // Title and basic info
+  parts.push(`Title: ${lessonData?.title || content.title}`);
+  parts.push(`Subject: ${subject}, Grade ${content.gradeLevel}`);
 
-  // Summary
+  // Summary (keep it short)
   if (lessonData?.summary) {
-    prompt += `## Overview\n${lessonData.summary}\n\n`;
+    parts.push(`\nOverview: ${truncateText(lessonData.summary, 500)}`);
   }
 
-  // Learning Objectives
+  // Learning Objectives (limit to 5)
   if (lessonData?.objectives && lessonData.objectives.length > 0) {
-    prompt += `## Learning Objectives\n`;
-    lessonData.objectives.forEach((obj, i) => {
-      prompt += `${i + 1}. ${obj}\n`;
+    const objectives = lessonData.objectives.slice(0, 5);
+    parts.push(`\nLearning Objectives:`);
+    objectives.forEach((obj, i) => {
+      parts.push(`${i + 1}. ${truncateText(obj, 150)}`);
     });
-    prompt += '\n';
   }
 
-  // Prerequisites
-  if (lessonData?.prerequisites && lessonData.prerequisites.length > 0) {
-    prompt += `## Prerequisites\n`;
-    lessonData.prerequisites.forEach(prereq => {
-      prompt += `- ${prereq}\n`;
-    });
-    prompt += '\n';
-  }
-
-  // Main Sections
+  // Main Sections (condensed)
   if (lessonData?.sections && lessonData.sections.length > 0) {
-    prompt += `## Lesson Content\n\n`;
+    parts.push(`\nLesson Content:`);
     lessonData.sections.forEach((section, index) => {
-      prompt += `### ${index + 1}. ${section.title}\n`;
-      if (section.duration) {
-        prompt += `Duration: ${section.duration} minutes\n`;
-      }
-      prompt += `${section.content}\n\n`;
+      parts.push(`\n${index + 1}. ${section.title}`);
+      // Truncate section content to prevent overly long prompts
+      parts.push(truncateText(section.content, 400));
 
-      // Activities
+      // Include a few activities if present
       if (section.activities && section.activities.length > 0) {
-        prompt += `**Activities:**\n`;
-        section.activities.forEach(act => {
+        const activities = section.activities.slice(0, 3);
+        parts.push('Activities:');
+        activities.forEach(act => {
           if (typeof act === 'string') {
-            prompt += `- ${act}\n`;
+            parts.push(`- ${truncateText(act, 100)}`);
           } else {
-            prompt += `- ${act.name || act.description || 'Activity'}\n`;
+            parts.push(`- ${truncateText(act.name || act.description || 'Activity', 100)}`);
           }
         });
-        prompt += '\n';
-      }
-
-      // Teaching Tips (only if includeTeacherNotes)
-      if (options.includeTeacherNotes && section.teachingTips && section.teachingTips.length > 0) {
-        prompt += `**Teaching Tips:**\n`;
-        section.teachingTips.forEach(tip => {
-          prompt += `- ${tip}\n`;
-        });
-        prompt += '\n';
       }
     });
   }
 
-  // Vocabulary
+  // Vocabulary (limit to 8 terms)
   if (lessonData?.vocabulary && lessonData.vocabulary.length > 0) {
-    prompt += `## Key Vocabulary\n`;
-    lessonData.vocabulary.forEach(vocab => {
-      prompt += `- **${vocab.term}**: ${vocab.definition}`;
-      if (vocab.example) {
-        prompt += ` (Example: ${vocab.example})`;
-      }
-      prompt += '\n';
+    const vocabItems = lessonData.vocabulary.slice(0, 8);
+    parts.push(`\nKey Vocabulary:`);
+    vocabItems.forEach(vocab => {
+      parts.push(`- ${vocab.term}: ${truncateText(vocab.definition, 100)}`);
     });
-    prompt += '\n';
   }
 
-  // Assessment Questions
+  // Assessment Questions (limit to 5)
   if (lessonData?.assessment?.questions && lessonData.assessment.questions.length > 0) {
-    prompt += `## Assessment Questions\n`;
-    lessonData.assessment.questions.forEach((q, i) => {
-      prompt += `${i + 1}. ${q.question}\n`;
-      if (q.options && q.options.length > 0) {
-        q.options.forEach((opt, j) => {
-          const letter = String.fromCharCode(65 + j);
-          prompt += `   ${letter}. ${opt}\n`;
-        });
+    const questions = lessonData.assessment.questions.slice(0, 5);
+    parts.push(`\nAssessment Questions:`);
+    questions.forEach((q, i) => {
+      parts.push(`${i + 1}. ${truncateText(q.question, 150)}`);
+      if (options.includeAnswers && q.correctAnswer) {
+        parts.push(`   Answer: ${truncateText(q.correctAnswer, 100)}`);
       }
-      if (options.includeAnswers) {
-        prompt += `   **Answer: ${q.correctAnswer}**\n`;
-        if (q.explanation) {
-          prompt += `   Explanation: ${q.explanation}\n`;
-        }
-      }
-      prompt += '\n';
     });
   }
 
-  // Summary Points
+  // Summary Points (limit to 5)
   if (lessonData?.summaryPoints && lessonData.summaryPoints.length > 0) {
-    prompt += `## Key Takeaways\n`;
-    lessonData.summaryPoints.forEach(point => {
-      prompt += `- ${point}\n`;
+    const summaryPoints = lessonData.summaryPoints.slice(0, 5);
+    parts.push(`\nKey Takeaways:`);
+    summaryPoints.forEach(point => {
+      parts.push(`- ${truncateText(point, 100)}`);
     });
-    prompt += '\n';
   }
 
-  // Teacher Notes (only if includeTeacherNotes)
-  if (options.includeTeacherNotes && lessonData?.teacherNotes) {
-    prompt += `## Teacher Notes\n${lessonData.teacherNotes}\n\n`;
-  }
-
-  // Next Steps
-  if (lessonData?.nextSteps) {
-    prompt += `## Next Steps\n${lessonData.nextSteps}\n`;
-  }
-
-  // Infographic mention
-  if (options.includeInfographic && content.infographicUrl) {
-    prompt += `\n## Visual Summary\nInclude a visual summary slide with an infographic-style layout summarizing the key concepts.\n`;
-  }
-
-  return prompt;
+  return parts.join('\n');
 }
 
 /**
@@ -230,40 +192,31 @@ function calculateSlideCount(content: TeacherContent, options: PresentonExportOp
   // Section slides
   const sectionCount = lessonData?.sections?.length || 0;
   if (options.slideStyle === 'focused') {
-    // More slides - one per section + extras for activities
-    slides += sectionCount * 2;
+    slides += Math.min(sectionCount * 2, 12); // Cap section slides
   } else {
-    // Dense - combine sections
-    slides += Math.ceil(sectionCount / 2);
+    slides += Math.min(Math.ceil(sectionCount / 2), 6);
   }
 
   // Vocabulary slide(s)
   const vocabCount = lessonData?.vocabulary?.length || 0;
   if (vocabCount > 0) {
-    slides += options.slideStyle === 'focused' ? Math.ceil(vocabCount / 4) : 1;
+    slides += 1;
   }
 
   // Assessment slide(s)
   const questionCount = lessonData?.assessment?.questions?.length || 0;
   if (questionCount > 0) {
-    slides += options.slideStyle === 'focused' ? Math.ceil(questionCount / 2) : 1;
+    slides += options.slideStyle === 'focused' ? 2 : 1;
   }
 
-  // Summary/takeaways slide
-  if (lessonData?.summaryPoints && lessonData.summaryPoints.length > 0) {
-    slides += 1;
-  }
-
-  // Infographic slide
-  if (options.includeInfographic && content.infographicUrl) {
-    slides += 1;
-  }
-
-  // Closing slide
+  // Summary slide
   slides += 1;
 
   // Cap at reasonable limits
-  return Math.min(Math.max(slides, 8), 25);
+  const minSlides = options.slideStyle === 'dense' ? 6 : 8;
+  const maxSlides = options.slideStyle === 'dense' ? 12 : 18;
+
+  return Math.min(Math.max(slides, minSlides), maxSlides);
 }
 
 /**
@@ -277,20 +230,18 @@ export async function generateLessonPPTX(
     throw new Error('PRESENTON_API_KEY is not configured');
   }
 
-  // Format the lesson content into a prompt
+  // Format the lesson content into a concise prompt
   const lessonPrompt = formatLessonContent(content, options);
 
   // Calculate appropriate slide count
   const slideCount = calculateSlideCount(content, options);
 
-  // Prepare the API request
+  console.log(`[Presenton] Content length: ${lessonPrompt.length} chars, slides: ${slideCount}`);
+
+  // Prepare the API request - keep it simple
   const requestBody: PresentonRequest = {
     content: lessonPrompt,
-    instructions: `Create a visually engaging educational presentation suitable for Grade ${content.gradeLevel} students.
-Use clear headings, bullet points, and visual elements.
-Keep text concise and readable.
-Include relevant icons and imagery where appropriate.
-Make the presentation suitable for classroom teaching.`,
+    instructions: `Create an engaging educational presentation for Grade ${content.gradeLevel} students. Use clear headings, bullet points, and include relevant images.`,
     tone: 'educational',
     verbosity: options.slideStyle === 'dense' ? 'concise' : 'standard',
     web_search: false,
@@ -298,13 +249,14 @@ Make the presentation suitable for classroom teaching.`,
     theme: options.theme,
     n_slides: slideCount,
     language: options.language || 'English',
-    template: 'modern',
+    template: 'general',
     include_table_of_contents: false,
     include_title_slide: true,
     export_as: 'pptx',
   };
 
   console.log(`[Presenton] Generating presentation with ${slideCount} slides...`);
+  console.log(`[Presenton] Request body:`, JSON.stringify(requestBody, null, 2).substring(0, 500) + '...');
 
   // Call Presenton API
   const response = await fetch(PRESENTON_API_URL, {
@@ -319,6 +271,16 @@ Make the presentation suitable for classroom teaching.`,
   if (!response.ok) {
     const errorText = await response.text();
     console.error('[Presenton] API error:', response.status, errorText);
+
+    // Provide more helpful error messages
+    if (response.status === 500) {
+      throw new Error('Presenton API is temporarily unavailable. Please try again in a moment.');
+    } else if (response.status === 401) {
+      throw new Error('Presenton API authentication failed. Please check the API key.');
+    } else if (response.status === 429) {
+      throw new Error('Presenton API rate limit exceeded. Please try again later.');
+    }
+
     throw new Error(`Presenton API error: ${response.status} - ${errorText}`);
   }
 
