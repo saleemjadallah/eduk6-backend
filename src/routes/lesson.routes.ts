@@ -934,4 +934,80 @@ router.post(
   }
 );
 
+// ============================================
+// PPT ANALYSIS
+// ============================================
+
+const analyzePPTSchema = z.object({
+  pptBase64: z.string().min(100, 'PowerPoint data is required'),
+  filename: z.string().max(255).optional(),
+  mimeType: z.enum([
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  ]),
+  subject: z.string().transform((val) => val.toUpperCase()).pipe(subjectEnum).optional().nullable(),
+  gradeLevel: z.string().optional().nullable(),
+  title: z.string().max(255).optional().nullable(),
+});
+
+/**
+ * POST /api/lessons/analyze-ppt
+ * Analyze PowerPoint file and extract educational content
+ * Converts PPT to PDF via CloudConvert, then uses Gemini for analysis
+ */
+router.post(
+  '/analyze-ppt',
+  authenticate,
+  validateInput(analyzePPTSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { pptBase64, filename, mimeType, subject, gradeLevel, title } = req.body;
+
+      logger.info('PPT analysis request received', {
+        filename,
+        mimeType,
+        base64Length: pptBase64.length,
+        userId: req.parent?.id || req.child?.id,
+      });
+
+      // Dynamically import PPT processor
+      const { analyzePPT, PPT_MIME_TYPES } = await import('../services/learning/pptProcessor.js');
+
+      // Analyze the PPT
+      const result = await analyzePPT(
+        pptBase64,
+        mimeType as (typeof PPT_MIME_TYPES)[number],
+        filename || 'presentation.pptx'
+      );
+
+      logger.info('PPT analysis completed', {
+        filename,
+        slideCount: result.slideCount,
+        tokensUsed: result.tokensUsed,
+      });
+
+      res.json({
+        success: true,
+        data: {
+          extractedText: result.extractedText,
+          suggestedTitle: title || result.suggestedTitle,
+          summary: result.summary,
+          detectedSubject: subject || result.detectedSubject,
+          detectedGradeLevel: gradeLevel || result.detectedGradeLevel,
+          keyTopics: result.keyTopics,
+          vocabulary: result.vocabulary,
+          slideCount: result.slideCount,
+          originalFormat: result.originalFormat,
+          tokensUsed: result.tokensUsed,
+        },
+      });
+    } catch (error) {
+      logger.error('PPT analysis failed', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      next(error);
+    }
+  }
+);
+
 export default router;
