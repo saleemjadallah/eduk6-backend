@@ -945,6 +945,7 @@ const analyzePPTSchema = z.object({
     'application/vnd.ms-powerpoint',
     'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   ]),
+  childId: z.string().min(1).nullable().optional(),
   subject: z.string().transform((val) => val.toUpperCase()).pipe(subjectEnum).optional().nullable(),
   gradeLevel: z.string().optional().nullable(),
   title: z.string().max(255).optional().nullable(),
@@ -954,6 +955,7 @@ const analyzePPTSchema = z.object({
  * POST /api/lessons/analyze-ppt
  * Analyze PowerPoint file and extract educational content
  * Converts PPT to PDF via CloudConvert, then uses Gemini for analysis
+ * Creates a lesson in the database with the analysis results
  */
 router.post(
   '/analyze-ppt',
@@ -962,11 +964,81 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { pptBase64, filename, mimeType, subject, gradeLevel, title } = req.body;
+      let { childId } = req.body;
+
+      // If childId is null/undefined, get the first child for this parent
+      if (!childId) {
+        if (req.child) {
+          childId = req.child.id;
+        } else if (req.parent) {
+          const firstChild = await prisma.child.findFirst({
+            where: { parentId: req.parent.id },
+            select: { id: true },
+            orderBy: { createdAt: 'asc' },
+          });
+
+          if (!firstChild) {
+            res.status(400).json({
+              success: false,
+              error: 'No child profile found. Please create a child profile first.',
+            });
+            return;
+          }
+          childId = firstChild.id;
+        } else {
+          res.status(401).json({
+            success: false,
+            error: 'Authentication required',
+          });
+          return;
+        }
+      }
+
+      // Get child info for age-appropriate analysis
+      const child = await prisma.child.findUnique({
+        where: { id: childId },
+        select: {
+          id: true,
+          parentId: true,
+          ageGroup: true,
+          gradeLevel: true,
+          curriculumType: true,
+        },
+      });
+
+      if (!child) {
+        res.status(404).json({
+          success: false,
+          error: 'Child not found',
+        });
+        return;
+      }
+
+      // Verify access to this child
+      if (req.parent && child.parentId !== req.parent.id) {
+        res.status(403).json({
+          success: false,
+          error: 'Access denied to this child profile',
+        });
+        return;
+      }
+
+      // Check lesson usage limits for FREE tier parents
+      const canCreateLesson = await parentUsageService.canCreateLesson(child.parentId);
+      if (!canCreateLesson) {
+        res.status(402).json({
+          success: false,
+          error: 'Monthly lesson limit reached. Please upgrade your subscription to create more lessons.',
+          code: 'LESSON_LIMIT_REACHED',
+        });
+        return;
+      }
 
       logger.info('PPT analysis request received', {
         filename,
         mimeType,
         base64Length: pptBase64.length,
+        childId,
         userId: req.parent?.id || req.child?.id,
       });
 
@@ -986,19 +1058,62 @@ router.post(
         tokensUsed: result.tokensUsed,
       });
 
+      // Determine subject
+      const validSubjects = ['MATH', 'SCIENCE', 'ENGLISH', 'ARABIC', 'ISLAMIC_STUDIES', 'SOCIAL_STUDIES', 'ART', 'MUSIC', 'OTHER'];
+      const detectedSubject = result.detectedSubject && validSubjects.includes(result.detectedSubject)
+        ? result.detectedSubject as Subject
+        : undefined;
+      const finalSubject = (subject as Subject | undefined) || detectedSubject;
+
+      // Format content using DocumentFormatter
+      const formattedContent = documentFormatter.format(result.extractedText, {
+        ageGroup: child.ageGroup,
+        vocabulary: result.vocabulary,
+      });
+
+      // Create lesson record with analyzed content
+      const lesson = await lessonService.create({
+        childId,
+        title: title || result.suggestedTitle || filename || 'PowerPoint Lesson',
+        sourceType: 'PPT' as SourceType,
+        subject: finalSubject,
+      });
+
+      // Update with analysis results
+      await lessonService.update(lesson.id, {
+        summary: result.summary,
+        gradeLevel: gradeLevel || result.detectedGradeLevel || String(child.gradeLevel),
+        formattedContent,
+        keyConcepts: result.keyTopics,
+        vocabulary: result.vocabulary ? JSON.parse(JSON.stringify(result.vocabulary)) : undefined,
+        aiConfidence: 0.85,
+        processingStatus: 'COMPLETED',
+        safetyReviewed: true,
+        extractedText: result.extractedText,
+      });
+
+      // Get updated lesson
+      const updatedLesson = await lessonService.getById(lesson.id);
+
+      // Record lesson creation for usage tracking
+      await parentUsageService.recordLessonCreation(child.parentId);
+
       res.json({
         success: true,
         data: {
+          lessonId: lesson.id,
+          lesson: updatedLesson,
           extractedText: result.extractedText,
           suggestedTitle: title || result.suggestedTitle,
           summary: result.summary,
-          detectedSubject: subject || result.detectedSubject,
+          detectedSubject: finalSubject || result.detectedSubject,
           detectedGradeLevel: gradeLevel || result.detectedGradeLevel,
           keyTopics: result.keyTopics,
           vocabulary: result.vocabulary,
           slideCount: result.slideCount,
           originalFormat: result.originalFormat,
           tokensUsed: result.tokensUsed,
+          formattedContent,
         },
       });
     } catch (error) {
