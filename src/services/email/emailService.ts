@@ -1650,4 +1650,157 @@ export const emailService = {
       return false;
     }
   },
+
+  /**
+   * Send suggestion/feedback email to support
+   */
+  async sendSuggestionEmail(
+    message: string,
+    userEmail: string | null,
+    portal: 'student' | 'teacher',
+    metadata?: {
+      userId?: string;
+      userType?: string;
+      page?: string;
+      browser?: string;
+    }
+  ): Promise<boolean> {
+    if (config.email.skipEmails || !resend) {
+      logger.info(`[Email] Skipped suggestion email from ${portal} portal`);
+      return true;
+    }
+
+    try {
+      const portalLabel = portal === 'teacher' ? 'Teacher Portal' : 'Student Portal';
+      const portalColor = portal === 'teacher' ? '#059669' : '#7C3AED';
+      const timestamp = new Date().toLocaleString('en-US', {
+        dateStyle: 'full',
+        timeStyle: 'short',
+        timeZone: 'America/New_York',
+      });
+
+      const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Suggestion from ${portalLabel}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    <tr>
+      <td style="background: linear-gradient(135deg, ${portalColor} 0%, #2DD4BF 100%); border-radius: 24px 24px 0 0; padding: 30px; text-align: center;">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">
+          📬 New Suggestion Received
+        </h1>
+        <p style="color: rgba(255,255,255,0.95); margin-top: 8px; font-size: 16px;">
+          From ${portalLabel}
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td style="background-color: #ffffff; padding: 40px; border-radius: 0 0 24px 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+
+        <!-- Suggestion Message -->
+        <div style="background: linear-gradient(135deg, #F3F4F6 0%, #E5E7EB 100%); border-radius: 16px; padding: 24px; margin-bottom: 24px; border-left: 4px solid ${portalColor};">
+          <h3 style="color: #1F2937; margin: 0 0 12px 0; font-size: 16px;">💬 Message:</h3>
+          <p style="color: #374151; margin: 0; font-size: 15px; line-height: 1.7; white-space: pre-wrap;">${message}</p>
+        </div>
+
+        <!-- Reply Email -->
+        ${userEmail ? `
+        <div style="background-color: #ECFDF5; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px;">
+          <p style="color: #065F46; margin: 0; font-size: 14px;">
+            <strong>📧 Reply to:</strong> <a href="mailto:${userEmail}" style="color: #059669;">${userEmail}</a>
+          </p>
+        </div>
+        ` : `
+        <div style="background-color: #FEF3C7; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px;">
+          <p style="color: #92400E; margin: 0; font-size: 14px;">
+            <strong>📧 Reply email:</strong> Not provided
+          </p>
+        </div>
+        `}
+
+        <!-- Metadata -->
+        <div style="background-color: #F9FAFB; border-radius: 12px; padding: 20px; border: 1px solid #E5E7EB;">
+          <h4 style="color: #6B7280; margin: 0 0 12px 0; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">📊 Details</h4>
+          <table role="presentation" cellspacing="0" cellpadding="0" style="width: 100%;">
+            <tr>
+              <td style="padding: 6px 0; color: #6B7280; font-size: 14px; width: 120px;">Portal:</td>
+              <td style="padding: 6px 0; color: #374151; font-size: 14px; font-weight: 500;">${portalLabel}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #6B7280; font-size: 14px;">User ID:</td>
+              <td style="padding: 6px 0; color: #374151; font-size: 14px; font-weight: 500;">${metadata?.userId || 'Anonymous'}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #6B7280; font-size: 14px;">User Type:</td>
+              <td style="padding: 6px 0; color: #374151; font-size: 14px; font-weight: 500;">${metadata?.userType || 'Unknown'}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #6B7280; font-size: 14px;">Page:</td>
+              <td style="padding: 6px 0; color: #374151; font-size: 14px; font-weight: 500;">${metadata?.page || 'Unknown'}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #6B7280; font-size: 14px;">Browser:</td>
+              <td style="padding: 6px 0; color: #374151; font-size: 14px; font-weight: 500;">${metadata?.browser || 'Unknown'}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #6B7280; font-size: 14px;">Timestamp:</td>
+              <td style="padding: 6px 0; color: #374151; font-size: 14px; font-weight: 500;">${timestamp}</td>
+            </tr>
+          </table>
+        </div>
+
+        <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+          This suggestion was submitted via the OrbitLearn suggestion box.
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+      `;
+
+      const text = `
+New Suggestion from ${portalLabel}
+
+Message:
+${message}
+
+Reply Email: ${userEmail || 'Not provided'}
+
+Details:
+- Portal: ${portalLabel}
+- User ID: ${metadata?.userId || 'Anonymous'}
+- User Type: ${metadata?.userType || 'Unknown'}
+- Page: ${metadata?.page || 'Unknown'}
+- Browser: ${metadata?.browser || 'Unknown'}
+- Timestamp: ${timestamp}
+      `;
+
+      const { error } = await resend.emails.send({
+        from: `OrbitLearn Suggestions <${config.email.fromEmail}>`,
+        to: 'support@orbitlearn.app',
+        replyTo: userEmail || undefined,
+        subject: `[${portal.toUpperCase()}] New Suggestion - OrbitLearn`,
+        html,
+        text,
+      });
+
+      if (error) {
+        logger.error('Failed to send suggestion email', { error, portal });
+        return false;
+      }
+
+      logger.info(`Suggestion email sent from ${portal} portal`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending suggestion email', { error, portal });
+      return false;
+    }
+  },
 };

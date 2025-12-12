@@ -1,7 +1,10 @@
-// Support routes for parent dashboard
-import { Router } from 'express';
+// Support routes for parent dashboard and suggestion box
+import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate, requireParent } from '../middleware/auth.js';
+import { authenticateTeacher } from '../middleware/teacherAuth.js';
+import { emailService } from '../services/email/emailService.js';
 import { logger } from '../utils/logger.js';
+import { z } from 'zod';
 
 const router = Router();
 
@@ -147,6 +150,111 @@ router.get('/faq', async (_req, res) => {
     success: true,
     data: faq,
   });
+});
+
+// =================================================================
+// SUGGESTION BOX ENDPOINT (For Student and Teacher Portals)
+// =================================================================
+
+// Validation schema for suggestions
+const suggestionSchema = z.object({
+  message: z.string().min(10, 'Message must be at least 10 characters').max(1000, 'Message must be less than 1000 characters'),
+  email: z.string().email('Invalid email format').optional().or(z.literal('')),
+  portal: z.enum(['student', 'teacher']),
+  metadata: z.object({
+    page: z.string().optional(),
+    browser: z.string().optional(),
+  }).optional(),
+});
+
+/**
+ * POST /api/support/suggestion
+ * Submit a suggestion from the suggestion box (student or teacher portal)
+ * Accepts both parent/child authentication and teacher authentication
+ */
+router.post('/suggestion', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Try to authenticate as parent/child first, then teacher
+    let userId: string | undefined;
+    let userType: string | undefined;
+
+    // Check for parent/child auth token
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+
+      // Try to decode without full validation for metadata purposes only
+      try {
+        const jwt = await import('jsonwebtoken');
+        const { config } = await import('../config/index.js');
+        const decoded = jwt.default.verify(token, config.jwtSecret) as any;
+
+        if (decoded.parentId) {
+          userId = decoded.parentId;
+          userType = 'parent';
+        } else if (decoded.childId) {
+          userId = decoded.childId;
+          userType = 'child';
+        } else if (decoded.teacherId) {
+          userId = decoded.teacherId;
+          userType = 'teacher';
+        }
+      } catch {
+        // Token invalid or expired - proceed without user context
+      }
+    }
+
+    // Validate request body
+    const validationResult = suggestionSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: validationResult.error.errors,
+      });
+    }
+
+    const { message, email, portal, metadata } = validationResult.data;
+
+    // Log the suggestion
+    logger.info('Suggestion received', {
+      portal,
+      userId,
+      userType,
+      hasEmail: !!email,
+      messageLength: message.length,
+      page: metadata?.page,
+    });
+
+    // Send email to support
+    const emailSent = await emailService.sendSuggestionEmail(
+      message,
+      email || null,
+      portal,
+      {
+        userId,
+        userType,
+        page: metadata?.page,
+        browser: metadata?.browser,
+      }
+    );
+
+    if (!emailSent) {
+      logger.error('Failed to send suggestion email');
+      // Still return success to user - we don't want to discourage feedback
+      // In production, we might queue this for retry
+    }
+
+    res.json({
+      success: true,
+      data: {
+        message: 'Thank you for your suggestion! We appreciate your feedback.',
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 export default router;
