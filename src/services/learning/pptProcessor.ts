@@ -166,6 +166,12 @@ Analyze this document and extract:
 7. Important vocabulary terms with definitions (5-15 terms)
 8. The number of slides/pages in the presentation
 
+IMPORTANT - Image handling rules:
+- DO extract and describe data from charts, graphs, diagrams, tables, and infographics (these contain important educational data)
+- DO NOT attempt to extract or transcribe text from static images, photos, clipart, or decorative graphics
+- If a slide contains only images without actual text, note "[Slide contains visual content]" and move on
+- Focus on the actual typed/written text content in the presentation
+
 Return JSON with this exact structure:
 {
   "extractedText": "Full text content from all slides, organized by slide...",
