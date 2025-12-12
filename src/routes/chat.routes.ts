@@ -193,6 +193,7 @@ router.post(
         childId,
         ageGroup: effectiveAgeGroup,
         hasLessonContext: !!lessonContext,
+        lessonContentLength: lessonContext?.content?.length || 0,
         hasSelectedText: !!selectedText,
         messageLength: message.length,
       });
@@ -687,15 +688,33 @@ Guidelines:
       // This allows answering contextual questions like "what does question 3 mean?"
       // Using 8000 chars to allow referencing most lesson content while staying within token limits
       const truncatedContent = lessonContext.content.substring(0, 8000);
-      prompt += `\n\n=== FULL LESSON CONTENT ===
-The following is the complete lesson content. Use this to answer questions about specific parts of the lesson (e.g., "what does practice question 3 mean?" or "explain the second paragraph").
+      prompt += `\n\n=== THE STUDENT'S LESSON (You CAN read this!) ===
+The student is currently viewing this lesson on the left side of their screen. You have FULL ACCESS to read this content.
 
-${truncatedContent}`;
+--- BEGIN LESSON CONTENT ---
+${truncatedContent}
+--- END LESSON CONTENT ---`;
       if (lessonContext.content.length > 8000) {
-        prompt += '\n\n[Note: Content was truncated. If the student asks about something not shown above, let them know you can only see the first part of the lesson.]';
+        prompt += '\n[Note: Lesson truncated to first 8000 characters. If asked about content not shown, explain you can only see the beginning.]';
       }
+      prompt += `
+
+=== CRITICAL INSTRUCTIONS FOR LESSON QUESTIONS ===
+When the student asks about the lesson (e.g., "explain question 3", "what's the second paragraph about", "read me the homework", "what does this mean"):
+
+1. SEARCH through the lesson content above to find what they're asking about
+2. QUOTE or PARAPHRASE the relevant section directly
+3. EXPLAIN in ${isYoung ? 'simple, fun language with emojis' : 'clear, age-appropriate language'}
+
+NEVER say "I can't see your screen" or "I don't have access to the lesson" - YOU DO have the lesson content above!
+
+If you can't find what they're asking about:
+- It might be beyond the 8000 character limit - let them know gently
+- Or ask them to be more specific about which part they mean`;
+    } else {
+      // No lesson content available
+      prompt += `\n\nNote: No specific lesson content is loaded right now. If the student asks about a lesson, encourage them to load one first or ask general learning questions.`;
     }
-    prompt += `\n\nIMPORTANT: Use this lesson content to answer questions accurately. When the student asks about specific topics from the lesson, reference this content directly.`;
   }
 
   if (selectedText) {
