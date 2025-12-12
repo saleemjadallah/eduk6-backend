@@ -666,6 +666,231 @@ If you didn't request this ${action}, please ignore this email or contact suppor
   },
 
   /**
+   * Usage warning email (70% and 90% thresholds)
+   */
+  usageWarning: (
+    parentName: string,
+    threshold: 70 | 90,
+    lessonsUsed: number,
+    lessonsLimit: number,
+    lessonsRemaining: number
+  ) => {
+    const isUrgent = threshold === 90;
+    const urgencyColor = isUrgent ? '#EF4444' : '#F59E0B';
+    const urgencyBgStart = isUrgent ? '#FEE2E2' : '#FEF3C7';
+    const urgencyBgEnd = isUrgent ? '#FECACA' : '#FDE68A';
+    const urgencyText = isUrgent ? '#991B1B' : '#92400E';
+
+    return {
+      subject: isUrgent
+        ? `⚠️ Only ${lessonsRemaining} Lessons Remaining! - OrbitLearn`
+        : `📊 You've Used ${threshold}% of Your Monthly Lessons - OrbitLearn`,
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Usage Update</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    <tr>
+      <td style="background: linear-gradient(135deg, ${urgencyColor} 0%, #F59E0B 100%); border-radius: 24px 24px 0 0; padding: 30px; text-align: center;">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">
+          ${isUrgent ? '⚠️ Running Low on Lessons' : '📊 Usage Update'}
+        </h1>
+      </td>
+    </tr>
+    <tr>
+      <td style="background-color: #ffffff; padding: 40px; border-radius: 0 0 24px 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
+          Hi ${parentName}! 👋
+        </p>
+
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
+          ${isUrgent
+            ? `You only have <strong>${lessonsRemaining} lesson${lessonsRemaining === 1 ? '' : 's'}</strong> remaining this month!`
+            : `You've used ${threshold}% of your monthly lesson allowance.`
+          }
+        </p>
+
+        <!-- Usage Box -->
+        <div style="background: linear-gradient(135deg, ${urgencyBgStart} 0%, ${urgencyBgEnd} 100%); border-radius: 16px; padding: 24px; margin: 28px 0; text-align: center;">
+          <div style="display: flex; justify-content: center; gap: 30px; margin-bottom: 16px;">
+            <div>
+              <div style="font-size: 36px; font-weight: bold; color: ${urgencyText};">${lessonsUsed}</div>
+              <div style="color: ${urgencyText}; font-size: 14px;">Used</div>
+            </div>
+            <div style="font-size: 36px; color: #ccc;">/</div>
+            <div>
+              <div style="font-size: 36px; font-weight: bold; color: ${urgencyText};">${lessonsLimit}</div>
+              <div style="color: ${urgencyText}; font-size: 14px;">Monthly Limit</div>
+            </div>
+          </div>
+          <div style="background: #e5e7eb; border-radius: 8px; height: 12px; overflow: hidden;">
+            <div style="background: ${urgencyColor}; height: 100%; width: ${threshold}%; border-radius: 8px;"></div>
+          </div>
+          <p style="color: ${urgencyText}; margin: 12px 0 0 0; font-size: 14px; font-weight: 600;">
+            ${lessonsRemaining} lesson${lessonsRemaining === 1 ? '' : 's'} remaining this month
+          </p>
+        </div>
+
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
+          ${isUrgent
+            ? "Don't let your child's learning momentum stop! Upgrade now to keep the lessons coming."
+            : "Keep the learning momentum going! Consider upgrading for unlimited lessons."
+          }
+        </p>
+
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${config.frontendUrl}/parent/billing" style="background: linear-gradient(135deg, #7C3AED 0%, #2DD4BF 100%); color: #ffffff; text-decoration: none; padding: 16px 36px; border-radius: 50px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);">
+            Upgrade for Unlimited Lessons 🚀
+          </a>
+        </div>
+
+        <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+          <span style="color: #a78bfa;">- The OrbitLearn Team 💜</span>
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+      `,
+      text: `
+${isUrgent ? 'Running Low on Lessons!' : 'Usage Update'}
+
+Hi ${parentName},
+
+${isUrgent
+  ? `You only have ${lessonsRemaining} lesson${lessonsRemaining === 1 ? '' : 's'} remaining this month!`
+  : `You've used ${threshold}% of your monthly lesson allowance.`
+}
+
+Usage: ${lessonsUsed} / ${lessonsLimit} lessons (${lessonsRemaining} remaining)
+
+${isUrgent
+  ? "Don't let your child's learning momentum stop! Upgrade now to keep the lessons coming."
+  : "Keep the learning momentum going! Consider upgrading for unlimited lessons."
+}
+
+Upgrade at: ${config.frontendUrl}/parent/billing
+
+- The OrbitLearn Team
+      `,
+    };
+  },
+
+  /**
+   * Limit reached email (100%)
+   */
+  limitReached: (parentName: string, lessonsLimit: number) => ({
+    subject: `🚫 Monthly Lesson Limit Reached - OrbitLearn`,
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lesson Limit Reached</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    <tr>
+      <td style="background: linear-gradient(135deg, #DC2626 0%, #EF4444 100%); border-radius: 24px 24px 0 0; padding: 30px; text-align: center;">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">
+          Monthly Lesson Limit Reached
+        </h1>
+      </td>
+    </tr>
+    <tr>
+      <td style="background-color: #ffffff; padding: 40px; border-radius: 0 0 24px 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
+          Hi ${parentName}! 👋
+        </p>
+
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
+          You've used all <strong>${lessonsLimit} lessons</strong> included in your free plan this month.
+        </p>
+
+        <!-- Limit Box -->
+        <div style="background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%); border-radius: 16px; padding: 24px; margin: 28px 0; text-align: center; border: 2px solid #F87171;">
+          <div style="font-size: 48px; margin-bottom: 8px;">🚫</div>
+          <h3 style="color: #991B1B; margin: 0 0 8px 0; font-size: 20px;">No Lessons Remaining</h3>
+          <p style="color: #B91C1C; margin: 0; font-size: 14px;">
+            New lessons will be available on the 1st of next month
+          </p>
+        </div>
+
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
+          Don't let your child's learning stop! <strong>Upgrade to a Family plan</strong> for unlimited lessons and keep the momentum going.
+        </p>
+
+        <!-- Benefits Box -->
+        <div style="background: linear-gradient(135deg, #EDE9FE 0%, #DDD6FE 100%); border-radius: 16px; padding: 20px; margin: 24px 0;">
+          <h4 style="color: #5B21B6; margin: 0 0 12px 0; font-size: 16px;">✨ Family Plan Benefits:</h4>
+          <table role="presentation" cellspacing="0" cellpadding="0">
+            <tr>
+              <td style="padding: 6px 0; color: #4b5563; font-size: 14px;">📚 <strong>Unlimited lessons</strong> every month</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #4b5563; font-size: 14px;">👨‍👩‍👧 <strong>2 child profiles</strong> (add a sibling!)</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #4b5563; font-size: 14px;">📊 <strong>Advanced analytics</strong> to track progress</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #4b5563; font-size: 14px;">💬 <strong>Priority support</strong> when you need help</td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${config.frontendUrl}/parent/billing" style="background: linear-gradient(135deg, #7C3AED 0%, #2DD4BF 100%); color: #ffffff; text-decoration: none; padding: 18px 40px; border-radius: 50px; font-weight: bold; font-size: 17px; display: inline-block; box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);">
+            Upgrade Now - Start Free Trial 🚀
+          </a>
+          <p style="color: #6b7280; margin: 12px 0 0 0; font-size: 13px;">
+            7-day free trial • Cancel anytime
+          </p>
+        </div>
+
+        <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+          <span style="color: #a78bfa;">- The OrbitLearn Team 💜</span>
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `,
+    text: `
+Monthly Lesson Limit Reached
+
+Hi ${parentName},
+
+You've used all ${lessonsLimit} lessons included in your free plan this month.
+
+New lessons will be available on the 1st of next month.
+
+Don't let your child's learning stop! Upgrade to a Family plan for unlimited lessons.
+
+Family Plan Benefits:
+- Unlimited lessons every month
+- 2 child profiles (add a sibling!)
+- Advanced analytics to track progress
+- Priority support when you need help
+
+Upgrade at: ${config.frontendUrl}/parent/billing
+(7-day free trial • Cancel anytime)
+
+- The OrbitLearn Team
+    `,
+  }),
+
+  /**
    * Security alert email for sensitive account changes
    */
   securityAlert: (parentName: string, alertType: string, details: string) => ({
@@ -1010,6 +1235,89 @@ export const emailService = {
       return true;
     } catch (error) {
       logger.error('Error sending teacher OTP email', { error, email });
+      return false;
+    }
+  },
+
+  /**
+   * Send usage warning email (70% or 90% threshold)
+   */
+  async sendUsageWarningEmail(
+    email: string,
+    parentName: string,
+    threshold: 70 | 90,
+    lessonsUsed: number,
+    lessonsLimit: number,
+    lessonsRemaining: number
+  ): Promise<boolean> {
+    if (config.email.skipEmails || !resend) {
+      logger.info(`[Email] Skipped usage warning (${threshold}%) email to ${email}`);
+      return true;
+    }
+
+    try {
+      const template = templates.usageWarning(
+        parentName,
+        threshold,
+        lessonsUsed,
+        lessonsLimit,
+        lessonsRemaining
+      );
+
+      const { error } = await resend.emails.send({
+        from: `OrbitLearn <${config.email.fromEmail}>`,
+        to: email,
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
+      });
+
+      if (error) {
+        logger.error('Failed to send usage warning email', { error, email, threshold });
+        return false;
+      }
+
+      logger.info(`Usage warning (${threshold}%) email sent to ${email}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending usage warning email', { error, email });
+      return false;
+    }
+  },
+
+  /**
+   * Send limit reached email (100%)
+   */
+  async sendLimitReachedEmail(
+    email: string,
+    parentName: string,
+    lessonsLimit: number
+  ): Promise<boolean> {
+    if (config.email.skipEmails || !resend) {
+      logger.info(`[Email] Skipped limit reached email to ${email}`);
+      return true;
+    }
+
+    try {
+      const template = templates.limitReached(parentName, lessonsLimit);
+
+      const { error } = await resend.emails.send({
+        from: `OrbitLearn <${config.email.fromEmail}>`,
+        to: email,
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
+      });
+
+      if (error) {
+        logger.error('Failed to send limit reached email', { error, email });
+        return false;
+      }
+
+      logger.info(`Limit reached email sent to ${email}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending limit reached email', { error, email });
       return false;
     }
   },

@@ -155,6 +155,11 @@ model ParentLessonUsage {
   month            DateTime @db.Date  // First day of the month (for grouping)
   lessonsCreated   Int      @default(0)
 
+  // Notification tracking (to avoid sending duplicate emails)
+  notified70Pct    Boolean  @default(false)  // Sent warning at 70%
+  notified90Pct    Boolean  @default(false)  // Sent warning at 90%
+  notified100Pct   Boolean  @default(false)  // Sent limit reached notification
+
   // Timestamps
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
