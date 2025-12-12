@@ -209,17 +209,11 @@ export const familySubscriptionService = {
       throw new Error('Stripe is not configured');
     }
 
-    const parent = await prisma.parent.findUnique({
-      where: { id: parentId },
-      select: { stripeCustomerId: true },
-    });
-
-    if (!parent?.stripeCustomerId) {
-      throw new Error('No Stripe customer found for parent');
-    }
+    // Get or create customer - handles manually upgraded users who don't have a Stripe customer
+    const customerId = await this.getOrCreateCustomer(parentId);
 
     const session = await stripe.billingPortal.sessions.create({
-      customer: parent.stripeCustomerId,
+      customer: customerId,
       return_url: returnUrl,
     });
 
