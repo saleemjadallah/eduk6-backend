@@ -112,6 +112,7 @@ export interface ExportOptions {
   includeTeacherNotes?: boolean;
   paperSize?: 'letter' | 'a4';
   colorScheme?: 'color' | 'grayscale';
+  separateAnswerKey?: boolean;
 }
 
 // Subject colors for styling - matches the Prisma Subject enum
@@ -836,13 +837,104 @@ function generateQuizHTML(
   const subject = (content.subject || 'OTHER') as Subject;
   const styles = getBaseStyles(subject, options.colorScheme);
 
+  // Determine if answers should be shown inline or on a separate answer key page
+  const showInlineAnswers = options.includeAnswers && !options.separateAnswerKey;
+  const showAnswerKey = options.includeAnswers && options.separateAnswerKey;
+
   let html = `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="UTF-8">
       <title>${quizData.title || content.title} - Quiz</title>
-      <style>${styles}</style>
+      <style>
+        ${styles}
+
+        /* Additional styles for answer key */
+        .answer-key-header {
+          text-align: center;
+          margin-bottom: 24px;
+          padding-bottom: 16px;
+          border-bottom: 3px solid #10B981;
+        }
+
+        .answer-key-header h1 {
+          font-size: 20pt;
+          font-weight: 700;
+          color: #10B981;
+          margin-bottom: 8px;
+        }
+
+        .answer-key-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 16px;
+        }
+
+        .answer-key-item {
+          background: #F9FAFB;
+          border: 1px solid #E5E7EB;
+          border-radius: 8px;
+          padding: 12px 16px;
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+        }
+
+        .answer-key-item .q-number {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 28px;
+          height: 28px;
+          background: #10B981;
+          color: white;
+          border-radius: 50%;
+          font-weight: 600;
+          font-size: 10pt;
+          flex-shrink: 0;
+        }
+
+        .answer-key-item .answer-content {
+          flex: 1;
+        }
+
+        .answer-key-item .answer-text {
+          font-weight: 600;
+          color: #065F46;
+          margin-bottom: 4px;
+        }
+
+        .answer-key-item .explanation-text {
+          font-size: 9pt;
+          color: #6B7280;
+          line-height: 1.4;
+        }
+
+        .name-line {
+          margin-bottom: 20px;
+          padding-bottom: 12px;
+          border-bottom: 1px solid #E5E7EB;
+        }
+
+        .name-line-field {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 8px;
+        }
+
+        .name-line-field span {
+          font-weight: 500;
+          color: #4B5563;
+        }
+
+        .name-line-field .line {
+          flex: 1;
+          border-bottom: 1px solid #9CA3AF;
+          height: 1px;
+        }
+      </style>
     </head>
     <body>
       <div class="header">
@@ -854,6 +946,21 @@ function generateQuizHTML(
           ${quizData.estimatedTime ? `<span>⏱ ${quizData.estimatedTime} min</span>` : ''}
         </div>
       </div>
+
+      ${showAnswerKey ? `
+        <div class="name-line">
+          <div class="name-line-field">
+            <span>Name:</span>
+            <div class="line"></div>
+          </div>
+          <div class="name-line-field">
+            <span>Date:</span>
+            <div class="line" style="max-width: 200px;"></div>
+            <span style="margin-left: 24px;">Score:</span>
+            <div class="line" style="max-width: 100px;"></div>
+          </div>
+        </div>
+      ` : ''}
 
       <div class="section">
         <h2 class="section-title"><span class="icon">📝</span> Questions</h2>
@@ -871,14 +978,14 @@ function generateQuizHTML(
             ${q.options && q.options.length > 0 ? `
               <ul class="options-list">
                 ${q.options.map((opt, j) => `
-                  <li class="${options.includeAnswers && opt === q.correctAnswer ? 'correct' : ''}">
+                  <li class="${showInlineAnswers && opt === q.correctAnswer ? 'correct' : ''}">
                     <span class="option-letter">${String.fromCharCode(65 + j)}</span>
                     ${opt}
                   </li>
                 `).join('')}
               </ul>
             ` : ''}
-            ${options.includeAnswers ? `
+            ${showInlineAnswers ? `
               <div class="answer-section">
                 <div class="label">Correct Answer:</div>
                 <div class="answer">${q.correctAnswer}</div>
@@ -888,6 +995,26 @@ function generateQuizHTML(
           </div>
         `).join('')}
       </div>
+
+      ${showAnswerKey ? `
+        <div class="page-break"></div>
+        <div class="answer-key-header">
+          <h1>Answer Key</h1>
+          <div style="font-size: 10pt; color: #6B7280;">${quizData.title || content.title}</div>
+        </div>
+
+        <div class="answer-key-grid">
+          ${quizData.questions.map((q, i) => `
+            <div class="answer-key-item">
+              <span class="q-number">${i + 1}</span>
+              <div class="answer-content">
+                <div class="answer-text">${q.correctAnswer}</div>
+                ${q.explanation ? `<div class="explanation-text">${q.explanation}</div>` : ''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
 
       <div class="footer">
         Generated by Orbit Learn • ${new Date().toLocaleDateString()}
@@ -1061,6 +1188,7 @@ export async function exportContent(
     includeTeacherNotes: options.includeTeacherNotes ?? true,
     paperSize: options.paperSize ?? 'letter',
     colorScheme: options.colorScheme ?? 'color',
+    separateAnswerKey: options.separateAnswerKey ?? false,
   };
 
   let html: string;
