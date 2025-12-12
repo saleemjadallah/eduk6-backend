@@ -23,6 +23,8 @@ export interface CreateContentInput {
   lessonContent?: unknown;
   quizContent?: unknown;
   flashcardContent?: unknown;
+  // Allow setting status directly (defaults to DRAFT if not provided)
+  status?: ContentStatus;
 }
 
 export interface UpdateContentInput {
@@ -94,7 +96,8 @@ export const contentService = {
         lessonContent: input.lessonContent as Parameters<typeof prisma.teacherContent.create>[0]['data']['lessonContent'],
         quizContent: input.quizContent as Parameters<typeof prisma.teacherContent.create>[0]['data']['quizContent'],
         flashcardContent: input.flashcardContent as Parameters<typeof prisma.teacherContent.create>[0]['data']['flashcardContent'],
-        status: 'DRAFT',
+        // Use provided status or default to DRAFT
+        status: input.status || 'DRAFT',
       },
     });
 

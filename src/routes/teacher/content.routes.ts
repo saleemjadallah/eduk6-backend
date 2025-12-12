@@ -29,6 +29,8 @@ const createContentSchema = z.object({
   lessonContent: z.record(z.unknown()).optional(),
   quizContent: z.record(z.unknown()).optional(),
   flashcardContent: z.record(z.unknown()).optional(),
+  // Allow setting status directly (defaults to DRAFT if not provided)
+  status: z.nativeEnum(ContentStatus).optional(),
 });
 
 const updateContentSchema = z.object({
