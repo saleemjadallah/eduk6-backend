@@ -1065,28 +1065,61 @@ router.post(
         : undefined;
       const finalSubject = (subject as Subject | undefined) || detectedSubject;
 
-      // Format content using DocumentFormatter
+      // Run the extracted text through full AI analysis to get contentBlocks for rich formatting
+      // This is the same pipeline used by /analyze for PDFs
+      const analysis = await geminiService.analyzeContent(result.extractedText, {
+        ageGroup: child.ageGroup,
+        curriculumType: child.curriculumType,
+        gradeLevel: child.gradeLevel,
+        subject: finalSubject,
+      });
+
+      logger.info('PPT content fully analyzed', {
+        filename,
+        hasContentBlocks: !!(analysis.contentBlocks && analysis.contentBlocks.length > 0),
+        contentBlockCount: analysis.contentBlocks?.length || 0,
+      });
+
+      // Format content using DocumentFormatter with full analysis context
+      // The contentBlocks enable the rich hybrid rendering (styled boxes, formulas, etc.)
       const formattedContent = documentFormatter.format(result.extractedText, {
         ageGroup: child.ageGroup,
-        vocabulary: result.vocabulary,
+        chapters: analysis.chapters,
+        vocabulary: analysis.vocabulary || result.vocabulary,
+        exercises: analysis.exercises?.map(ex => ({
+          id: ex.id,
+          type: ex.type,
+          questionText: ex.questionText,
+          expectedAnswer: ex.expectedAnswer,
+          acceptableAnswers: ex.acceptableAnswers,
+          hint1: ex.hint1,
+          hint2: ex.hint2,
+          explanation: ex.explanation,
+          difficulty: ex.difficulty,
+          locationInContent: ex.locationInContent,
+        })),
+        contentBlocks: analysis.contentBlocks,
       });
 
       // Create lesson record with analyzed content
       const lesson = await lessonService.create({
         childId,
-        title: title || result.suggestedTitle || filename || 'PowerPoint Lesson',
+        title: title || analysis.title || result.suggestedTitle || filename || 'PowerPoint Lesson',
         sourceType: 'PPT' as SourceType,
         subject: finalSubject,
       });
 
-      // Update with analysis results
+      // Update with analysis results - use full analysis data for rich content
       await lessonService.update(lesson.id, {
-        summary: result.summary,
-        gradeLevel: gradeLevel || result.detectedGradeLevel || String(child.gradeLevel),
+        summary: analysis.summary || result.summary,
+        gradeLevel: gradeLevel || String(analysis.gradeLevel) || result.detectedGradeLevel || String(child.gradeLevel),
         formattedContent,
-        keyConcepts: result.keyTopics,
-        vocabulary: result.vocabulary ? JSON.parse(JSON.stringify(result.vocabulary)) : undefined,
-        aiConfidence: 0.85,
+        chapters: analysis.chapters ? JSON.parse(JSON.stringify(analysis.chapters)) : undefined,
+        keyConcepts: analysis.keyConcepts || result.keyTopics,
+        vocabulary: analysis.vocabulary ? JSON.parse(JSON.stringify(analysis.vocabulary)) :
+                   result.vocabulary ? JSON.parse(JSON.stringify(result.vocabulary)) : undefined,
+        suggestedQuestions: analysis.suggestedQuestions,
+        aiConfidence: analysis.confidence || 0.85,
         processingStatus: 'COMPLETED',
         safetyReviewed: true,
         extractedText: result.extractedText,
@@ -1104,12 +1137,14 @@ router.post(
           lessonId: lesson.id,
           lesson: updatedLesson,
           extractedText: result.extractedText,
-          suggestedTitle: title || result.suggestedTitle,
-          summary: result.summary,
+          suggestedTitle: title || analysis.title || result.suggestedTitle,
+          summary: analysis.summary || result.summary,
           detectedSubject: finalSubject || result.detectedSubject,
-          detectedGradeLevel: gradeLevel || result.detectedGradeLevel,
-          keyTopics: result.keyTopics,
-          vocabulary: result.vocabulary,
+          detectedGradeLevel: gradeLevel || String(analysis.gradeLevel) || result.detectedGradeLevel,
+          keyTopics: analysis.keyConcepts || result.keyTopics,
+          vocabulary: analysis.vocabulary || result.vocabulary,
+          chapters: analysis.chapters,
+          suggestedQuestions: analysis.suggestedQuestions,
           slideCount: result.slideCount,
           originalFormat: result.originalFormat,
           tokensUsed: result.tokensUsed,
