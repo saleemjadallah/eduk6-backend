@@ -537,6 +537,15 @@ export const teacherAuthService = {
         role: teacher.role,
         subscriptionTier: teacher.subscriptionTier,
         subscriptionStatus: teacher.subscriptionStatus,
+        // Profile details
+        schoolName: teacher.schoolName,
+        primarySubject: teacher.primarySubject,
+        gradeRange: teacher.gradeRange,
+        // Notification preferences
+        notifyProductUpdates: teacher.notifyProductUpdates,
+        notifyTipsAndTutorials: teacher.notifyTipsAndTutorials,
+        notifyUsageAlerts: teacher.notifyUsageAlerts,
+        notifyWeeklyDigest: teacher.notifyWeeklyDigest,
       },
       organization: teacher.organization,
       quota: {
@@ -557,11 +566,29 @@ export const teacherAuthService = {
     data: {
       firstName?: string;
       lastName?: string;
+      schoolName?: string | null;
+      primarySubject?: string | null;
+      gradeRange?: string | null;
+      notifyProductUpdates?: boolean;
+      notifyTipsAndTutorials?: boolean;
+      notifyUsageAlerts?: boolean;
+      notifyWeeklyDigest?: boolean;
     }
   ) {
-    const updateData: Record<string, string> = {};
+    const updateData: Record<string, unknown> = {};
+
+    // Profile fields
     if (data.firstName !== undefined) updateData.firstName = data.firstName;
     if (data.lastName !== undefined) updateData.lastName = data.lastName;
+    if (data.schoolName !== undefined) updateData.schoolName = data.schoolName;
+    if (data.primarySubject !== undefined) updateData.primarySubject = data.primarySubject;
+    if (data.gradeRange !== undefined) updateData.gradeRange = data.gradeRange;
+
+    // Notification preferences
+    if (data.notifyProductUpdates !== undefined) updateData.notifyProductUpdates = data.notifyProductUpdates;
+    if (data.notifyTipsAndTutorials !== undefined) updateData.notifyTipsAndTutorials = data.notifyTipsAndTutorials;
+    if (data.notifyUsageAlerts !== undefined) updateData.notifyUsageAlerts = data.notifyUsageAlerts;
+    if (data.notifyWeeklyDigest !== undefined) updateData.notifyWeeklyDigest = data.notifyWeeklyDigest;
 
     const teacher = await prisma.teacher.update({
       where: { id: teacherId },
@@ -571,6 +598,13 @@ export const teacherAuthService = {
         email: true,
         firstName: true,
         lastName: true,
+        schoolName: true,
+        primarySubject: true,
+        gradeRange: true,
+        notifyProductUpdates: true,
+        notifyTipsAndTutorials: true,
+        notifyUsageAlerts: true,
+        notifyWeeklyDigest: true,
       },
     });
 

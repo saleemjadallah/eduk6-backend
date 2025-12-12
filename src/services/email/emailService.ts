@@ -977,6 +977,245 @@ Review your account settings at: ${config.frontendUrl}/parent/settings
 - The OrbitLearn Security Team
     `,
   }),
+
+  // =====================================================
+  // TEACHER PORTAL EMAIL TEMPLATES
+  // =====================================================
+
+  /**
+   * Teacher credit usage warning email (70% and 90% thresholds)
+   */
+  teacherCreditWarning: (
+    teacherName: string,
+    threshold: 70 | 90,
+    creditsUsed: number,
+    creditsTotal: number,
+    creditsRemaining: number,
+    tier: string
+  ) => {
+    const isUrgent = threshold === 90;
+    const urgencyColor = isUrgent ? '#EF4444' : '#F59E0B';
+    const urgencyBgStart = isUrgent ? '#FEE2E2' : '#FEF3C7';
+    const urgencyBgEnd = isUrgent ? '#FECACA' : '#FDE68A';
+    const urgencyText = isUrgent ? '#991B1B' : '#92400E';
+
+    return {
+      subject: isUrgent
+        ? `⚠️ Only ${creditsRemaining} Credits Remaining! - OrbitLearn for Teachers`
+        : `📊 You've Used ${threshold}% of Your Monthly Credits - OrbitLearn for Teachers`,
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Credit Usage Warning</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    <tr>
+      <td style="background: linear-gradient(135deg, ${urgencyColor} 0%, ${isUrgent ? '#F87171' : '#FBBF24'} 100%); border-radius: 24px 24px 0 0; padding: 30px; text-align: center;">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">
+          ${isUrgent ? '⚠️ Credits Running Low!' : '📊 Credit Usage Update'}
+        </h1>
+      </td>
+    </tr>
+    <tr>
+      <td style="background-color: #ffffff; padding: 40px; border-radius: 0 0 24px 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
+          Hi ${teacherName}! 👋
+        </p>
+
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
+          ${isUrgent
+            ? `You've used <strong>${threshold}%</strong> of your monthly credits. You only have <strong>${creditsRemaining} credits</strong> remaining.`
+            : `You've used <strong>${threshold}%</strong> of your monthly credits. Keep creating great content!`
+          }
+        </p>
+
+        <!-- Usage Progress Box -->
+        <div style="background: linear-gradient(135deg, ${urgencyBgStart} 0%, ${urgencyBgEnd} 100%); border-radius: 16px; padding: 24px; margin: 28px 0; border-left: 4px solid ${urgencyColor};">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+            <span style="color: ${urgencyText}; font-weight: 600;">Credits Used</span>
+            <span style="color: ${urgencyText}; font-weight: 700;">${creditsUsed} / ${creditsTotal}</span>
+          </div>
+          <div style="background-color: #ffffff; border-radius: 8px; height: 12px; overflow: hidden;">
+            <div style="background: linear-gradient(90deg, ${urgencyColor} 0%, ${isUrgent ? '#F87171' : '#FBBF24'} 100%); height: 100%; width: ${threshold}%; border-radius: 8px;"></div>
+          </div>
+          <p style="color: ${urgencyText}; margin: 12px 0 0 0; font-size: 14px; text-align: center;">
+            <strong>${creditsRemaining} credits</strong> remaining this month
+          </p>
+        </div>
+
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
+          ${isUrgent
+            ? `Don't let your workflow stop! Purchase a credit pack or upgrade your plan to keep creating.`
+            : `Need more credits? Upgrade your plan or purchase a credit pack anytime.`
+          }
+        </p>
+
+        <!-- Current Plan Info -->
+        <div style="background: linear-gradient(135deg, #EDE9FE 0%, #DDD6FE 100%); border-radius: 16px; padding: 20px; margin: 24px 0;">
+          <h4 style="color: #5B21B6; margin: 0 0 12px 0; font-size: 16px;">📋 Your Current Plan: ${tier}</h4>
+          <table role="presentation" cellspacing="0" cellpadding="0">
+            <tr>
+              <td style="padding: 6px 0; color: #4b5563; font-size: 14px;">💳 <strong>${creditsTotal} credits</strong> per month</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #4b5563; font-size: 14px;">📦 <strong>Credit packs</strong> available for purchase</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #4b5563; font-size: 14px;">🔄 <strong>Unused credits</strong> roll over (up to ${creditsTotal * 2})</td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${config.frontendUrl}/teacher/billing" style="background: linear-gradient(135deg, #7C3AED 0%, #2DD4BF 100%); color: #ffffff; text-decoration: none; padding: 18px 40px; border-radius: 50px; font-weight: bold; font-size: 17px; display: inline-block; box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);">
+            ${isUrgent ? 'Get More Credits Now 🚀' : 'View Billing Options 💳'}
+          </a>
+        </div>
+
+        <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+          <span style="color: #a78bfa;">- The OrbitLearn Team 💜</span>
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+      `,
+      text: `
+Credit Usage Warning
+
+Hi ${teacherName},
+
+${isUrgent
+  ? `You've used ${threshold}% of your monthly credits. You only have ${creditsRemaining} credits remaining.`
+  : `You've used ${threshold}% of your monthly credits. Keep creating great content!`
+}
+
+Usage: ${creditsUsed} / ${creditsTotal} credits (${creditsRemaining} remaining)
+
+${isUrgent
+  ? "Don't let your workflow stop! Purchase a credit pack or upgrade your plan to keep creating."
+  : "Need more credits? Upgrade your plan or purchase a credit pack anytime."
+}
+
+Manage your billing at: ${config.frontendUrl}/teacher/billing
+
+- The OrbitLearn Team
+      `,
+    };
+  },
+
+  /**
+   * Teacher credit limit reached email (100%)
+   */
+  teacherCreditLimitReached: (
+    teacherName: string,
+    creditsTotal: number,
+    tier: string
+  ) => ({
+    subject: `🚫 Monthly Credit Limit Reached - OrbitLearn for Teachers`,
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Credit Limit Reached</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    <tr>
+      <td style="background: linear-gradient(135deg, #DC2626 0%, #EF4444 100%); border-radius: 24px 24px 0 0; padding: 30px; text-align: center;">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">
+          Monthly Credit Limit Reached
+        </h1>
+      </td>
+    </tr>
+    <tr>
+      <td style="background-color: #ffffff; padding: 40px; border-radius: 0 0 24px 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
+          Hi ${teacherName}! 👋
+        </p>
+
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
+          You've used all <strong>${creditsTotal} credits</strong> included in your ${tier} plan this month.
+        </p>
+
+        <!-- Limit Box -->
+        <div style="background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%); border-radius: 16px; padding: 24px; margin: 28px 0; text-align: center; border: 2px solid #F87171;">
+          <div style="font-size: 48px; margin-bottom: 8px;">🚫</div>
+          <h3 style="color: #991B1B; margin: 0 0 8px 0; font-size: 20px;">No Credits Remaining</h3>
+          <p style="color: #B91C1C; margin: 0; font-size: 14px;">
+            Your credits will reset on the 1st of next month
+          </p>
+        </div>
+
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
+          Don't let your productivity stop! <strong>Purchase a credit pack</strong> to continue creating content immediately, or <strong>upgrade your plan</strong> for more monthly credits.
+        </p>
+
+        <!-- Options Box -->
+        <div style="background: linear-gradient(135deg, #EDE9FE 0%, #DDD6FE 100%); border-radius: 16px; padding: 20px; margin: 24px 0;">
+          <h4 style="color: #5B21B6; margin: 0 0 12px 0; font-size: 16px;">💡 Your Options:</h4>
+          <table role="presentation" cellspacing="0" cellpadding="0">
+            <tr>
+              <td style="padding: 6px 0; color: #4b5563; font-size: 14px;">📦 <strong>Credit Pack</strong> - 100 credits for $4.99 (instant)</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #4b5563; font-size: 14px;">⭐ <strong>Upgrade to Basic</strong> - 500 credits/month for $9.99</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #4b5563; font-size: 14px;">🚀 <strong>Upgrade to Pro</strong> - 2,000 credits/month for $24.99</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #4b5563; font-size: 14px;">⏰ <strong>Wait</strong> - Credits reset on the 1st of next month</td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${config.frontendUrl}/teacher/billing" style="background: linear-gradient(135deg, #7C3AED 0%, #2DD4BF 100%); color: #ffffff; text-decoration: none; padding: 18px 40px; border-radius: 50px; font-weight: bold; font-size: 17px; display: inline-block; box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);">
+            Get More Credits Now 🚀
+          </a>
+        </div>
+
+        <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+          <span style="color: #a78bfa;">- The OrbitLearn Team 💜</span>
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `,
+    text: `
+Monthly Credit Limit Reached
+
+Hi ${teacherName},
+
+You've used all ${creditsTotal} credits included in your ${tier} plan this month.
+
+Your credits will reset on the 1st of next month.
+
+Don't let your productivity stop! Purchase a credit pack to continue creating content immediately, or upgrade your plan for more monthly credits.
+
+Your Options:
+- Credit Pack - 100 credits for $4.99 (instant)
+- Upgrade to Basic - 500 credits/month for $9.99
+- Upgrade to Pro - 2,000 credits/month for $24.99
+- Wait - Credits reset on the 1st of next month
+
+Manage your billing at: ${config.frontendUrl}/teacher/billing
+
+- The OrbitLearn Team
+    `,
+  }),
 };
 
 export const emailService = {
@@ -1318,6 +1557,96 @@ export const emailService = {
       return true;
     } catch (error) {
       logger.error('Error sending limit reached email', { error, email });
+      return false;
+    }
+  },
+
+  // =====================================================
+  // TEACHER PORTAL EMAIL METHODS
+  // =====================================================
+
+  /**
+   * Send teacher credit usage warning email (70% or 90% threshold)
+   */
+  async sendTeacherCreditWarningEmail(
+    email: string,
+    teacherName: string,
+    threshold: 70 | 90,
+    creditsUsed: number,
+    creditsTotal: number,
+    creditsRemaining: number,
+    tier: string
+  ): Promise<boolean> {
+    if (config.email.skipEmails || !resend) {
+      logger.info(`[Email] Skipped teacher credit warning (${threshold}%) email to ${email}`);
+      return true;
+    }
+
+    try {
+      const template = templates.teacherCreditWarning(
+        teacherName,
+        threshold,
+        creditsUsed,
+        creditsTotal,
+        creditsRemaining,
+        tier
+      );
+
+      const { error } = await resend.emails.send({
+        from: `OrbitLearn <${config.email.fromEmail}>`,
+        to: email,
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
+      });
+
+      if (error) {
+        logger.error('Failed to send teacher credit warning email', { error, email, threshold });
+        return false;
+      }
+
+      logger.info(`Teacher credit warning (${threshold}%) email sent to ${email}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending teacher credit warning email', { error, email });
+      return false;
+    }
+  },
+
+  /**
+   * Send teacher credit limit reached email (100%)
+   */
+  async sendTeacherCreditLimitReachedEmail(
+    email: string,
+    teacherName: string,
+    creditsTotal: number,
+    tier: string
+  ): Promise<boolean> {
+    if (config.email.skipEmails || !resend) {
+      logger.info(`[Email] Skipped teacher credit limit reached email to ${email}`);
+      return true;
+    }
+
+    try {
+      const template = templates.teacherCreditLimitReached(teacherName, creditsTotal, tier);
+
+      const { error } = await resend.emails.send({
+        from: `OrbitLearn <${config.email.fromEmail}>`,
+        to: email,
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
+      });
+
+      if (error) {
+        logger.error('Failed to send teacher credit limit reached email', { error, email });
+        return false;
+      }
+
+      logger.info(`Teacher credit limit reached email sent to ${email}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending teacher credit limit reached email', { error, email });
       return false;
     }
   },

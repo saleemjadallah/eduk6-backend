@@ -3,6 +3,7 @@ import { prisma } from '../../config/database.js';
 import { TokenOperation, TeacherSubscriptionTier } from '@prisma/client';
 import { logger } from '../../utils/logger.js';
 import { PaymentRequiredError } from '../../middleware/errorHandler.js';
+import { emailService } from '../email/emailService.js';
 
 // =============================================================================
 // TOKEN COSTS (Updated December 2025 - Google Gemini API Pricing)
@@ -292,6 +293,12 @@ export const quotaService = {
         data: {
           currentMonthUsage: { increment: tokensUsed },
         },
+      });
+
+      // Check and send credit usage notifications (async, non-blocking)
+      // Only for individual teachers (org members use org notifications)
+      checkAndSendCreditNotifications(teacherId).catch((err) => {
+        logger.error('Failed to check/send credit notifications', { error: err, teacherId });
       });
     }
 
@@ -761,6 +768,168 @@ export const quotaService = {
 function getNextMonthStart(): Date {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth() + 1, 1);
+}
+
+/**
+ * Get the start of current month for notification tracking
+ */
+function getCurrentMonthStart(): Date {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
+/**
+ * Format tier name for display
+ */
+function formatTierName(tier: TeacherSubscriptionTier): string {
+  switch (tier) {
+    case 'PROFESSIONAL':
+      return 'Professional';
+    case 'BASIC':
+      return 'Basic';
+    case 'FREE':
+    default:
+      return 'Free';
+  }
+}
+
+/**
+ * Check credit usage thresholds and send notification emails if needed
+ * Tracks sent notifications to avoid duplicates
+ */
+async function checkAndSendCreditNotifications(teacherId: string): Promise<void> {
+  // Get teacher info including usage and notification status
+  const teacher = await prisma.teacher.findUnique({
+    where: { id: teacherId },
+    select: {
+      email: true,
+      firstName: true,
+      subscriptionTier: true,
+      monthlyTokenQuota: true,
+      currentMonthUsage: true,
+      rolledOverCredits: true,
+      bonusCredits: true,
+      notifiedWarning70: true,
+      notifiedWarning90: true,
+      notifiedLimitReached: true,
+      lastNotificationReset: true,
+    },
+  });
+
+  if (!teacher) return;
+
+  // Check if we need to reset notification flags for a new month
+  const currentMonth = getCurrentMonthStart();
+  const lastReset = teacher.lastNotificationReset;
+
+  if (!lastReset || new Date(lastReset) < currentMonth) {
+    // New month - reset notification flags
+    await prisma.teacher.update({
+      where: { id: teacherId },
+      data: {
+        notifiedWarning70: false,
+        notifiedWarning90: false,
+        notifiedLimitReached: false,
+        lastNotificationReset: currentMonth,
+      },
+    });
+    // Re-fetch with reset flags
+    return checkAndSendCreditNotifications(teacherId);
+  }
+
+  // Calculate credits
+  const subscriptionCredits = tokensToCredits(teacher.monthlyTokenQuota);
+  const totalCredits = subscriptionCredits + (teacher.rolledOverCredits || 0) + (teacher.bonusCredits || 0);
+  const usedCredits = tokensToCredits(teacher.currentMonthUsage);
+  const remainingCredits = Math.max(0, totalCredits - usedCredits);
+
+  // Calculate percentage based on subscription credits (not total with bonuses)
+  const percentUsed = subscriptionCredits > 0
+    ? Math.round((usedCredits / subscriptionCredits) * 100)
+    : 0;
+
+  const teacherName = teacher.firstName || 'there';
+  const tierName = formatTierName(teacher.subscriptionTier);
+
+  // Check 100% threshold (limit reached)
+  if (percentUsed >= 100 && !teacher.notifiedLimitReached) {
+    await emailService.sendTeacherCreditLimitReachedEmail(
+      teacher.email,
+      teacherName,
+      subscriptionCredits,
+      tierName
+    );
+
+    await prisma.teacher.update({
+      where: { id: teacherId },
+      data: {
+        notifiedLimitReached: true,
+        notifiedWarning90: true, // Also mark 90% as sent
+        notifiedWarning70: true, // Also mark 70% as sent
+      },
+    });
+
+    logger.info(`Credit limit reached notification sent to teacher ${teacherId}`, {
+      percentUsed,
+      usedCredits,
+      totalCredits,
+    });
+    return;
+  }
+
+  // Check 90% threshold
+  if (percentUsed >= 90 && !teacher.notifiedWarning90) {
+    await emailService.sendTeacherCreditWarningEmail(
+      teacher.email,
+      teacherName,
+      90,
+      usedCredits,
+      subscriptionCredits,
+      remainingCredits,
+      tierName
+    );
+
+    await prisma.teacher.update({
+      where: { id: teacherId },
+      data: {
+        notifiedWarning90: true,
+        notifiedWarning70: true, // Also mark 70% as sent
+      },
+    });
+
+    logger.info(`Credit 90% warning notification sent to teacher ${teacherId}`, {
+      percentUsed,
+      usedCredits,
+      remainingCredits,
+    });
+    return;
+  }
+
+  // Check 70% threshold
+  if (percentUsed >= 70 && !teacher.notifiedWarning70) {
+    await emailService.sendTeacherCreditWarningEmail(
+      teacher.email,
+      teacherName,
+      70,
+      usedCredits,
+      subscriptionCredits,
+      remainingCredits,
+      tierName
+    );
+
+    await prisma.teacher.update({
+      where: { id: teacherId },
+      data: {
+        notifiedWarning70: true,
+      },
+    });
+
+    logger.info(`Credit 70% warning notification sent to teacher ${teacherId}`, {
+      percentUsed,
+      usedCredits,
+      remainingCredits,
+    });
+  }
 }
 
 // Export credit utilities for use in other services

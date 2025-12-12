@@ -703,9 +703,20 @@ model Teacher {
   firstName        String?
   lastName         String?
 
+  // Profile details
+  schoolName       String?              // School or organization name
+  primarySubject   Subject?             // Primary teaching subject
+  gradeRange       String?              // e.g., "ELEMENTARY", "MIDDLE", "HIGH", "MIXED"
+
   // Email verification
   emailVerified    Boolean  @default(false)
   emailVerifiedAt  DateTime?
+
+  // Notification preferences
+  notifyProductUpdates  Boolean @default(true)   // Product updates and news
+  notifyTipsAndTutorials Boolean @default(true)  // Tips and tutorials
+  notifyUsageAlerts     Boolean @default(true)   // Usage/credit alerts
+  notifyWeeklyDigest    Boolean @default(false)  // Weekly activity digest
 
   // Organization (null for independent teachers)
   organizationId   String?
@@ -730,6 +741,12 @@ model Teacher {
   // Credit System (December 2025)
   rolledOverCredits     Int      @default(0)       // Credits rolled over from previous month
   bonusCredits          Int      @default(0)       // Credits from credit pack purchases (never expire)
+
+  // Credit usage notification tracking (to avoid duplicate emails)
+  notifiedWarning70     Boolean  @default(false)   // Sent warning at 70% usage
+  notifiedWarning90     Boolean  @default(false)   // Sent warning at 90% usage
+  notifiedLimitReached  Boolean  @default(false)   // Sent limit reached notification
+  lastNotificationReset DateTime?                  // When notifications were last reset (tracks month)
 
   // Google Drive integration
   googleDriveTokens  Json?

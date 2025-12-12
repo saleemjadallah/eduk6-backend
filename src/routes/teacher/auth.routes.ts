@@ -417,6 +417,19 @@ router.get(
   }
 );
 
+const updateProfileSchema = z.object({
+  firstName: z.string().max(100).optional(),
+  lastName: z.string().max(100).optional(),
+  schoolName: z.string().max(255).optional().nullable(),
+  primarySubject: z.enum(['MATH', 'SCIENCE', 'ENGLISH', 'ARABIC', 'ISLAMIC_STUDIES', 'SOCIAL_STUDIES', 'ART', 'MUSIC', 'OTHER']).optional().nullable(),
+  gradeRange: z.enum(['ELEMENTARY', 'MIDDLE', 'HIGH', 'MIXED']).optional().nullable(),
+  // Notification preferences
+  notifyProductUpdates: z.boolean().optional(),
+  notifyTipsAndTutorials: z.boolean().optional(),
+  notifyUsageAlerts: z.boolean().optional(),
+  notifyWeeklyDigest: z.boolean().optional(),
+});
+
 /**
  * PATCH /api/teacher/auth/profile
  * Update teacher profile
@@ -425,12 +438,31 @@ router.patch(
   '/profile',
   authenticateTeacher,
   requireTeacher,
+  validateInput(updateProfileSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { firstName, lastName } = req.body;
+      const {
+        firstName,
+        lastName,
+        schoolName,
+        primarySubject,
+        gradeRange,
+        notifyProductUpdates,
+        notifyTipsAndTutorials,
+        notifyUsageAlerts,
+        notifyWeeklyDigest,
+      } = req.body;
+
       const result = await teacherAuthService.updateProfile(req.teacher!.id, {
         firstName,
         lastName,
+        schoolName,
+        primarySubject,
+        gradeRange,
+        notifyProductUpdates,
+        notifyTipsAndTutorials,
+        notifyUsageAlerts,
+        notifyWeeklyDigest,
       });
 
       res.json({
