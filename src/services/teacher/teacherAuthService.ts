@@ -613,10 +613,67 @@ export const teacherAuthService = {
 
   /**
    * Delete teacher account
+   * Cancels any active Stripe subscription and deletes all associated data
    */
-  async deleteAccount(teacherId: string): Promise<void> {
-    // Invalidate all sessions first
+  async deleteAccount(teacherId: string, password: string): Promise<void> {
+    // Get teacher data including subscription info
+    const teacher = await prisma.teacher.findUnique({
+      where: { id: teacherId },
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+        stripeSubscriptionId: true,
+        stripeCustomerId: true,
+      },
+    });
+
+    if (!teacher) {
+      throw new NotFoundError('Account not found');
+    }
+
+    // Verify password before allowing deletion
+    const isValid = await bcrypt.compare(password, teacher.passwordHash);
+    if (!isValid) {
+      throw new UnauthorizedError('Invalid password');
+    }
+
+    // Cancel active Stripe subscription if exists
+    if (teacher.stripeSubscriptionId) {
+      try {
+        const { subscriptionService } = await import('../stripe/subscriptionService.js');
+        if (subscriptionService.isConfigured()) {
+          const stripe = (await import('stripe')).default;
+          const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY || '', {
+            apiVersion: '2025-11-17.clover',
+          });
+          // Cancel immediately, not at period end
+          await stripeClient.subscriptions.cancel(teacher.stripeSubscriptionId);
+          logger.info(`Cancelled Stripe subscription for deleted teacher`, {
+            teacherId,
+            subscriptionId: teacher.stripeSubscriptionId,
+          });
+        }
+      } catch (error) {
+        // Log but don't block deletion - subscription will eventually fail/expire
+        logger.error('Failed to cancel Stripe subscription during account deletion', {
+          error,
+          teacherId,
+          subscriptionId: teacher.stripeSubscriptionId,
+        });
+      }
+    }
+
+    // Invalidate all sessions
     await sessionService.invalidateAllSessions(teacherId);
+
+    // Clean up any pending OTPs (best-effort, they auto-expire anyway)
+    try {
+      await otpService.cancel(teacher.email, 'verify_email');
+      await otpService.cancel(teacher.email, 'reset_password');
+    } catch {
+      // OTP cleanup is best-effort - OTPs auto-expire after 10 minutes
+    }
 
     // Delete the teacher account (cascades to content, rubrics, etc.)
     await prisma.teacher.delete({

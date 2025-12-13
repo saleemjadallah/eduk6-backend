@@ -681,10 +681,67 @@ export const authService = {
 
   /**
    * Delete account and all associated data (COPPA compliance)
+   * Cancels any active Stripe subscription and deletes all associated data
    */
-  async deleteAccount(parentId: string): Promise<void> {
-    // Invalidate all sessions first
+  async deleteAccount(parentId: string, password: string): Promise<void> {
+    // Get parent data including subscription info
+    const parent = await prisma.parent.findUnique({
+      where: { id: parentId },
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+        stripeSubscriptionId: true,
+        stripeCustomerId: true,
+      },
+    });
+
+    if (!parent) {
+      throw new NotFoundError('Account not found');
+    }
+
+    // Verify password before allowing deletion
+    const isValid = await bcrypt.compare(password, parent.passwordHash);
+    if (!isValid) {
+      throw new UnauthorizedError('Invalid password');
+    }
+
+    // Cancel active Stripe subscription if exists
+    if (parent.stripeSubscriptionId) {
+      try {
+        const stripe = (await import('stripe')).default;
+        const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+        if (stripeSecretKey) {
+          const stripeClient = new stripe(stripeSecretKey, {
+            apiVersion: '2025-11-17.clover',
+          });
+          // Cancel immediately, not at period end
+          await stripeClient.subscriptions.cancel(parent.stripeSubscriptionId);
+          logger.info(`Cancelled Stripe subscription for deleted parent`, {
+            parentId,
+            subscriptionId: parent.stripeSubscriptionId,
+          });
+        }
+      } catch (error) {
+        // Log but don't block deletion - subscription will eventually fail/expire
+        logger.error('Failed to cancel Stripe subscription during account deletion', {
+          error,
+          parentId,
+          subscriptionId: parent.stripeSubscriptionId,
+        });
+      }
+    }
+
+    // Invalidate all sessions
     await sessionService.invalidateAllSessions(parentId);
+
+    // Clean up any pending OTPs (best-effort, they auto-expire anyway)
+    try {
+      await otpService.cancel(parent.email, 'verify_email');
+      await otpService.cancel(parent.email, 'reset_password');
+    } catch {
+      // OTP cleanup is best-effort - OTPs auto-expire after 10 minutes
+    }
 
     // Delete the parent account (cascades to children and all related data)
     await prisma.parent.delete({

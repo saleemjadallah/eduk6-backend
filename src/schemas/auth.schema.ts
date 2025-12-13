@@ -80,6 +80,11 @@ export const resetKBQViaCCSchema = z.object({
   })).min(3).max(5),
 });
 
+// Account deletion schema
+export const deleteAccountSchema = z.object({
+  password: z.string().min(1, 'Password is required to confirm account deletion'),
+});
+
 // Type exports
 export type SignupInput = z.infer<typeof signupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
@@ -95,3 +100,4 @@ export type ResetChildPinInput = z.infer<typeof resetChildPinSchema>;
 export type UnlockChildPinInput = z.infer<typeof unlockChildPinSchema>;
 export type ResetKBQInput = z.infer<typeof resetKBQSchema>;
 export type ResetKBQViaCCInput = z.infer<typeof resetKBQViaCCSchema>;
+export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;

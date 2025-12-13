@@ -48,6 +48,10 @@ const changePasswordSchema = z.object({
   newPassword: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
+const deleteAccountSchema = z.object({
+  password: z.string().min(1, 'Password is required to confirm account deletion'),
+});
+
 // ============================================
 // AUTHENTICATION ROUTES
 // ============================================
@@ -478,14 +482,18 @@ router.patch(
 /**
  * DELETE /api/teacher/auth/delete-account
  * Delete teacher account and all data
+ * Requires password confirmation for security
+ * Cancels any active Stripe subscription immediately
  */
 router.delete(
   '/delete-account',
   authenticateTeacher,
   requireTeacher,
+  validateInput(deleteAccountSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await teacherAuthService.deleteAccount(req.teacher!.id);
+      const { password } = req.body;
+      await teacherAuthService.deleteAccount(req.teacher!.id, password);
 
       res.json({
         success: true,

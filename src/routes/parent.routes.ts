@@ -5,8 +5,56 @@ import { xpEngine } from '../services/gamification/xpEngine.js';
 import { streakService } from '../services/gamification/streakService.js';
 import { badgeService } from '../services/gamification/badgeService.js';
 import { prisma } from '../config/database.js';
+import { Streak } from '@prisma/client';
+import { dashboardCache } from '../services/cache/dashboardCache.js';
 
 const router = Router();
+
+/**
+ * Compute streak info from already-loaded streak data (no DB call)
+ * Same logic as streakService.getStreakInfo but works with pre-loaded data
+ */
+function computeStreakInfo(streak: Streak | null): {
+  current: number;
+  longest: number;
+  lastActivityDate: Date | null;
+  freezeAvailable: boolean;
+  isActiveToday: boolean;
+} {
+  if (!streak) {
+    return {
+      current: 0,
+      longest: 0,
+      lastActivityDate: null,
+      freezeAvailable: false,
+      isActiveToday: false,
+    };
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const lastActivity = new Date(streak.lastActivityDate);
+  lastActivity.setHours(0, 0, 0, 0);
+
+  const isActiveToday = lastActivity.getTime() === today.getTime();
+
+  // Check if streak is still valid
+  const daysDiff = Math.floor(
+    (today.getTime() - lastActivity.getTime()) / (24 * 60 * 60 * 1000)
+  );
+
+  // If more than 1 day has passed, streak is broken (show 0)
+  const current = daysDiff > 1 ? 0 : streak.current;
+
+  return {
+    current,
+    longest: streak.longest,
+    lastActivityDate: streak.lastActivityDate,
+    freezeAvailable: streak.freezeAvailable,
+    isActiveToday,
+  };
+}
 
 /**
  * GET /api/parent/dashboard
@@ -16,6 +64,16 @@ const router = Router();
 router.get('/dashboard', authenticate, async (req, res, next) => {
   try {
     const parentId = req.parent!.id;
+
+    // Check cache first (5 minute TTL)
+    const cached = await dashboardCache.getParentDashboard(parentId);
+    if (cached) {
+      return res.json({
+        success: true,
+        data: cached,
+        cached: true,
+      });
+    }
 
     // Get all children for this parent
     const children = await prisma.child.findMany({
@@ -55,66 +113,65 @@ router.get('/dashboard', authenticate, async (req, res, next) => {
       },
     });
 
-    // Calculate per-child stats and aggregate
-    const childrenWithStats = await Promise.all(
-      children.map(async (child) => {
-        const lessonsCount = child.lessons.length;
-        totalLessons += lessonsCount;
+    // Calculate per-child stats and aggregate (no N+1 queries - uses pre-loaded streak data)
+    const childrenWithStats = children.map((child) => {
+      const lessonsCount = child.lessons.length;
+      totalLessons += lessonsCount;
 
-        // Use streakService to get properly validated streak info
-        const streakInfo = await streakService.getStreakInfo(child.id);
+      // Use pre-loaded streak data instead of making N queries
+      // computeStreakInfo applies the same validation logic as streakService.getStreakInfo
+      const streakInfo = computeStreakInfo(child.streak);
 
-        if (streakInfo.current > longestStreak) {
-          longestStreak = streakInfo.current;
-        }
-        totalStreak += streakInfo.current;
+      if (streakInfo.current > longestStreak) {
+        longestStreak = streakInfo.current;
+      }
+      totalStreak += streakInfo.current;
 
-        // Calculate age from dateOfBirth
-        const birthDate = new Date(child.dateOfBirth);
-        const ageDiff = Date.now() - birthDate.getTime();
-        const ageDate = new Date(ageDiff);
-        const age = Math.abs(ageDate.getUTCFullYear() - 1970);
+      // Calculate age from dateOfBirth
+      const birthDate = new Date(child.dateOfBirth);
+      const ageDiff = Date.now() - birthDate.getTime();
+      const ageDate = new Date(ageDiff);
+      const age = Math.abs(ageDate.getUTCFullYear() - 1970);
 
-        // Check if child was active today
-        const wasActiveToday =
-          child.lastActiveAt && new Date(child.lastActiveAt) >= today;
+      // Check if child was active today
+      const wasActiveToday =
+        child.lastActiveAt && new Date(child.lastActiveAt) >= today;
 
-        // Get XP progress
-        const progress = child.progress || {
-          totalXP: 0,
-          level: 1,
-          lessonsCompleted: 0,
-        };
+      // Get XP progress
+      const progress = child.progress || {
+        totalXP: 0,
+        level: 1,
+        lessonsCompleted: 0,
+      };
 
-        // Check activity based on streak service or child's lastActiveAt
-        const isActiveToday = streakInfo.isActiveToday || wasActiveToday;
+      // Check activity based on streak data or child's lastActiveAt
+      const isActiveToday = streakInfo.isActiveToday || wasActiveToday;
 
-        return {
-          id: child.id,
-          displayName: child.displayName,
-          avatarUrl: child.avatarUrl,
-          age,
-          ageGroup: child.ageGroup,
-          gradeLevel: child.gradeLevel,
-          lessonsCompleted: lessonsCount,
-          currentStreak: streakInfo.current,
-          longestStreak: streakInfo.longest,
-          lastActive: isActiveToday
-            ? 'Today'
-            : child.lastActiveAt
-              ? formatTimeAgo(child.lastActiveAt)
-              : 'Never',
-          wasActiveToday: isActiveToday,
-          xp: progress.totalXP,
-          level: progress.level,
-          recentBadges: child.earnedBadges.map((eb) => ({
-            name: eb.badge.name,
-            icon: eb.badge.icon,
-            earnedAt: eb.earnedAt,
-          })),
-        };
-      })
-    );
+      return {
+        id: child.id,
+        displayName: child.displayName,
+        avatarUrl: child.avatarUrl,
+        age,
+        ageGroup: child.ageGroup,
+        gradeLevel: child.gradeLevel,
+        lessonsCompleted: lessonsCount,
+        currentStreak: streakInfo.current,
+        longestStreak: streakInfo.longest,
+        lastActive: isActiveToday
+          ? 'Today'
+          : child.lastActiveAt
+            ? formatTimeAgo(child.lastActiveAt)
+            : 'Never',
+        wasActiveToday: isActiveToday,
+        xp: progress.totalXP,
+        level: progress.level,
+        recentBadges: child.earnedBadges.map((eb) => ({
+          name: eb.badge.name,
+          icon: eb.badge.icon,
+          earnedAt: eb.earnedAt,
+        })),
+      };
+    });
 
     // Get recent activity across all children
     const recentActivity = await getRecentActivity(parentId);
@@ -137,21 +194,27 @@ router.get('/dashboard', authenticate, async (req, res, next) => {
     const weeklyProgress =
       weeklyGoal > 0 ? Math.min(100, Math.round((lessonsThisWeek / weeklyGoal) * 100)) : 0;
 
+    // Build response data
+    const dashboardData = {
+      // Aggregated stats
+      stats: {
+        totalLessons,
+        completedToday: lessonsCompletedToday,
+        streakDays: longestStreak, // Show longest streak among children
+        weeklyProgress,
+      },
+      // Per-child data
+      children: childrenWithStats,
+      // Recent activity feed
+      recentActivity,
+    };
+
+    // Cache the dashboard data (5 minute TTL)
+    await dashboardCache.setParentDashboard(parentId, dashboardData);
+
     res.json({
       success: true,
-      data: {
-        // Aggregated stats
-        stats: {
-          totalLessons,
-          completedToday: lessonsCompletedToday,
-          streakDays: longestStreak, // Show longest streak among children
-          weeklyProgress,
-        },
-        // Per-child data
-        children: childrenWithStats,
-        // Recent activity feed
-        recentActivity,
-      },
+      data: dashboardData,
     });
   } catch (error) {
     next(error);

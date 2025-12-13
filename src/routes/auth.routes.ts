@@ -20,6 +20,7 @@ import {
   unlockChildPinSchema,
   resetKBQSchema,
   resetKBQViaCCSchema,
+  deleteAccountSchema,
 } from '../schemas/auth.schema.js';
 
 const router = Router();
@@ -401,14 +402,18 @@ router.patch(
 /**
  * DELETE /api/auth/delete-account
  * Delete account and all data (COPPA compliance)
+ * Requires password confirmation for security
+ * Cancels any active Stripe subscription immediately
  */
 router.delete(
   '/delete-account',
   authenticate,
   requireParent,
+  validateInput(deleteAccountSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await authService.deleteAccount(req.parent!.id);
+      const { password } = req.body;
+      await authService.deleteAccount(req.parent!.id, password);
 
       res.json({
         success: true,

@@ -120,6 +120,8 @@ model Child {
   lastActiveAt     DateTime?
 
   @@index([parentId])
+  @@index([parentId, ageGroup])       // Dashboard age-group filtering
+  @@index([parentId, lastActiveAt])   // Activity tracking queries
 }
 
 model Consent {
@@ -229,6 +231,8 @@ model Lesson {
   @@index([childId, createdAt])
   @@index([processingStatus])
   @@index([childId, completedAt])
+  @@index([childId, subject, processingStatus])    // Subject filtering with status
+  @@index([childId, processingStatus, createdAt])  // Completed lessons by date
 }
 
 model ChatMessage {
@@ -260,6 +264,7 @@ model ChatMessage {
 
   @@index([childId, createdAt])
   @@index([lessonId])
+  @@index([childId, lessonId, createdAt])  // Chat history per lesson
 }
 
 // ============================================
@@ -453,6 +458,7 @@ model EarnedBadge {
 
   @@unique([childId, badgeId])
   @@index([childId])
+  @@index([childId, earnedAt])  // Recent badges display
 }
 
 model DailyChallenge {
@@ -694,6 +700,7 @@ model Organization {
   updatedAt        DateTime @updatedAt
 
   @@index([slug])
+  @@index([subscriptionStatus, quotaResetDate])  // Quota reset cron job
 }
 
 model Teacher {
@@ -766,6 +773,7 @@ model Teacher {
 
   @@index([email])
   @@index([organizationId])
+  @@index([subscriptionStatus, quotaResetDate])  // Quota reset cron job
 }
 
 // ============================================
@@ -793,6 +801,7 @@ model TokenUsageLog {
 
   @@index([teacherId, createdAt])
   @@index([operation])
+  @@index([teacherId, operation, createdAt])  // Usage analytics by operation
 }
 
 model OrgTokenUsageLog {
@@ -813,6 +822,7 @@ model OrgTokenUsageLog {
 
   @@index([organizationId, createdAt])
   @@index([teacherId, createdAt])
+  @@index([organizationId, operation, createdAt])  // Org usage analytics by operation
 }
 
 // ============================================

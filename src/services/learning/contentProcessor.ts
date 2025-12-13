@@ -14,6 +14,7 @@ import { badgeService } from '../gamification/badgeService.js';
 import { xpEngine } from '../gamification/xpEngine.js';
 import { documentFormatter } from '../formatting/index.js';
 import { analyzePPT } from './pptProcessor.js';
+import { dashboardCache } from '../cache/dashboardCache.js';
 
 // Note: Formatting is now handled by the deterministic DocumentFormatter
 // for 100% reliability. AI only extracts metadata (exercises, vocabulary, etc.)
@@ -55,7 +56,12 @@ export function initializeContentProcessor(): void {
   processingWorker = new Worker(
     'content-processing',
     processContentJob,
-    { connection }
+    {
+      connection,
+      concurrency: 2, // Limit concurrent processing to prevent CPU bottleneck
+      lockDuration: 180000, // 3 minutes - AI operations (Gemini API) can be slow
+      lockRenewTime: 60000, // Renew lock every minute
+    }
   );
 
   processingWorker.on('completed', (job) => {
@@ -271,6 +277,23 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
       logger.error(`Failed to create exercises for lesson ${lessonId}`, {
         error: exerciseError instanceof Error ? exerciseError.message : 'Unknown error',
         stack: exerciseError instanceof Error ? exerciseError.stack : undefined,
+      });
+    }
+
+    // Invalidate dashboard cache for the parent (so they see updated lesson count immediately)
+    try {
+      const child = await prisma.child.findUnique({
+        where: { id: childId },
+        select: { parentId: true },
+      });
+      if (child?.parentId) {
+        await dashboardCache.invalidateChildCaches(childId, child.parentId);
+        logger.debug(`Invalidated dashboard cache for parent ${child.parentId}`);
+      }
+    } catch (cacheError) {
+      // Don't fail processing if cache invalidation fails
+      logger.warn(`Failed to invalidate dashboard cache for child ${childId}`, {
+        error: cacheError instanceof Error ? cacheError.message : 'Unknown error',
       });
     }
 
