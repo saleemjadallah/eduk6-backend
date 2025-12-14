@@ -38,6 +38,7 @@ import parentSubscriptionRoutes from './routes/parent/index.js';
 import ocrRoutes from './routes/ocr.routes.js';
 import webhookRoutes from './routes/webhook.routes.js';
 import contactRoutes from './routes/contact.routes.js';
+import gamificationRoutes from './routes/gamification.routes.js';
 
 // Services initialization
 import { initializeContentProcessor, shutdownContentProcessor } from './services/learning/contentProcessor.js';
@@ -156,8 +157,8 @@ app.use('/api/teacher', teacherRoutes);
 // Parent Portal routes (subscription management)
 app.use('/api/parent', parentSubscriptionRoutes);
 
-// TODO: Add remaining routes as they're implemented
-// app.use('/api/gamification', gamificationRoutes);
+// Gamification routes (XP, badges, streaks)
+app.use('/api/gamification', gamificationRoutes);
 
 // ============================================
 // ERROR HANDLING

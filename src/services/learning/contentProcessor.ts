@@ -8,6 +8,7 @@ import { exerciseService } from './exerciseService.js';
 import { AgeGroup, SourceType } from '@prisma/client';
 import { logger } from '../../utils/logger.js';
 import { LessonAnalysis } from '../ai/geminiService.js';
+import pdfParse from 'pdf-parse';
 
 import { CurriculumType } from '@prisma/client';
 import { badgeService } from '../gamification/badgeService.js';
@@ -15,6 +16,8 @@ import { xpEngine } from '../gamification/xpEngine.js';
 import { documentFormatter } from '../formatting/index.js';
 import { analyzePPT } from './pptProcessor.js';
 import { dashboardCache } from '../cache/dashboardCache.js';
+import { genAI } from '../../config/gemini.js';
+import { config } from '../../config/index.js';
 
 // Note: Formatting is now handled by the deterministic DocumentFormatter
 // for 100% reliability. AI only extracts metadata (exercises, vocabulary, etc.)
@@ -311,17 +314,97 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
  * Extract text from a PDF file
  */
 async function extractTextFromPDF(fileUrl: string): Promise<string> {
-  // TODO: Download file from R2 and use pdf-parse
-  // For now, return placeholder
   logger.info(`Extracting text from PDF: ${fileUrl}`);
 
-  // In production, this would:
-  // 1. Download file from R2
-  // 2. Use pdf-parse to extract text
-  // 3. Return the extracted text
+  try {
+    // 1. Download file from R2/CDN
+    const response = await fetch(fileUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to download PDF: ${response.status} ${response.statusText}`);
+    }
 
-  // Placeholder implementation
-  return 'PDF content would be extracted here';
+    // 2. Convert to Buffer
+    const arrayBuffer = await response.arrayBuffer();
+    const pdfBuffer = Buffer.from(arrayBuffer);
+
+    // 3. Use pdf-parse to extract text
+    const pdfData = await pdfParse(pdfBuffer);
+
+    logger.info(`PDF text extraction completed`, {
+      fileUrl,
+      pageCount: pdfData.numpages,
+      textLength: pdfData.text.length,
+    });
+
+    // 4. Return the extracted text
+    if (!pdfData.text || pdfData.text.trim().length === 0) {
+      // If pdf-parse returns empty text (scanned PDF), fall back to Gemini Vision
+      logger.info('PDF appears to be scanned/image-based, using Gemini Vision for OCR');
+      return await extractTextFromPDFWithVision(pdfBuffer);
+    }
+
+    return pdfData.text;
+  } catch (error) {
+    logger.error(`Failed to extract text from PDF`, {
+      fileUrl,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    throw error;
+  }
+}
+
+/**
+ * Extract text from a scanned/image-based PDF using Gemini Vision
+ */
+async function extractTextFromPDFWithVision(pdfBuffer: Buffer): Promise<string> {
+  const pdfBase64 = pdfBuffer.toString('base64');
+
+  const model = genAI.getGenerativeModel({
+    model: config.gemini.models.flash,
+    generationConfig: {
+      temperature: 0.1,
+      maxOutputTokens: 8000,
+    },
+  });
+
+  const prompt = `You are an expert document reader. This PDF contains scanned or image-based content.
+
+Please extract ALL text content from this document. Include:
+- All visible text, headers, and paragraphs
+- Text from any charts, diagrams, or figures
+- Captions and labels
+- Any handwritten text if legible
+
+Format the extracted text in a clean, readable way that preserves the document's logical structure.
+If sections are unclear, indicate with [unclear] but still attempt to extract what you can.
+
+Return ONLY the extracted text content, no additional commentary.`;
+
+  try {
+    const result = await model.generateContent([
+      { text: prompt },
+      {
+        inlineData: {
+          mimeType: 'application/pdf',
+          data: pdfBase64,
+        },
+      },
+    ]);
+
+    const extractedText = result.response.text();
+
+    logger.info('PDF Vision OCR completed', {
+      textLength: extractedText.length,
+      tokensUsed: result.response.usageMetadata?.totalTokenCount,
+    });
+
+    return extractedText;
+  } catch (error) {
+    logger.error('PDF Vision OCR failed', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    throw new Error('Failed to extract text from scanned PDF');
+  }
 }
 
 /**
@@ -379,17 +462,97 @@ async function extractTextFromPPT(fileUrl: string): Promise<string> {
  * Extract text from an image using Gemini Vision
  */
 async function extractTextFromImage(fileUrl: string): Promise<string> {
-  // TODO: Download file from R2 and use Gemini Vision for OCR
   logger.info(`Extracting text from image: ${fileUrl}`);
 
-  // In production, this would:
-  // 1. Download image from R2
-  // 2. Convert to base64
-  // 3. Use Gemini Vision API for OCR
-  // 4. Return extracted text
+  try {
+    // 1. Download image from R2/CDN
+    const response = await fetch(fileUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+    }
 
-  // Placeholder implementation
-  return 'Image text would be extracted here using Gemini Vision';
+    // 2. Convert to base64
+    const arrayBuffer = await response.arrayBuffer();
+    const imageBuffer = Buffer.from(arrayBuffer);
+    const imageBase64 = imageBuffer.toString('base64');
+
+    // 3. Determine MIME type from URL or response headers
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    const mimeType = getMimeTypeFromUrl(fileUrl, contentType);
+
+    // 4. Use Gemini Vision API for OCR
+    const model = genAI.getGenerativeModel({
+      model: config.gemini.models.flash,
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 4000,
+      },
+    });
+
+    const prompt = `You are an expert document reader analyzing an educational image or document.
+
+Please extract ALL text content from this image. This may include:
+- Printed text, headers, paragraphs
+- Handwritten notes or annotations
+- Text from worksheets, textbooks, or educational materials
+- Labels, captions, and titles
+- Mathematical equations and formulas
+- Text from charts, diagrams, or tables
+
+IMPORTANT:
+- Extract text exactly as it appears, maintaining formatting where possible
+- For math equations, use standard notation (e.g., x^2 for x squared, sqrt() for square root)
+- If text is unclear, indicate with [unclear] but still attempt to extract
+- Preserve the logical structure and reading order
+
+Return ONLY the extracted text content, formatted in a clean and readable way.`;
+
+    const result = await model.generateContent([
+      { text: prompt },
+      {
+        inlineData: {
+          mimeType,
+          data: imageBase64,
+        },
+      },
+    ]);
+
+    const extractedText = result.response.text();
+
+    logger.info('Image OCR completed', {
+      fileUrl,
+      mimeType,
+      textLength: extractedText.length,
+      tokensUsed: result.response.usageMetadata?.totalTokenCount,
+    });
+
+    return extractedText;
+  } catch (error) {
+    logger.error('Failed to extract text from image', {
+      fileUrl,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    throw error;
+  }
+}
+
+/**
+ * Get MIME type from URL extension or content-type header
+ */
+function getMimeTypeFromUrl(url: string, fallback: string): string {
+  const extension = url.split('.').pop()?.toLowerCase().split('?')[0];
+
+  const mimeTypes: Record<string, string> = {
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'gif': 'image/gif',
+    'webp': 'image/webp',
+    'heic': 'image/heic',
+    'heif': 'image/heif',
+  };
+
+  return mimeTypes[extension || ''] || fallback;
 }
 
 /**
