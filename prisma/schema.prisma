@@ -17,12 +17,16 @@ datasource db {
 model Parent {
   id               String   @id @default(uuid())
   email            String   @unique
-  passwordHash     String
+  passwordHash     String?  // Optional for OAuth users
   firstName        String?
   lastName         String?
   phone            String?
   country          String   @default("AE")
   timezone         String   @default("Asia/Dubai")
+
+  // OAuth providers
+  googleId         String?  @unique  // Google OAuth sub (unique identifier)
+  authProvider     String   @default("email")  // "email" | "google"
 
   // Email verification
   emailVerified    Boolean  @default(false)

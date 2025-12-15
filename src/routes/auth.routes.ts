@@ -83,6 +83,47 @@ router.post(
 );
 
 /**
+ * POST /api/auth/google
+ * Google Sign-In - handles both new users and returning users
+ * Returns isNewUser=true for first-time users (redirect to onboarding)
+ */
+router.post(
+  '/google',
+  authRateLimit,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { idToken } = req.body;
+
+      if (!idToken) {
+        res.status(400).json({
+          success: false,
+          error: 'Google ID token is required',
+        });
+        return;
+      }
+
+      const deviceInfo = req.headers['user-agent'];
+      const ipAddress = req.ip;
+
+      const result = await authService.googleSignIn(idToken, deviceInfo, ipAddress);
+
+      res.json({
+        success: true,
+        data: {
+          token: result.accessToken,
+          refreshToken: result.refreshToken,
+          parent: result.parent,
+          children: result.children,
+          isNewUser: result.isNewUser,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * POST /api/auth/refresh
  * Refresh access token
  */

@@ -1,5 +1,6 @@
 // Main authentication service
 import bcrypt from 'bcrypt';
+import { OAuth2Client } from 'google-auth-library';
 import { prisma } from '../../config/database.js';
 import { tokenService } from './tokenService.js';
 import { sessionService } from './sessionService.js';
@@ -7,6 +8,9 @@ import { emailService, otpService } from '../email/index.js';
 import { UnauthorizedError, ConflictError, ValidationError, NotFoundError } from '../../middleware/errorHandler.js';
 import { AgeGroup, Child, Parent } from '@prisma/client';
 import { logger } from '../../utils/logger.js';
+
+// Google OAuth client
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const SALT_ROUNDS = 12;
 
@@ -127,6 +131,11 @@ export const authService = {
       throw new UnauthorizedError('Invalid email or password');
     }
 
+    // Check if user signed up with Google (no password)
+    if (!parent.passwordHash) {
+      throw new UnauthorizedError('This account uses Google Sign-In. Please sign in with Google.');
+    }
+
     // Verify password
     const isValid = await bcrypt.compare(password, parent.passwordHash);
 
@@ -174,6 +183,196 @@ export const authService = {
         consentStatus,
       },
       children: parent.children,
+    };
+  },
+
+  /**
+   * Google Sign-In - handles both new users and returning users
+   * For new users: creates account with emailVerified=true, isNewUser=true
+   * For returning users: logs them in, isNewUser=false
+   */
+  async googleSignIn(
+    idToken: string,
+    deviceInfo?: string,
+    ipAddress?: string
+  ): Promise<LoginResult & { isNewUser: boolean }> {
+    // Verify the Google ID token
+    let ticket;
+    try {
+      ticket = await googleClient.verifyIdToken({
+        idToken,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+    } catch (error) {
+      logger.error('Google ID token verification failed', { error });
+      throw new UnauthorizedError('Invalid Google credentials');
+    }
+
+    const payload = ticket.getPayload();
+    if (!payload) {
+      throw new UnauthorizedError('Invalid Google credentials');
+    }
+
+    const { sub: googleId, email, given_name: firstName, family_name: lastName, email_verified } = payload;
+
+    if (!email) {
+      throw new ValidationError('Google account must have an email address');
+    }
+
+    // Check if user exists by googleId or email
+    let parent = await prisma.parent.findFirst({
+      where: {
+        OR: [
+          { googleId },
+          { email: email.toLowerCase() },
+        ],
+      },
+      include: {
+        children: {
+          select: {
+            id: true,
+            displayName: true,
+            avatarUrl: true,
+            ageGroup: true,
+          },
+        },
+        consents: {
+          where: {
+            status: 'VERIFIED',
+            OR: [
+              { expiresAt: null },
+              { expiresAt: { gt: new Date() } },
+            ],
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    let isNewUser = false;
+
+    if (!parent) {
+      // New user - create account
+      isNewUser = true;
+      parent = await prisma.parent.create({
+        data: {
+          email: email.toLowerCase(),
+          googleId,
+          authProvider: 'google',
+          firstName: firstName || null,
+          lastName: lastName || null,
+          emailVerified: email_verified ?? true, // Google verifies emails
+          emailVerifiedAt: email_verified ? new Date() : null,
+        },
+        include: {
+          children: {
+            select: {
+              id: true,
+              displayName: true,
+              avatarUrl: true,
+              ageGroup: true,
+            },
+          },
+          consents: {
+            where: { status: 'VERIFIED' },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+        },
+      });
+
+      // Send welcome email for new users
+      emailService.sendWelcomeEmail(
+        parent.email,
+        parent.firstName || 'there'
+      ).catch(err => {
+        logger.error('Failed to send welcome email', { error: err, parentId: parent!.id });
+      });
+
+      logger.info(`New Google user created: ${parent.email}`);
+    } else {
+      // Existing user - check if we need to link Google account
+      if (!parent.googleId) {
+        // User signed up with email, now logging in with Google
+        // Link the Google account
+        parent = await prisma.parent.update({
+          where: { id: parent.id },
+          data: {
+            googleId,
+            // Don't change authProvider - keep original
+            // Mark email as verified if not already
+            emailVerified: true,
+            emailVerifiedAt: parent.emailVerifiedAt || new Date(),
+          },
+          include: {
+            children: {
+              select: {
+                id: true,
+                displayName: true,
+                avatarUrl: true,
+                ageGroup: true,
+              },
+            },
+            consents: {
+              where: {
+                status: 'VERIFIED',
+                OR: [
+                  { expiresAt: null },
+                  { expiresAt: { gt: new Date() } },
+                ],
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+            },
+          },
+        });
+
+        logger.info(`Linked Google account to existing user: ${parent.email}`);
+      }
+    }
+
+    // Generate tokens
+    const { accessToken, refreshToken, refreshTokenId, refreshTokenHash } = tokenService.generateParentTokens(parent.id);
+
+    // Get the token family ID from the generated token
+    const tokenPayload = tokenService.verifyRefreshToken(refreshToken);
+    const tokenFamilyId = tokenPayload.fid || tokenService.generateTokenFamilyId();
+
+    // Create session
+    await sessionService.createSession({
+      userId: parent.id,
+      type: 'parent',
+      refreshTokenId,
+      refreshTokenHash,
+      tokenFamilyId,
+      deviceInfo,
+      ipAddress,
+    });
+
+    // Update last login
+    await prisma.parent.update({
+      where: { id: parent.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    // Determine consent status
+    const hasVerifiedConsent = parent.consents && parent.consents.length > 0;
+    const consentStatus = hasVerifiedConsent ? 'verified' : 'none';
+
+    return {
+      accessToken,
+      refreshToken,
+      parent: {
+        id: parent.id,
+        email: parent.email,
+        firstName: parent.firstName,
+        lastName: parent.lastName,
+        emailVerified: parent.emailVerified,
+        consentStatus,
+      },
+      children: parent.children,
+      isNewUser,
     };
   },
 
