@@ -218,7 +218,7 @@ async function getCurrencyInfoByIP(
       throw new Error(`GeoPlugin API error: ${response.status} ${response.statusText}`);
     }
 
-    const data: GeoPluginResponse = await response.json();
+    const data = await response.json() as GeoPluginResponse;
 
     // Check for valid response
     if (data.geoplugin_status !== 200 && data.geoplugin_status !== 206) {
