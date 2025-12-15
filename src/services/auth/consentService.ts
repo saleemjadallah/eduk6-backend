@@ -479,6 +479,11 @@ export const consentService = {
       throw new ValidationError('Parent account not found');
     }
 
+    // Check if user has a password (Google OAuth users don't)
+    if (!parent.passwordHash) {
+      throw new ValidationError('Google Sign-In accounts require credit card verification to reset security questions.');
+    }
+
     // Verify password for re-authentication
     const isPasswordValid = await bcrypt.compare(password, parent.passwordHash);
     if (!isPasswordValid) {

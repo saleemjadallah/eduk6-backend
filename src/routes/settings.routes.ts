@@ -154,6 +154,14 @@ router.post('/change-password', authenticate, requireParent, async (req, res, ne
       });
     }
 
+    // Check if user has a password (Google OAuth users don't)
+    if (!parent.passwordHash) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot change password for Google Sign-In accounts. Please manage your password through Google.',
+      });
+    }
+
     // Verify current password
     const isValid = await bcrypt.compare(currentPassword, parent.passwordHash);
     if (!isValid) {

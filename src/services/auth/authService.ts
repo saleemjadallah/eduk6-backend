@@ -766,6 +766,11 @@ export const authService = {
       throw new NotFoundError('Account not found');
     }
 
+    // Check if user has a password (Google OAuth users don't)
+    if (!parent.passwordHash) {
+      throw new ValidationError('Cannot change password for Google Sign-In accounts. Please manage your password through Google.');
+    }
+
     // Verify current password
     const isValid = await bcrypt.compare(currentPassword, parent.passwordHash);
 
@@ -899,6 +904,11 @@ export const authService = {
       throw new NotFoundError('Account not found');
     }
 
+    // Check if user has a password (Google OAuth users don't)
+    if (!parent.passwordHash) {
+      throw new ValidationError('Google Sign-In accounts cannot be deleted with password verification. Please contact support.');
+    }
+
     // Verify password before allowing deletion
     const isValid = await bcrypt.compare(password, parent.passwordHash);
     if (!isValid) {
@@ -975,6 +985,11 @@ export const authService = {
       throw new NotFoundError('Parent account not found');
     }
 
+    // Check if user has a password (Google OAuth users don't)
+    if (!parent.passwordHash) {
+      throw new ValidationError('Google Sign-In accounts require alternative verification. Please contact support to reset PIN.');
+    }
+
     // Verify parent password for re-authentication
     const isPasswordValid = await bcrypt.compare(parentPassword, parent.passwordHash);
     if (!isPasswordValid) {
@@ -1033,6 +1048,11 @@ export const authService = {
 
     if (!parent) {
       throw new NotFoundError('Parent account not found');
+    }
+
+    // Check if user has a password (Google OAuth users don't)
+    if (!parent.passwordHash) {
+      throw new ValidationError('Google Sign-In accounts require alternative verification. Please contact support to unlock PIN.');
     }
 
     // Verify parent password
