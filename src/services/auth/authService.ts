@@ -9,8 +9,20 @@ import { UnauthorizedError, ConflictError, ValidationError, NotFoundError } from
 import { AgeGroup, Child, Parent } from '@prisma/client';
 import { logger } from '../../utils/logger.js';
 
-// Google OAuth client
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+// Google OAuth client - initialized lazily to ensure env var is available
+let googleClient: OAuth2Client | null = null;
+
+function getGoogleClient(): OAuth2Client {
+  if (!googleClient) {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      throw new Error('GOOGLE_CLIENT_ID environment variable is not set');
+    }
+    googleClient = new OAuth2Client(clientId);
+    logger.info('Google OAuth client initialized', { clientId: clientId.substring(0, 20) + '...' });
+  }
+  return googleClient;
+}
 
 const SALT_ROUNDS = 12;
 
@@ -199,9 +211,12 @@ export const authService = {
     // Verify the Google ID token
     let ticket;
     try {
-      ticket = await googleClient.verifyIdToken({
+      const client = getGoogleClient();
+      const clientId = process.env.GOOGLE_CLIENT_ID;
+      logger.info('Verifying Google ID token', { audience: clientId?.substring(0, 20) + '...' });
+      ticket = await client.verifyIdToken({
         idToken,
-        audience: process.env.GOOGLE_CLIENT_ID,
+        audience: clientId,
       });
     } catch (error) {
       logger.error('Google ID token verification failed', { error });
