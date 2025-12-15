@@ -8,8 +8,8 @@
  *
  * Family Pricing Structure (December 2025):
  * - FREE: $0/month - 1 child, 10 lessons/month
- * - FAMILY: $4.99/month or $47.90/year (20% off) - 2 children, unlimited lessons
- * - FAMILY_PLUS: $9.99/month or $95.90/year (20% off) - 4 children, unlimited lessons
+ * - FAMILY: $7.99/month or $57.99/year (~40% off, $4.83/month effective) - 2 children, unlimited lessons
+ * - FAMILY_PLUS: $14.99/month or $107.99/year (~40% off, $9.00/month effective) - 4 children, unlimited lessons
  */
 
 import { SubscriptionTier } from '@prisma/client';
@@ -65,8 +65,8 @@ export const FAMILY_SUBSCRIPTION_PRODUCTS: Record<
     tier: 'FAMILY',
     childLimit: 2,
     lessonsPerMonth: null, // Unlimited
-    priceMonthly: 4.99,
-    priceAnnual: 47.9, // ~20% savings
+    priceMonthly: 7.99,
+    priceAnnual: 57.99, // ~40% savings ($4.83/month effective)
     priceIdMonthly: env.STRIPE_PRICE_FAMILY_MONTHLY || '',
     priceIdAnnual: env.STRIPE_PRICE_FAMILY_ANNUAL || '',
     features: [
@@ -83,8 +83,8 @@ export const FAMILY_SUBSCRIPTION_PRODUCTS: Record<
     tier: 'FAMILY_PLUS',
     childLimit: 4,
     lessonsPerMonth: null, // Unlimited
-    priceMonthly: 9.99,
-    priceAnnual: 95.9, // ~20% savings
+    priceMonthly: 14.99,
+    priceAnnual: 107.99, // ~40% savings ($9.00/month effective)
     priceIdMonthly: env.STRIPE_PRICE_FAMILY_PLUS_MONTHLY || '',
     priceIdAnnual: env.STRIPE_PRICE_FAMILY_PLUS_ANNUAL || '',
     features: [

@@ -39,6 +39,7 @@ import ocrRoutes from './routes/ocr.routes.js';
 import webhookRoutes from './routes/webhook.routes.js';
 import contactRoutes from './routes/contact.routes.js';
 import gamificationRoutes from './routes/gamification.routes.js';
+import currencyRoutes from './routes/currency.routes.js';
 
 // Services initialization
 import { initializeContentProcessor, shutdownContentProcessor } from './services/learning/contentProcessor.js';
@@ -158,6 +159,9 @@ app.use('/api/parent', parentSubscriptionRoutes);
 
 // Gamification routes (XP, badges, streaks)
 app.use('/api/gamification', gamificationRoutes);
+
+// Currency detection routes (public - no auth required)
+app.use('/api/currency', currencyRoutes);
 
 // ============================================
 // ERROR HANDLING
