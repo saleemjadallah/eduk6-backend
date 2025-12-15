@@ -26,6 +26,38 @@ function getGoogleClient(): OAuth2Client {
 
 const SALT_ROUNDS = 12;
 
+// Helper to calculate age from date of birth
+function calculateAge(dateOfBirth: Date): number {
+  const today = new Date();
+  let age = today.getFullYear() - dateOfBirth.getFullYear();
+  const monthDiff = today.getMonth() - dateOfBirth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dateOfBirth.getDate())) {
+    age--;
+  }
+  return age;
+}
+
+// Standard child select fields for API responses
+const childSelectFields = {
+  id: true,
+  displayName: true,
+  avatarUrl: true,
+  dateOfBirth: true,
+  ageGroup: true,
+  gradeLevel: true,
+  lastActiveAt: true,
+  createdAt: true,
+} as const;
+
+// Transform child data to include calculated age
+function transformChildWithAge(child: any) {
+  return {
+    ...child,
+    age: child.dateOfBirth ? calculateAge(child.dateOfBirth) : null,
+    grade: child.gradeLevel,
+  };
+}
+
 export interface SignupParams {
   email: string;
   password: string;
@@ -118,12 +150,7 @@ export const authService = {
       where: { email: email.toLowerCase() },
       include: {
         children: {
-          select: {
-            id: true,
-            displayName: true,
-            avatarUrl: true,
-            ageGroup: true,
-          },
+          select: childSelectFields,
         },
         consents: {
           where: {
@@ -218,8 +245,12 @@ export const authService = {
         idToken,
         audience: clientId,
       });
-    } catch (error) {
-      logger.error('Google ID token verification failed', { error });
+    } catch (error: any) {
+      logger.error('Google ID token verification failed', {
+        error: error?.message || error,
+        stack: error?.stack,
+        clientId: process.env.GOOGLE_CLIENT_ID?.substring(0, 30),
+      });
       throw new UnauthorizedError('Invalid Google credentials');
     }
 
@@ -298,11 +329,18 @@ export const authService = {
       });
 
       // Send welcome email for new users
+      logger.info(`Sending welcome email for new Google user: ${parent.email}`);
       emailService.sendWelcomeEmail(
         parent.email,
         parent.firstName || 'there'
-      ).catch(err => {
-        logger.error('Failed to send welcome email', { error: err, parentId: parent!.id });
+      ).then(success => {
+        if (success) {
+          logger.info(`Welcome email sent successfully for Google user: ${parent!.email}`);
+        } else {
+          logger.error(`Welcome email failed for Google user: ${parent!.email}`);
+        }
+      }).catch(err => {
+        logger.error('Failed to send welcome email for Google user', { error: err, parentId: parent!.id });
       });
 
       logger.info(`New Google user created: ${parent.email}`);

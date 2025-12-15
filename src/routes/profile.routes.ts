@@ -14,6 +14,17 @@ function getAgeGroup(age: number): AgeGroup {
   return 'OLDER';
 }
 
+// Helper to calculate age from date of birth
+function calculateAge(dateOfBirth: Date): number {
+  const today = new Date();
+  let age = today.getFullYear() - dateOfBirth.getFullYear();
+  const monthDiff = today.getMonth() - dateOfBirth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dateOfBirth.getDate())) {
+    age--;
+  }
+  return age;
+}
+
 // Helper to map curriculum string to enum
 function mapCurriculumType(curriculum: string): CurriculumType {
   const mapping: Record<string, CurriculumType> = {
@@ -118,6 +129,7 @@ router.post(
         select: {
           id: true,
           displayName: true,
+          dateOfBirth: true,
           ageGroup: true,
           gradeLevel: true,
           avatarUrl: true,
@@ -128,9 +140,16 @@ router.post(
         },
       });
 
+      // Add calculated age to response
+      const childWithAge = {
+        ...child,
+        age: calculateAge(child.dateOfBirth),
+        grade: child.gradeLevel, // Also include as 'grade' for frontend compatibility
+      };
+
       res.status(201).json({
         success: true,
-        data: child,
+        data: childWithAge,
       });
     } catch (error) {
       next(error);
@@ -155,6 +174,7 @@ router.get(
         select: {
           id: true,
           displayName: true,
+          dateOfBirth: true,
           ageGroup: true,
           gradeLevel: true,
           avatarUrl: true,
@@ -167,9 +187,16 @@ router.get(
         orderBy: { createdAt: 'asc' },
       });
 
+      // Add calculated age to each child
+      const childrenWithAge = children.map(child => ({
+        ...child,
+        age: calculateAge(child.dateOfBirth),
+        grade: child.gradeLevel,
+      }));
+
       res.json({
         success: true,
-        data: children,
+        data: childrenWithAge,
       });
     } catch (error) {
       next(error);
@@ -194,6 +221,7 @@ router.get(
         select: {
           id: true,
           displayName: true,
+          dateOfBirth: true,
           ageGroup: true,
           gradeLevel: true,
           avatarUrl: true,
@@ -209,9 +237,16 @@ router.get(
         throw new NotFoundError('Child profile not found');
       }
 
+      // Add calculated age
+      const childWithAge = {
+        ...child,
+        age: calculateAge(child.dateOfBirth),
+        grade: child.gradeLevel,
+      };
+
       res.json({
         success: true,
-        data: child,
+        data: childWithAge,
       });
     } catch (error) {
       next(error);
@@ -273,6 +308,7 @@ router.patch(
         select: {
           id: true,
           displayName: true,
+          dateOfBirth: true,
           ageGroup: true,
           gradeLevel: true,
           avatarUrl: true,
@@ -284,9 +320,16 @@ router.patch(
         },
       });
 
+      // Add calculated age
+      const childWithAge = {
+        ...child,
+        age: calculateAge(child.dateOfBirth),
+        grade: child.gradeLevel,
+      };
+
       res.json({
         success: true,
-        data: child,
+        data: childWithAge,
       });
     } catch (error) {
       next(error);
