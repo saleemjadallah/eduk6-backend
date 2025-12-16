@@ -110,11 +110,16 @@ Jeffrey: "Plants are amazing! They use sunlight, water, and air to make their ow
 
 IMPORTANT: Always answer the actual question asked. Never redirect to unrelated topics.`;
 
-      // Build conversation history
-      const history = conversationHistory?.map((msg: { role: string; content: string }) => ({
+      // Build conversation history - must start with 'user' role for Gemini
+      let history = conversationHistory?.map((msg: { role: string; content: string }) => ({
         role: msg.role === 'user' ? 'user' : 'model',
         parts: [{ text: msg.content }],
       })) || [];
+
+      // Gemini requires first message to be from 'user', so filter out leading 'model' messages
+      while (history.length > 0 && history[0].role === 'model') {
+        history = history.slice(1);
+      }
 
       const model = genAI.getGenerativeModel({
         model: config.gemini.models.flash,
