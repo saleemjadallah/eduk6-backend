@@ -147,7 +147,12 @@ IMPORTANT: Always answer the actual question asked. Never redirect to unrelated 
         },
       });
     } catch (error) {
-      logger.error('Demo chat error', { error });
+      // Properly serialize error for logging (Error objects don't serialize to JSON)
+      const errorDetails = error instanceof Error
+        ? { message: error.message, stack: error.stack, name: error.name }
+        : { raw: String(error) };
+      logger.error('Demo chat error', { error: errorDetails });
+
       // Return a friendly fallback response instead of an error
       res.json({
         success: true,
