@@ -5,6 +5,7 @@ import { prisma } from '../config/database.js';
 import { ValidationError, NotFoundError } from '../middleware/errorHandler.js';
 import { AgeGroup, LearningStyle, CurriculumType } from '@prisma/client';
 import { getChildLimitForTier } from '../config/stripeProductsFamily.js';
+import { updateParentGradeRanges } from '../services/brevoService.js';
 
 const router = Router();
 
@@ -146,6 +147,19 @@ router.post(
         age: calculateAge(child.dateOfBirth),
         grade: child.gradeLevel, // Also include as 'grade' for frontend compatibility
       };
+
+      // Update parent's grade ranges in Brevo (fire-and-forget)
+      // Include all children's grades for accurate segmentation
+      const allChildren = await prisma.child.findMany({
+        where: { parentId },
+        select: { gradeLevel: true },
+      });
+      const gradeLevels = allChildren
+        .map(c => c.gradeLevel)
+        .filter((g): g is number => g !== null);
+      if (gradeLevels.length > 0) {
+        updateParentGradeRanges(parent.email, gradeLevels).catch(() => {});
+      }
 
       res.status(201).json({
         success: true,

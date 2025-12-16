@@ -10,6 +10,7 @@ const BREVO_LIST_ID = parseInt(process.env.BREVO_LIST_ID || '3', 10);
 const BREVO_API_URL = 'https://api.brevo.com/v3/contacts';
 
 export type UserType = 'PARENT' | 'TEACHER';
+export type GradeRange = 'K-2' | '3-6' | '7-8';
 
 export interface BrevoContactData {
   email: string;
@@ -17,6 +18,19 @@ export interface BrevoContactData {
   lastName?: string;
   userType: UserType;
   subscriptionTier?: string;
+  gradeRanges?: GradeRange[];
+}
+
+/**
+ * Map a grade level (0-8) to a marketing segment
+ * K-2: Kindergarten through 2nd grade (grades 0-2)
+ * 3-6: 3rd through 6th grade (grades 3-6)
+ * 7-8: 7th through 8th grade (grades 7-8)
+ */
+export function getGradeRange(gradeLevel: number): GradeRange {
+  if (gradeLevel <= 2) return 'K-2';
+  if (gradeLevel <= 6) return '3-6';
+  return '7-8';
 }
 
 interface BrevoCreateContactPayload {
@@ -27,6 +41,7 @@ interface BrevoCreateContactPayload {
     USER_TYPE: string;
     SIGNUP_DATE: string;
     SUBSCRIPTION_TIER?: string;
+    GRADE_RANGES?: string; // Comma-separated: "K-2,3-6"
   };
   listIds: number[];
   updateEnabled: boolean;
@@ -62,6 +77,10 @@ export async function addContactToBrevo(data: BrevoContactData): Promise<boolean
     }
     if (data.subscriptionTier) {
       payload.attributes.SUBSCRIPTION_TIER = data.subscriptionTier;
+    }
+    if (data.gradeRanges && data.gradeRanges.length > 0) {
+      // Store unique grade ranges as comma-separated string
+      payload.attributes.GRADE_RANGES = [...new Set(data.gradeRanges)].join(',');
     }
 
     const response = await fetch(BREVO_API_URL, {
@@ -109,6 +128,7 @@ export async function updateBrevoContact(
     FIRSTNAME: string;
     LASTNAME: string;
     SUBSCRIPTION_TIER: string;
+    GRADE_RANGES: string;
   }>
 ): Promise<boolean> {
   if (!BREVO_API_KEY) {
@@ -138,6 +158,26 @@ export async function updateBrevoContact(
     logger.error('Failed to update contact in Brevo:', error);
     return false;
   }
+}
+
+/**
+ * Update a parent's grade ranges in Brevo based on their children
+ * Call this when a child is created or updated
+ */
+export async function updateParentGradeRanges(
+  parentEmail: string,
+  childGradeLevels: number[]
+): Promise<boolean> {
+  if (!BREVO_API_KEY || childGradeLevels.length === 0) {
+    return false;
+  }
+
+  // Map all grade levels to ranges and dedupe
+  const gradeRanges = [...new Set(childGradeLevels.map(getGradeRange))];
+
+  return updateBrevoContact(parentEmail, {
+    GRADE_RANGES: gradeRanges.join(','),
+  });
 }
 
 /**
