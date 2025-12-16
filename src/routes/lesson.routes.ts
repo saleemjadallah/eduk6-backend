@@ -10,6 +10,7 @@ import { documentFormatter } from '../services/formatting/index.js';
 import { parentUsageService } from '../services/parent/usageService.js';
 import { prisma } from '../config/database.js';
 import { logger } from '../utils/logger.js';
+import { sanitizeForPostgres, sanitizeObjectForPostgres } from '../utils/sanitize.js';
 import { genAI } from '../config/gemini.js';
 import { config } from '../config/index.js';
 import { AgeGroup, Subject, SourceType, CurriculumType } from '@prisma/client';
@@ -221,19 +222,19 @@ router.post(
         subject: finalSubject,
       });
 
-      // Update with analysis results
+      // Update with analysis results (sanitize text fields to remove null bytes)
       await lessonService.update(lesson.id, {
-        summary: analysis.summary,
+        summary: sanitizeForPostgres(analysis.summary),
         gradeLevel: String(analysis.gradeLevel), // Convert to string for Prisma
-        formattedContent, // Deterministically formatted HTML (100% reliable)
-        chapters: analysis.chapters ? JSON.parse(JSON.stringify(analysis.chapters)) : undefined,
-        keyConcepts: analysis.keyConcepts,
-        vocabulary: analysis.vocabulary ? JSON.parse(JSON.stringify(analysis.vocabulary)) : undefined,
-        suggestedQuestions: analysis.suggestedQuestions,
+        formattedContent: sanitizeForPostgres(formattedContent), // Deterministically formatted HTML (100% reliable)
+        chapters: analysis.chapters ? sanitizeObjectForPostgres(JSON.parse(JSON.stringify(analysis.chapters))) : undefined,
+        keyConcepts: analysis.keyConcepts ? analysis.keyConcepts.map(c => sanitizeForPostgres(c) || c) : undefined,
+        vocabulary: analysis.vocabulary ? sanitizeObjectForPostgres(JSON.parse(JSON.stringify(analysis.vocabulary))) : undefined,
+        suggestedQuestions: analysis.suggestedQuestions ? analysis.suggestedQuestions.map(q => sanitizeForPostgres(q) || q) : undefined,
         aiConfidence: analysis.confidence,
         processingStatus: 'COMPLETED',
         safetyReviewed: true,
-        extractedText: content,
+        extractedText: sanitizeForPostgres(content),
       });
 
       // Get updated lesson
@@ -1109,20 +1110,20 @@ router.post(
         subject: finalSubject,
       });
 
-      // Update with analysis results - use full analysis data for rich content
+      // Update with analysis results - use full analysis data for rich content (sanitize text fields)
       await lessonService.update(lesson.id, {
-        summary: analysis.summary || result.summary,
+        summary: sanitizeForPostgres(analysis.summary || result.summary),
         gradeLevel: gradeLevel || String(analysis.gradeLevel) || result.detectedGradeLevel || String(child.gradeLevel),
-        formattedContent,
-        chapters: analysis.chapters ? JSON.parse(JSON.stringify(analysis.chapters)) : undefined,
-        keyConcepts: analysis.keyConcepts || result.keyTopics,
-        vocabulary: analysis.vocabulary ? JSON.parse(JSON.stringify(analysis.vocabulary)) :
-                   result.vocabulary ? JSON.parse(JSON.stringify(result.vocabulary)) : undefined,
-        suggestedQuestions: analysis.suggestedQuestions,
+        formattedContent: sanitizeForPostgres(formattedContent),
+        chapters: analysis.chapters ? sanitizeObjectForPostgres(JSON.parse(JSON.stringify(analysis.chapters))) : undefined,
+        keyConcepts: (analysis.keyConcepts || result.keyTopics)?.map(c => sanitizeForPostgres(c) || c),
+        vocabulary: analysis.vocabulary ? sanitizeObjectForPostgres(JSON.parse(JSON.stringify(analysis.vocabulary))) :
+                   result.vocabulary ? sanitizeObjectForPostgres(JSON.parse(JSON.stringify(result.vocabulary))) : undefined,
+        suggestedQuestions: analysis.suggestedQuestions?.map(q => sanitizeForPostgres(q) || q),
         aiConfidence: analysis.confidence || 0.85,
         processingStatus: 'COMPLETED',
         safetyReviewed: true,
-        extractedText: result.extractedText,
+        extractedText: sanitizeForPostgres(result.extractedText),
       });
 
       // Get updated lesson
