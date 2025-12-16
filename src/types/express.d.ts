@@ -1,5 +1,5 @@
 // Express request extensions
-import { Parent, Child, AgeGroup, TeacherRole } from '@prisma/client';
+import { Parent, Child, AgeGroup, TeacherRole, AdminRole } from '@prisma/client';
 
 declare global {
   namespace Express {
@@ -26,8 +26,15 @@ declare global {
         role: TeacherRole;
       };
 
+      // Authenticated admin (VC Analytics Dashboard)
+      admin?: {
+        id: string;
+        email: string;
+        role: AdminRole;
+      };
+
       // Session type
-      sessionType?: 'parent' | 'child' | 'teacher';
+      sessionType?: 'parent' | 'child' | 'teacher' | 'admin';
 
       // Token quota check result (set by quota middleware)
       quotaCheck?: {

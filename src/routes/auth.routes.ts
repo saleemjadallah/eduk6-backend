@@ -5,6 +5,7 @@ import { prisma } from '../config/database.js';
 import { authenticate, requireParent } from '../middleware/auth.js';
 import { validateInput } from '../middleware/validateInput.js';
 import { authRateLimit, emailRateLimit } from '../middleware/rateLimit.js';
+import { addContactToBrevo } from '../services/brevoService.js';
 import {
   signupSchema,
   loginSchema,
@@ -40,6 +41,16 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const result = await authService.signup(req.body);
+
+      // Add contact to Brevo for email marketing (fire-and-forget)
+      addContactToBrevo({
+        email: req.body.email,
+        firstName: req.body.firstName,
+        lastName: req.body.lastName,
+        userType: 'PARENT',
+        subscriptionTier: 'FREE',
+      }).catch(() => {}); // Silently ignore errors - don't block signup
+
       res.status(201).json({
         success: true,
         data: result,
@@ -106,6 +117,17 @@ router.post(
       const ipAddress = req.ip;
 
       const result = await authService.googleSignIn(idToken, deviceInfo, ipAddress);
+
+      // Add new Google sign-in users to Brevo (fire-and-forget)
+      if (result.isNewUser) {
+        addContactToBrevo({
+          email: result.parent.email,
+          firstName: result.parent.firstName || undefined,
+          lastName: result.parent.lastName || undefined,
+          userType: 'PARENT',
+          subscriptionTier: 'FREE',
+        }).catch(() => {}); // Silently ignore errors
+      }
 
       res.json({
         success: true,

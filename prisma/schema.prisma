@@ -58,6 +58,9 @@ model Parent {
   lastLoginAt      DateTime?
 
   @@index([email])
+  @@index([subscriptionTier, subscriptionStatus])  // MRR/revenue queries
+  @@index([createdAt])                             // Cohort analysis
+  @@index([country])                               // Geographic segmentation
 }
 
 model ParentPrivacyPreferences {
@@ -117,6 +120,7 @@ model Child {
   textSelections   TextSelection[]
   exerciseAttempts ExerciseAttempt[]
   notes            Note[]
+  activitySessions ActivitySession[]   // Analytics: DAU/WAU/MAU tracking
 
   // Timestamps
   createdAt        DateTime @default(now())
@@ -126,6 +130,7 @@ model Child {
   @@index([parentId])
   @@index([parentId, ageGroup])       // Dashboard age-group filtering
   @@index([parentId, lastActiveAt])   // Activity tracking queries
+  @@index([createdAt])                // Cohort analysis
 }
 
 model Consent {
@@ -1052,6 +1057,125 @@ model Classroom {
 
   @@index([teacherId])
   @@index([accessCode])
+}
+
+// ============================================
+// ADMIN PORTAL - VC ANALYTICS DASHBOARD
+// ============================================
+
+model Admin {
+  id               String    @id @default(uuid())
+  email            String    @unique
+  passwordHash     String
+  name             String
+  role             AdminRole @default(ANALYST)
+
+  // Security
+  emailVerified    Boolean   @default(false)
+  emailVerifiedAt  DateTime?
+  lastLoginAt      DateTime?
+
+  // Timestamps
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([email])
+}
+
+enum AdminRole {
+  SUPER_ADMIN    // Full access, can create other admins
+  ANALYST        // Read-only access to analytics
+}
+
+// Activity tracking for DAU/WAU/MAU calculations
+model ActivitySession {
+  id              String   @id @default(uuid())
+  childId         String
+  child           Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  // Session timing
+  startedAt       DateTime
+  endedAt         DateTime?
+  durationMinutes Int      @default(0)
+
+  // Activity breakdown (JSON for flexibility)
+  // Structure: { chat: 10, flashcards: 5, upload: 2, quiz: 3, lesson: 15 }
+  activities      Json     @default("{}")
+
+  // Gamification
+  xpEarned        Int      @default(0)
+  lessonsStarted  Int      @default(0)
+  lessonsCompleted Int     @default(0)
+
+  // Denormalized date fields for efficient GROUP BY queries
+  createdDate     DateTime @db.Date          // Date only (for DAU)
+  weekStart       DateTime @db.Date          // Monday of the week (for WAU)
+  monthStart      DateTime @db.Date          // First of the month (for MAU)
+
+  // Device/platform (for segmentation)
+  platform        String?                    // "ios", "android", "web"
+  deviceType      String?                    // "mobile", "tablet", "desktop"
+
+  createdAt       DateTime @default(now())
+
+  // CRITICAL INDEXES for analytics queries
+  @@index([createdDate])                                    // DAU queries
+  @@index([childId, createdDate])                          // Per-child activity
+  @@index([weekStart])                                      // WAU queries
+  @@index([monthStart])                                     // MAU queries
+}
+
+// Pre-computed daily metrics (populated by nightly job)
+model DailyAnalyticsSnapshot {
+  id                   String   @id @default(uuid())
+  date                 DateTime @unique @db.Date
+
+  // User counts
+  dauCount             Int      @default(0)          // Active users today
+  newUsersCount        Int      @default(0)          // New signups today
+
+  // Engagement metrics
+  totalSessions        Int      @default(0)
+  avgSessionMinutes    Float    @default(0)
+  totalXpAwarded       Int      @default(0)
+
+  // Lesson metrics
+  lessonsCreated       Int      @default(0)
+  lessonsCompleted     Int      @default(0)
+
+  // Revenue metrics (snapshot at end of day)
+  totalFreeUsers       Int      @default(0)
+  totalFamilyUsers     Int      @default(0)
+  totalFamilyPlusUsers Int      @default(0)
+  estimatedMrr         Decimal  @db.Decimal(10, 2)
+
+  // Teacher portal
+  teacherDauCount      Int      @default(0)
+
+  computedAt           DateTime @default(now())
+
+  @@index([date])
+}
+
+// Pre-computed cohort retention (populated by weekly job)
+model CohortRetentionSnapshot {
+  id              String   @id @default(uuid())
+  cohortMonth     DateTime @db.Date             // e.g., 2024-01-01
+  monthNumber     Int                           // 0 = signup month, 1, 2, ... 12
+
+  // Metrics
+  cohortSize      Int                           // Users who signed up in this month
+  activeUsers     Int                           // Users active in monthNumber
+  retentionRate   Float                         // activeUsers / cohortSize * 100
+
+  // Segmentation (optional)
+  segment         String?  @default("all")      // "all", "free", "paid", etc.
+
+  computedAt      DateTime @default(now())
+
+  @@unique([cohortMonth, monthNumber, segment])
+  @@index([cohortMonth])
+  @@index([computedAt])
 }
 
 // ============================================

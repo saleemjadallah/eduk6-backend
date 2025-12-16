@@ -35,6 +35,7 @@ import reportsRoutes from './routes/reports.routes.js';
 import supportRoutes from './routes/support.routes.js';
 import teacherRoutes from './routes/teacher/index.js';
 import parentSubscriptionRoutes from './routes/parent/index.js';
+import adminRoutes from './routes/admin/index.js';
 import ocrRoutes from './routes/ocr.routes.js';
 import webhookRoutes from './routes/webhook.routes.js';
 import contactRoutes from './routes/contact.routes.js';
@@ -153,6 +154,9 @@ app.use('/api/contact', contactRoutes);
 
 // Teacher Portal routes
 app.use('/api/teacher', teacherRoutes);
+
+// Admin Portal routes (VC Analytics Dashboard)
+app.use('/api/admin', adminRoutes);
 
 // Parent Portal routes (subscription management)
 app.use('/api/parent', parentSubscriptionRoutes);

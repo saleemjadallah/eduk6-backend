@@ -5,7 +5,7 @@ import { logger } from '../../utils/logger.js';
 
 export interface Session {
   userId: string;
-  type: 'parent' | 'child' | 'teacher';
+  type: 'parent' | 'child' | 'teacher' | 'admin';
   parentId?: string;
   refreshTokenId: string;
   refreshTokenHash: string; // Hashed refresh token for secure storage
