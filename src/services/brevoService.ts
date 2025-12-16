@@ -19,6 +19,7 @@ export interface BrevoContactData {
   userType: UserType;
   subscriptionTier?: string;
   gradeRanges?: GradeRange[];
+  listId?: number; // Optional custom list ID (defaults to BREVO_LIST_ID)
 }
 
 /**
@@ -64,7 +65,7 @@ export async function addContactToBrevo(data: BrevoContactData): Promise<boolean
         USER_TYPE: data.userType,
         SIGNUP_DATE: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
       },
-      listIds: [BREVO_LIST_ID],
+      listIds: [data.listId || BREVO_LIST_ID], // Use custom list ID if provided
       updateEnabled: true, // Update if contact already exists
     };
 

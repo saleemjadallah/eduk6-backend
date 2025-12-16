@@ -11,12 +11,19 @@ import { logger } from '../utils/logger.js';
 
 const router = Router();
 
+// Brevo list IDs for different audiences
+const BREVO_LISTS = {
+  subscribers: parseInt(process.env.BREVO_LIST_ID || '3', 10),      // General subscribers
+  exit_intent_parent: parseInt(process.env.BREVO_LIST_ID || '3', 10), // Parent exit intent (same as subscribers)
+  exit_intent_teacher: 4,  // Teacher exit intent - separate list
+} as const;
+
 // Validation schema for lead capture
 const leadCaptureSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
   firstName: z.string().optional(),
-  source: z.enum(['exit_intent', 'footer', 'landing_page']).default('exit_intent'),
-  leadMagnet: z.enum(['curriculum_guide']).default('curriculum_guide'),
+  source: z.enum(['exit_intent', 'exit_intent_teacher', 'footer', 'landing_page']).default('exit_intent'),
+  leadMagnet: z.enum(['curriculum_guide', 'teacher_toolkit']).default('curriculum_guide'),
 });
 
 // Lead magnet download URLs
@@ -25,6 +32,15 @@ const LEAD_MAGNETS = {
     title: 'Complete Parent\'s Curriculum Guide',
     url: 'https://cdn.orbitlearn.app/static/downloads/Orbit-Learn-Curriculum-Guide.pdf',
     filename: 'Orbit-Learn-Curriculum-Guide.pdf',
+    listId: BREVO_LISTS.exit_intent_parent,
+    userType: 'PARENT' as const,
+  },
+  teacher_toolkit: {
+    title: 'AI Teaching Toolkit Guide',
+    url: 'https://cdn.orbitlearn.app/static/downloads/Orbit-Learn-Curriculum-Guide.pdf', // Same guide for now
+    filename: 'Orbit-Learn-AI-Teaching-Toolkit.pdf',
+    listId: BREVO_LISTS.exit_intent_teacher,
+    userType: 'TEACHER' as const,
   },
 } as const;
 
@@ -48,16 +64,17 @@ router.post(
         });
       }
 
-      // Add contact to Brevo (fire-and-forget but we wait for response)
+      // Add contact to Brevo with the correct list ID for this lead magnet
       const brevoSuccess = await addContactToBrevo({
         email,
         firstName,
-        userType: 'PARENT', // Leads from exit-intent are potential parents
+        userType: magnet.userType,
         subscriptionTier: 'LEAD', // Mark as lead, not signed up yet
+        listId: magnet.listId,
       });
 
       // Log the lead capture
-      logger.info(`Lead captured: ${email} (source: ${source}, magnet: ${leadMagnet})`);
+      logger.info(`Lead captured: ${email} (source: ${source}, magnet: ${leadMagnet}, list: ${magnet.listId})`);
 
       // Return success with download URL regardless of Brevo status
       // We don't want to block the user experience if Brevo fails
