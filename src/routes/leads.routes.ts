@@ -13,9 +13,9 @@ const router = Router();
 
 // Brevo list IDs for different audiences
 const BREVO_LISTS = {
-  subscribers: parseInt(process.env.BREVO_LIST_ID || '3', 10),      // General subscribers
-  exit_intent_parent: parseInt(process.env.BREVO_LIST_ID || '3', 10), // Parent exit intent (same as subscribers)
-  exit_intent_teacher: 4,  // Teacher exit intent - separate list
+  subscribers: parseInt(process.env.BREVO_LIST_ID || '3', 10),      // General subscribers (signups)
+  exit_intent_student: 5,  // Exit Intent - Student list
+  exit_intent_teacher: 4,  // Exit Intent - Teacher list
 } as const;
 
 // Validation schema for lead capture
@@ -32,7 +32,7 @@ const LEAD_MAGNETS = {
     title: 'Complete Parent\'s Curriculum Guide',
     url: 'https://cdn.orbitlearn.app/static/downloads/Orbit-Learn-Curriculum-Guide.pdf',
     filename: 'Orbit-Learn-Curriculum-Guide.pdf',
-    listId: BREVO_LISTS.exit_intent_parent,
+    listId: BREVO_LISTS.exit_intent_student,
     userType: 'PARENT' as const,
   },
   teacher_toolkit: {
