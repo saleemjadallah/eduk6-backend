@@ -41,6 +41,7 @@ import webhookRoutes from './routes/webhook.routes.js';
 import contactRoutes from './routes/contact.routes.js';
 import gamificationRoutes from './routes/gamification.routes.js';
 import currencyRoutes from './routes/currency.routes.js';
+import leadsRoutes from './routes/leads.routes.js';
 
 // Services initialization
 import { initializeContentProcessor, shutdownContentProcessor } from './services/learning/contentProcessor.js';
@@ -166,6 +167,9 @@ app.use('/api/gamification', gamificationRoutes);
 
 // Currency detection routes (public - no auth required)
 app.use('/api/currency', currencyRoutes);
+
+// Lead capture routes (public - for exit-intent popups)
+app.use('/api/leads', leadsRoutes);
 
 // ============================================
 // ERROR HANDLING
