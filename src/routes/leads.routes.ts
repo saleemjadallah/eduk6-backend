@@ -36,8 +36,8 @@ const LEAD_MAGNETS = {
     userType: 'PARENT' as const,
   },
   teacher_toolkit: {
-    title: 'AI Teaching Toolkit Guide',
-    url: 'https://cdn.orbitlearn.app/static/downloads/Orbit-Learn-Curriculum-Guide.pdf', // Same guide for now
+    title: 'AI Teaching Toolkit',
+    url: 'https://cdn.orbitlearn.app/static/downloads/Orbit-Learn-AI-Teaching-Toolkit.pdf',
     filename: 'Orbit-Learn-AI-Teaching-Toolkit.pdf',
     listId: BREVO_LISTS.exit_intent_teacher,
     userType: 'TEACHER' as const,
