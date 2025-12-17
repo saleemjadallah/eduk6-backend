@@ -6,4 +6,4 @@
  */
 
 export { currencyService, getClientIP } from './currencyService.js';
-export type { CurrencyInfo, ConvertedPrice, GeoPluginResponse } from './currencyService.js';
+export type { CurrencyInfo, ConvertedPrice, IpWhoisResponse } from './currencyService.js';

@@ -1,7 +1,7 @@
 /**
  * Currency Service
  *
- * Location-based automatic currency detection and conversion using GeoPlugin.
+ * Location-based automatic currency detection and conversion using ipwhois.app.
  * Detects visitor's location via IP and returns their local currency info
  * with real-time exchange rates.
  *
@@ -10,6 +10,8 @@
  * - Exchange rate conversion (base currency: USD)
  * - Redis caching (1 hour TTL for exchange rates)
  * - Fallback to USD if detection fails
+ *
+ * API: ipwhois.app - Free tier: 10,000 requests/month
  */
 
 import { redis } from '../../config/redis.js';
@@ -19,31 +21,37 @@ import { logger } from '../../utils/logger.js';
 // TYPES
 // =============================================================================
 
-export interface GeoPluginResponse {
-  geoplugin_request: string;
-  geoplugin_status: number;
-  geoplugin_delay: string;
-  geoplugin_credit: string;
-  geoplugin_city: string;
-  geoplugin_region: string;
-  geoplugin_regionCode: string;
-  geoplugin_regionName: string;
-  geoplugin_areaCode: string;
-  geoplugin_dmaCode: string;
-  geoplugin_countryCode: string;
-  geoplugin_countryName: string;
-  geoplugin_inEU: number;
-  geoplugin_euVATrate: boolean | number;
-  geoplugin_continentCode: string;
-  geoplugin_continentName: string;
-  geoplugin_latitude: string;
-  geoplugin_longitude: string;
-  geoplugin_locationAccuracyRadius: string;
-  geoplugin_timezone: string;
-  geoplugin_currencyCode: string;
-  geoplugin_currencySymbol: string;
-  geoplugin_currencySymbol_UTF8: string;
-  geoplugin_currencyConverter: number;
+export interface IpWhoisResponse {
+  ip: string;
+  success: boolean;
+  message?: string;
+  type: string;
+  continent: string;
+  continent_code: string;
+  country: string;
+  country_code: string;
+  country_flag: string;
+  country_capital: string;
+  country_phone: string;
+  country_neighbours: string;
+  region: string;
+  city: string;
+  latitude: number;
+  longitude: number;
+  asn: string;
+  org: string;
+  isp: string;
+  timezone: string;
+  timezone_name: string;
+  timezone_dstOffset: number;
+  timezone_gmtOffset: number;
+  timezone_gmt: string;
+  currency: string;
+  currency_code: string;
+  currency_symbol: string;
+  currency_rates: number;
+  currency_plural: string;
+  is_eu: boolean;
 }
 
 export interface CurrencyInfo {
@@ -72,8 +80,9 @@ export interface ConvertedPrice {
 // CONSTANTS
 // =============================================================================
 
-const GEOPLUGIN_API_URL = 'http://www.geoplugin.net/json.gp';
-const GEOPLUGIN_SSL_URL = 'https://ssl.geoplugin.net/json.gp';
+// Using ipwhois.app - free tier: 10,000 requests/month
+// Includes currency code, symbol, and exchange rates
+const IPWHOIS_API_URL = 'https://ipwhois.app/json/';
 
 // Cache settings
 const CACHE_PREFIX = 'currency:';
@@ -169,7 +178,7 @@ function formatPrice(amount: number, currencySymbol: string, currencyCode: strin
 // =============================================================================
 
 /**
- * Get currency info from GeoPlugin API
+ * Get currency info from ipwhois.app API
  * Uses caching to reduce API calls
  */
 async function getCurrencyInfoByIP(
@@ -187,25 +196,14 @@ async function getCurrencyInfoByIP(
       return JSON.parse(cached) as CurrencyInfo;
     }
 
-    // Build API URL
-    let apiUrl = GEOPLUGIN_SSL_URL;
-    const params = new URLSearchParams();
-
+    // Build API URL - ipwhois.app accepts IP as path parameter
+    let apiUrl = IPWHOIS_API_URL;
     if (ipAddress) {
-      params.append('ip', ipAddress);
+      apiUrl += ipAddress;
     }
 
-    if (baseCurrency !== 'USD') {
-      params.append('base_currency', baseCurrency);
-    }
-
-    const queryString = params.toString();
-    if (queryString) {
-      apiUrl += `?${queryString}`;
-    }
-
-    // Call GeoPlugin API
-    logger.info('Calling GeoPlugin API', { apiUrl: apiUrl.replace(/ip=[\d.]+/, 'ip=***') });
+    // Call ipwhois.app API
+    logger.info('Calling ipwhois.app API', { apiUrl: ipAddress ? apiUrl.replace(ipAddress, '***') : apiUrl });
 
     const response = await fetch(apiUrl, {
       method: 'GET',
@@ -215,29 +213,30 @@ async function getCurrencyInfoByIP(
     });
 
     if (!response.ok) {
-      throw new Error(`GeoPlugin API error: ${response.status} ${response.statusText}`);
+      throw new Error(`ipwhois.app API error: ${response.status} ${response.statusText}`);
     }
 
-    const data = await response.json() as GeoPluginResponse;
+    const data = await response.json() as IpWhoisResponse;
 
     // Check for valid response
-    if (data.geoplugin_status !== 200 && data.geoplugin_status !== 206) {
-      logger.warn('GeoPlugin returned non-success status', { status: data.geoplugin_status });
+    if (!data.success) {
+      logger.warn('ipwhois.app returned error', { message: data.message });
       return DEFAULT_CURRENCY;
     }
 
     // Parse response into our format
+    // ipwhois.app provides exchange rate from USD directly
     const currencyInfo: CurrencyInfo = {
-      currencyCode: data.geoplugin_currencyCode || 'USD',
-      currencySymbol: data.geoplugin_currencySymbol_UTF8 || data.geoplugin_currencySymbol || '$',
-      exchangeRate: data.geoplugin_currencyConverter || 1,
-      countryCode: data.geoplugin_countryCode || 'US',
-      countryName: data.geoplugin_countryName || 'United States',
-      city: data.geoplugin_city || '',
-      region: data.geoplugin_regionName || data.geoplugin_region || '',
-      timezone: data.geoplugin_timezone || 'UTC',
-      isEU: data.geoplugin_inEU === 1,
-      euVATrate: typeof data.geoplugin_euVATrate === 'number' ? data.geoplugin_euVATrate : null,
+      currencyCode: data.currency_code || 'USD',
+      currencySymbol: data.currency_symbol?.split(' ')[0] || '$', // Take first symbol if multiple
+      exchangeRate: data.currency_rates || 1,
+      countryCode: data.country_code || 'US',
+      countryName: data.country || 'United States',
+      city: data.city || '',
+      region: data.region || '',
+      timezone: data.timezone || 'UTC',
+      isEU: data.is_eu || false,
+      euVATrate: null, // ipwhois.app doesn't provide VAT rates
     };
 
     // Cache the result
@@ -245,11 +244,12 @@ async function getCurrencyInfoByIP(
     logger.info('Currency info fetched and cached', {
       countryCode: currencyInfo.countryCode,
       currencyCode: currencyInfo.currencyCode,
+      exchangeRate: currencyInfo.exchangeRate,
     });
 
     return currencyInfo;
   } catch (error) {
-    logger.error('Error fetching currency info from GeoPlugin', { error, ipAddress });
+    logger.error('Error fetching currency info from ipwhois.app', { error, ipAddress });
     return DEFAULT_CURRENCY;
   }
 }
