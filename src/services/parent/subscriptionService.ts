@@ -382,24 +382,56 @@ export const familySubscriptionService = {
     // Stripe API returns current_period_end as a number (Unix timestamp)
     const currentPeriodEnd = (subscription as any).current_period_end as number;
 
-    // Update parent's subscription info
-    await prisma.parent.update({
-      where: { id: parentId },
-      data: {
-        subscriptionTier: tier,
-        subscriptionStatus: subscription.status === 'active' || subscription.status === 'trialing' ? 'ACTIVE' : 'PAST_DUE',
-        stripeSubscriptionId: subscription.id,
-        subscriptionExpiresAt: new Date(currentPeriodEnd * 1000),
-        trialEndsAt,
+    // Determine subscription status
+    const subscriptionStatus = (subscription.status === 'active' || subscription.status === 'trialing')
+      ? 'ACTIVE' as const
+      : 'PAST_DUE' as const;
+
+    // Build update data
+    const updateData = {
+      subscriptionTier: tier,
+      subscriptionStatus,
+      stripeSubscriptionId: subscription.id,
+      subscriptionExpiresAt: currentPeriodEnd ? new Date(currentPeriodEnd * 1000) : null,
+      trialEndsAt,
+    };
+
+    logger.info('Updating parent subscription', {
+      parentId,
+      subscriptionId: subscription.id,
+      updateData: {
+        ...updateData,
+        subscriptionExpiresAt: updateData.subscriptionExpiresAt?.toISOString(),
+        trialEndsAt: updateData.trialEndsAt?.toISOString(),
       },
     });
 
-    logger.info('Family subscription created/updated', {
-      parentId,
-      subscriptionId: subscription.id,
-      tier,
-      status: subscription.status,
-    });
+    // Update parent's subscription info
+    try {
+      await prisma.parent.update({
+        where: { id: parentId },
+        data: updateData,
+      });
+
+      logger.info('Family subscription created/updated', {
+        parentId,
+        subscriptionId: subscription.id,
+        tier,
+        status: subscription.status,
+      });
+    } catch (error) {
+      logger.error('Failed to update parent subscription', {
+        parentId,
+        subscriptionId: subscription.id,
+        updateData: {
+          ...updateData,
+          subscriptionExpiresAt: updateData.subscriptionExpiresAt?.toISOString(),
+          trialEndsAt: updateData.trialEndsAt?.toISOString(),
+        },
+        error: error instanceof Error ? error.message : error,
+      });
+      throw error;
+    }
   },
 
   /**
