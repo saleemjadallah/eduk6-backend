@@ -378,10 +378,19 @@ export const subscriptionService = {
    * Handle subscription created/updated from webhook
    */
   async handleSubscriptionCreated(subscription: Stripe.Subscription): Promise<void> {
+    // Skip family subscriptions - they're handled by familySubscriptionService
+    if (subscription.metadata.type === 'family') {
+      logger.debug('Skipping family subscription in teacher handler', {
+        subscriptionId: subscription.id,
+      });
+      return;
+    }
+
     const teacherId = subscription.metadata.teacherId;
     if (!teacherId) {
       logger.warn('Subscription has no teacherId in metadata', {
         subscriptionId: subscription.id,
+        metadata: subscription.metadata,
       });
       return;
     }
@@ -433,10 +442,19 @@ export const subscriptionService = {
    * Handle subscription deleted from webhook
    */
   async handleSubscriptionDeleted(subscription: Stripe.Subscription): Promise<void> {
+    // Skip family subscriptions - they're handled by familySubscriptionService
+    if (subscription.metadata.type === 'family') {
+      logger.debug('Skipping family subscription deletion in teacher handler', {
+        subscriptionId: subscription.id,
+      });
+      return;
+    }
+
     const teacherId = subscription.metadata.teacherId;
     if (!teacherId) {
       logger.warn('Subscription has no teacherId in metadata', {
         subscriptionId: subscription.id,
+        metadata: subscription.metadata,
       });
       return;
     }
@@ -466,10 +484,19 @@ export const subscriptionService = {
    * Handle checkout session completed from webhook
    */
   async handleCheckoutCompleted(session: Stripe.Checkout.Session): Promise<void> {
+    // Skip family subscription checkouts - they're handled by familySubscriptionService
+    if (session.metadata?.type === 'family') {
+      logger.debug('Skipping family checkout in teacher handler', {
+        sessionId: session.id,
+      });
+      return;
+    }
+
     const teacherId = session.metadata?.teacherId;
     if (!teacherId) {
       logger.warn('Checkout session has no teacherId in metadata', {
         sessionId: session.id,
+        metadata: session.metadata,
       });
       return;
     }
