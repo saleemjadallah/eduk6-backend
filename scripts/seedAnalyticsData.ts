@@ -478,7 +478,7 @@ async function deleteTestData(): Promise<void> {
 // Main execution
 async function main() {
   console.log('='.repeat(60));
-  console.log('OrbitLearn Analytics Seed Data Generator');
+  console.log('Orbit Learn Analytics Seed Data Generator');
   console.log('='.repeat(60));
   console.log('');
 

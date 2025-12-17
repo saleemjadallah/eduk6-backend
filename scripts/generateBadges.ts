@@ -1,6 +1,6 @@
 /**
  * Badge Image Generator using Gemini Image Generation
- * Generates unique, kid-friendly badge images for the OrbitLearn achievement system
+ * Generates unique, kid-friendly badge images for the Orbit Learn achievement system
  *
  * Usage: npx tsx scripts/generateBadges.ts
  */
@@ -270,7 +270,7 @@ const RARITY_STYLES = {
 async function generateBadgeImage(badge: typeof BADGE_DEFINITIONS[0]): Promise<Buffer | null> {
   const rarityStyle = RARITY_STYLES[badge.rarity as keyof typeof RARITY_STYLES];
 
-  const prompt = `Create a circular achievement badge icon for a children's educational app called OrbitLearn.
+  const prompt = `Create a circular achievement badge icon for a children's educational app called Orbit Learn.
 
 IMPORTANT DESIGN GUIDELINES:
 - STYLE: Cartoon/illustrated style suitable for children ages 4-12
@@ -285,7 +285,7 @@ SHAPE:
 - The main icon should be centered and fill most of the circle
 - Leave a small margin from the edge
 
-COLORS - Use OrbitLearn brand colors as accents:
+COLORS - Use Orbit Learn brand colors as accents:
 - Nanobanana Blue: #3B82F6
 - Nanobanana Yellow: #FCD34D
 - Nanobanana Green: #22C55E
@@ -340,7 +340,7 @@ async function main() {
   }
 
   console.log('='.repeat(60));
-  console.log('OrbitLearn Badge Generator');
+  console.log('Orbit Learn Badge Generator');
   console.log('='.repeat(60));
   console.log(`Output directory: ${outputDir}`);
   console.log(`Total badges to generate: ${BADGE_DEFINITIONS.length}\n`);

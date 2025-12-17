@@ -111,7 +111,7 @@ async function generateCloudImage(prompt: string, outputPath: string): Promise<v
 }
 
 async function main() {
-  console.log('🌥️  Cloud Image Generator for OrbitLearn\n');
+  console.log('🌥️  Cloud Image Generator for Orbit Learn\n');
 
   // Create output directory if it doesn't exist
   if (!fs.existsSync(OUTPUT_DIR)) {

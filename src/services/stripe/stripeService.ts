@@ -44,7 +44,7 @@ export const stripeService = {
       const paymentIntent = await stripe.paymentIntents.create({
         amount: CONSENT_VERIFICATION_AMOUNT,
         currency: CONSENT_VERIFICATION_CURRENCY,
-        description: 'OrbitLearn Parental Consent Verification',
+        description: 'Orbit Learn Parental Consent Verification',
         metadata: {
           type: 'consent_verification',
           parentId,

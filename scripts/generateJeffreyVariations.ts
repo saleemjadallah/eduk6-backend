@@ -180,7 +180,7 @@ CRITICAL:
 - Must feel friendly and approachable for children`;
 
   // IMAGE 4: Logo icon - Jeffrey with orbit rings (narrow face version)
-  const prompt4 = `Create a logo/icon for "OrbitLearn" - an educational learning app for children.
+  const prompt4 = `Create a logo/icon for "Orbit Learn" - an educational learning app for children.
 
 DESIGN CONCEPT:
 Jeffrey, a friendly alien-human teacher, is positioned inside a circular orbit design, waving welcomingly.

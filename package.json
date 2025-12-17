@@ -1,7 +1,7 @@
 {
   "name": "eduk6-backend",
   "version": "1.0.0",
-  "description": "OrbitLearn K-6 AI Learning Platform Backend",
+  "description": "Orbit Learn K-6 AI Learning Platform Backend",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

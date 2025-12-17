@@ -12,22 +12,22 @@ const templates = {
    * Welcome email for new parents
    */
   welcome: (parentName: string) => ({
-    subject: 'Welcome to OrbitLearn! Your Learning Adventure Begins 🚀',
+    subject: 'Welcome to Orbit Learn! Your Learning Adventure Begins 🚀',
     html: `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome to OrbitLearn!</title>
+  <title>Welcome to Orbit Learn!</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
     <!-- Header with Logo -->
     <tr>
       <td style="background: linear-gradient(135deg, #7C3AED 0%, #2DD4BF 100%); border-radius: 24px 24px 0 0; padding: 40px; text-align: center;">
-        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 120px; height: 120px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);">
-        <h1 style="color: #ffffff; margin: 0; font-size: 32px; font-weight: 700;">Welcome to OrbitLearn!</h1>
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="Orbit Learn" style="width: 120px; height: 120px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);">
+        <h1 style="color: #ffffff; margin: 0; font-size: 32px; font-weight: 700;">Welcome to Orbit Learn!</h1>
         <p style="color: rgba(255,255,255,0.95); margin-top: 10px; font-size: 18px;">Where Learning is an Adventure!</p>
       </td>
     </tr>
@@ -36,7 +36,7 @@ const templates = {
         <h2 style="color: #1e1b4b; margin-top: 0; font-size: 24px;">Hi ${parentName}! 👋</h2>
 
         <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
-          Thank you for joining OrbitLearn! We're thrilled to have you and your family as part of our learning community.
+          Thank you for joining Orbit Learn! We're thrilled to have you and your family as part of our learning community.
         </p>
 
         <!-- Jeffrey Introduction Box -->
@@ -90,7 +90,7 @@ const templates = {
 
         <p style="color: #6b7280; font-size: 14px; border-top: 1px solid #e5e7eb; padding-top: 24px; margin-bottom: 0; text-align: center;">
           Questions? Reply to this email - we're here to help!<br>
-          <span style="color: #9ca3af;">- The OrbitLearn Team 💜</span>
+          <span style="color: #9ca3af;">- The Orbit Learn Team 💜</span>
         </p>
       </td>
     </tr>
@@ -99,11 +99,11 @@ const templates = {
 </html>
     `,
     text: `
-Welcome to OrbitLearn!
+Welcome to Orbit Learn!
 
 Hi ${parentName}!
 
-Thank you for joining OrbitLearn! We're thrilled to have you and your family as part of our learning community.
+Thank you for joining Orbit Learn! We're thrilled to have you and your family as part of our learning community.
 
 Meet Jeffrey, Your Child's AI Tutor!
 Jeffrey is a friendly, patient AI tutor who adapts to each child's learning style. With his lavender skin and warm smile, he makes education fun with interactive lessons and personalized encouragement from kindergarten through middle school!
@@ -116,7 +116,7 @@ Getting Started:
 Start learning at: ${config.frontendUrl}/dashboard
 
 Questions? Reply to this email - we're here to help!
-- The OrbitLearn Team
+- The Orbit Learn Team
     `,
   }),
 
@@ -148,7 +148,7 @@ Questions? Reply to this email - we're here to help!
     const { title, message, action, emoji } = purposes[purpose];
 
     return {
-      subject: `${emoji} ${title} - OrbitLearn`,
+      subject: `${emoji} ${title} - Orbit Learn`,
       html: `
 <!DOCTYPE html>
 <html>
@@ -162,7 +162,7 @@ Questions? Reply to this email - we're here to help!
     <!-- Header with Logo -->
     <tr>
       <td style="background: linear-gradient(135deg, #7C3AED 0%, #2DD4BF 100%); border-radius: 24px 24px 0 0; padding: 30px; text-align: center;">
-        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="Orbit Learn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
         <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">${title}</h1>
       </td>
     </tr>
@@ -187,13 +187,13 @@ Questions? Reply to this email - we're here to help!
         <!-- Security Tip -->
         <div style="background-color: #FEF3C7; border-radius: 12px; padding: 16px 20px; margin-top: 24px; border-left: 4px solid #F59E0B;">
           <p style="color: #92400E; margin: 0; font-size: 14px;">
-            <strong>🔒 Security tip:</strong> Never share this code with anyone. OrbitLearn will never ask for your code via phone or text.
+            <strong>🔒 Security tip:</strong> Never share this code with anyone. Orbit Learn will never ask for your code via phone or text.
           </p>
         </div>
 
         <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 28px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
           If you didn't request this ${action}, please ignore this email or contact support if you have concerns.<br><br>
-          <span style="color: #a78bfa;">- The OrbitLearn Team 💜</span>
+          <span style="color: #a78bfa;">- The Orbit Learn Team 💜</span>
         </p>
       </td>
     </tr>
@@ -210,11 +210,11 @@ Your verification code: ${otp}
 
 This code expires in 10 minutes.
 
-Security tip: Never share this code with anyone. OrbitLearn will never ask for your code via phone or text.
+Security tip: Never share this code with anyone. Orbit Learn will never ask for your code via phone or text.
 
 If you didn't request this ${action}, please ignore this email or contact support if you have concerns.
 
-- The OrbitLearn Team
+- The Orbit Learn Team
       `,
     };
   },
@@ -223,7 +223,7 @@ If you didn't request this ${action}, please ignore this email or contact suppor
    * Child added notification email
    */
   childAdded: (parentName: string, childName: string) => ({
-    subject: `🎉 ${childName}'s Profile is Ready! - OrbitLearn`,
+    subject: `🎉 ${childName}'s Profile is Ready! - Orbit Learn`,
     html: `
 <!DOCTYPE html>
 <html>
@@ -237,7 +237,7 @@ If you didn't request this ${action}, please ignore this email or contact suppor
     <!-- Header with Logo -->
     <tr>
       <td style="background: linear-gradient(135deg, #2DD4BF 0%, #7C3AED 100%); border-radius: 24px 24px 0 0; padding: 30px; text-align: center;">
-        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="Orbit Learn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
         <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">🎉 ${childName}'s Profile is Ready!</h1>
       </td>
     </tr>
@@ -300,7 +300,7 @@ If you didn't request this ${action}, please ignore this email or contact suppor
         </div>
 
         <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
-          <span style="color: #a78bfa;">- The OrbitLearn Team 💜</span>
+          <span style="color: #a78bfa;">- The Orbit Learn Team 💜</span>
         </p>
       </td>
     </tr>
@@ -324,7 +324,7 @@ Next Steps:
 
 View profile at: ${config.frontendUrl}/dashboard/children
 
-- The OrbitLearn Team
+- The Orbit Learn Team
     `,
   }),
 
@@ -342,7 +342,7 @@ View profile at: ${config.frontendUrl}/dashboard/children
       badgesEarned: string[];
     }
   ) => ({
-    subject: `📊 ${childName}'s Weekly Learning Report - OrbitLearn`,
+    subject: `📊 ${childName}'s Weekly Learning Report - Orbit Learn`,
     html: `
 <!DOCTYPE html>
 <html>
@@ -356,7 +356,7 @@ View profile at: ${config.frontendUrl}/dashboard/children
     <!-- Header with Logo -->
     <tr>
       <td style="background: linear-gradient(135deg, #7C3AED 0%, #EC4899 100%); border-radius: 24px 24px 0 0; padding: 30px; text-align: center;">
-        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="Orbit Learn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
         <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">${childName}'s Weekly Report 📊</h1>
         <p style="color: rgba(255,255,255,0.95); margin-top: 8px; font-size: 16px;">Great progress this week!</p>
       </td>
@@ -424,7 +424,7 @@ View profile at: ${config.frontendUrl}/dashboard/children
 
         <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
           Keep up the great work! Every lesson brings ${childName} closer to their learning goals.<br><br>
-          <span style="color: #a78bfa;">- The OrbitLearn Team 💜</span>
+          <span style="color: #a78bfa;">- The Orbit Learn Team 💜</span>
         </p>
       </td>
     </tr>
@@ -451,7 +451,7 @@ View full report at: ${config.frontendUrl}/dashboard/progress
 
 Keep up the great work! Every lesson brings ${childName} closer to their learning goals.
 
-- The OrbitLearn Team
+- The Orbit Learn Team
     `,
   }),
 
@@ -459,22 +459,22 @@ Keep up the great work! Every lesson brings ${childName} closer to their learnin
    * Welcome email for new teachers (green color scheme)
    */
   teacherWelcome: (teacherName: string) => ({
-    subject: 'Welcome to OrbitLearn for Educators! 🎓',
+    subject: 'Welcome to Orbit Learn for Educators! 🎓',
     html: `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome to OrbitLearn for Educators!</title>
+  <title>Welcome to Orbit Learn for Educators!</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
     <!-- Header with Logo - Green Theme -->
     <tr>
       <td style="background: linear-gradient(135deg, #059669 0%, #10B981 50%, #34D399 100%); border-radius: 24px 24px 0 0; padding: 40px; text-align: center;">
-        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 120px; height: 120px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);">
-        <h1 style="color: #ffffff; margin: 0; font-size: 32px; font-weight: 700;">Welcome to OrbitLearn!</h1>
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="Orbit Learn" style="width: 120px; height: 120px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);">
+        <h1 style="color: #ffffff; margin: 0; font-size: 32px; font-weight: 700;">Welcome to Orbit Learn!</h1>
         <p style="color: rgba(255,255,255,0.95); margin-top: 10px; font-size: 18px;">Empowering Educators with AI</p>
       </td>
     </tr>
@@ -483,7 +483,7 @@ Keep up the great work! Every lesson brings ${childName} closer to their learnin
         <h2 style="color: #064E3B; margin-top: 0; font-size: 24px;">Hi ${teacherName}! 👋</h2>
 
         <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
-          Thank you for joining OrbitLearn! We're excited to have you as part of our educator community. Our platform is designed to help you create engaging educational content and streamline your grading workflow.
+          Thank you for joining Orbit Learn! We're excited to have you as part of our educator community. Our platform is designed to help you create engaging educational content and streamline your grading workflow.
         </p>
 
         <!-- AI Features Box -->
@@ -536,7 +536,7 @@ Keep up the great work! Every lesson brings ${childName} closer to their learnin
 
         <p style="color: #6b7280; font-size: 14px; border-top: 1px solid #e5e7eb; padding-top: 24px; margin-bottom: 0; text-align: center;">
           Questions? Reply to this email - we're here to help!<br>
-          <span style="color: #10B981;">- The OrbitLearn Team 💚</span>
+          <span style="color: #10B981;">- The Orbit Learn Team 💚</span>
         </p>
       </td>
     </tr>
@@ -545,11 +545,11 @@ Keep up the great work! Every lesson brings ${childName} closer to their learnin
 </html>
     `,
     text: `
-Welcome to OrbitLearn for Educators!
+Welcome to Orbit Learn for Educators!
 
 Hi ${teacherName}!
 
-Thank you for joining OrbitLearn! We're excited to have you as part of our educator community. Our platform is designed to help you create engaging educational content and streamline your grading workflow.
+Thank you for joining Orbit Learn! We're excited to have you as part of our educator community. Our platform is designed to help you create engaging educational content and streamline your grading workflow.
 
 Powerful AI Tools at Your Fingertips
 Create lessons, quizzes, and flashcards in minutes. Our AI helps you focus on what matters most - teaching and inspiring students.
@@ -562,7 +562,7 @@ What You Can Do:
 Get started at: ${config.frontendUrl}/teacher/dashboard
 
 Questions? Reply to this email - we're here to help!
-- The OrbitLearn Team
+- The Orbit Learn Team
     `,
   }),
 
@@ -594,7 +594,7 @@ Questions? Reply to this email - we're here to help!
     const { title, message, action, emoji } = purposes[purpose];
 
     return {
-      subject: `${emoji} ${title} - OrbitLearn for Educators`,
+      subject: `${emoji} ${title} - Orbit Learn for Educators`,
       html: `
 <!DOCTYPE html>
 <html>
@@ -608,7 +608,7 @@ Questions? Reply to this email - we're here to help!
     <!-- Header with Logo - Green Theme -->
     <tr>
       <td style="background: linear-gradient(135deg, #059669 0%, #10B981 50%, #34D399 100%); border-radius: 24px 24px 0 0; padding: 30px; text-align: center;">
-        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="Orbit Learn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
         <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">${title}</h1>
       </td>
     </tr>
@@ -633,13 +633,13 @@ Questions? Reply to this email - we're here to help!
         <!-- Security Tip - Green Themed -->
         <div style="background-color: #ECFDF5; border-radius: 12px; padding: 16px 20px; margin-top: 24px; border-left: 4px solid #10B981;">
           <p style="color: #065F46; margin: 0; font-size: 14px;">
-            <strong>🔒 Security tip:</strong> Never share this code with anyone. OrbitLearn will never ask for your code via phone or text.
+            <strong>🔒 Security tip:</strong> Never share this code with anyone. Orbit Learn will never ask for your code via phone or text.
           </p>
         </div>
 
         <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 28px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
           If you didn't request this ${action}, please ignore this email or contact support if you have concerns.<br><br>
-          <span style="color: #10B981;">- The OrbitLearn Team 💚</span>
+          <span style="color: #10B981;">- The Orbit Learn Team 💚</span>
         </p>
       </td>
     </tr>
@@ -656,11 +656,11 @@ Your verification code: ${otp}
 
 This code expires in 10 minutes.
 
-Security tip: Never share this code with anyone. OrbitLearn will never ask for your code via phone or text.
+Security tip: Never share this code with anyone. Orbit Learn will never ask for your code via phone or text.
 
 If you didn't request this ${action}, please ignore this email or contact support if you have concerns.
 
-- The OrbitLearn Team
+- The Orbit Learn Team
       `,
     };
   },
@@ -683,8 +683,8 @@ If you didn't request this ${action}, please ignore this email or contact suppor
 
     return {
       subject: isUrgent
-        ? `⚠️ Only ${lessonsRemaining} Lessons Remaining! - OrbitLearn`
-        : `📊 You've Used ${threshold}% of Your Monthly Lessons - OrbitLearn`,
+        ? `⚠️ Only ${lessonsRemaining} Lessons Remaining! - Orbit Learn`
+        : `📊 You've Used ${threshold}% of Your Monthly Lessons - Orbit Learn`,
       html: `
 <!DOCTYPE html>
 <html>
@@ -697,7 +697,7 @@ If you didn't request this ${action}, please ignore this email or contact suppor
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
     <tr>
       <td style="background: linear-gradient(135deg, ${urgencyColor} 0%, #F59E0B 100%); border-radius: 24px 24px 0 0; padding: 30px; text-align: center;">
-        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="Orbit Learn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
         <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">
           ${isUrgent ? '⚠️ Running Low on Lessons' : '📊 Usage Update'}
         </h1>
@@ -751,7 +751,7 @@ If you didn't request this ${action}, please ignore this email or contact suppor
         </div>
 
         <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
-          <span style="color: #a78bfa;">- The OrbitLearn Team 💜</span>
+          <span style="color: #a78bfa;">- The Orbit Learn Team 💜</span>
         </p>
       </td>
     </tr>
@@ -778,7 +778,7 @@ ${isUrgent
 
 Upgrade at: ${config.frontendUrl}/parent/billing
 
-- The OrbitLearn Team
+- The Orbit Learn Team
       `,
     };
   },
@@ -787,7 +787,7 @@ Upgrade at: ${config.frontendUrl}/parent/billing
    * Limit reached email (100%)
    */
   limitReached: (parentName: string, lessonsLimit: number) => ({
-    subject: `🚫 Monthly Lesson Limit Reached - OrbitLearn`,
+    subject: `🚫 Monthly Lesson Limit Reached - Orbit Learn`,
     html: `
 <!DOCTYPE html>
 <html>
@@ -800,7 +800,7 @@ Upgrade at: ${config.frontendUrl}/parent/billing
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
     <tr>
       <td style="background: linear-gradient(135deg, #DC2626 0%, #EF4444 100%); border-radius: 24px 24px 0 0; padding: 30px; text-align: center;">
-        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="Orbit Learn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
         <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">
           Monthly Lesson Limit Reached
         </h1>
@@ -858,7 +858,7 @@ Upgrade at: ${config.frontendUrl}/parent/billing
         </div>
 
         <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
-          <span style="color: #a78bfa;">- The OrbitLearn Team 💜</span>
+          <span style="color: #a78bfa;">- The Orbit Learn Team 💜</span>
         </p>
       </td>
     </tr>
@@ -886,7 +886,7 @@ Family Plan Benefits:
 Upgrade at: ${config.frontendUrl}/parent/billing
 (7-day free trial • Cancel anytime)
 
-- The OrbitLearn Team
+- The Orbit Learn Team
     `,
   }),
 
@@ -894,7 +894,7 @@ Upgrade at: ${config.frontendUrl}/parent/billing
    * Security alert email for sensitive account changes
    */
   securityAlert: (parentName: string, alertType: string, details: string) => ({
-    subject: `🔒 Security Alert: ${alertType} - OrbitLearn`,
+    subject: `🔒 Security Alert: ${alertType} - Orbit Learn`,
     html: `
 <!DOCTYPE html>
 <html>
@@ -908,7 +908,7 @@ Upgrade at: ${config.frontendUrl}/parent/billing
     <!-- Header with Logo -->
     <tr>
       <td style="background: linear-gradient(135deg, #EF4444 0%, #F59E0B 100%); border-radius: 24px 24px 0 0; padding: 30px; text-align: center;">
-        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="Orbit Learn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
         <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">🔒 Security Alert</h1>
       </td>
     </tr>
@@ -919,7 +919,7 @@ Upgrade at: ${config.frontendUrl}/parent/billing
         </p>
 
         <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
-          We're letting you know about a security-related change on your OrbitLearn account:
+          We're letting you know about a security-related change on your Orbit Learn account:
         </p>
 
         <!-- Alert Box -->
@@ -949,7 +949,7 @@ Upgrade at: ${config.frontendUrl}/parent/billing
 
         <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
           This is an automated security notification. If you have any questions, please contact our support team.<br><br>
-          <span style="color: #a78bfa;">- The OrbitLearn Security Team 🛡️</span>
+          <span style="color: #a78bfa;">- The Orbit Learn Security Team 🛡️</span>
         </p>
       </td>
     </tr>
@@ -962,7 +962,7 @@ Security Alert: ${alertType}
 
 Hi ${parentName},
 
-We're letting you know about a security-related change on your OrbitLearn account:
+We're letting you know about a security-related change on your Orbit Learn account:
 
 ${alertType}
 ${details}
@@ -974,7 +974,7 @@ If you didn't authorize this action, please secure your account immediately by c
 
 Review your account settings at: ${config.frontendUrl}/parent/settings
 
-- The OrbitLearn Security Team
+- The Orbit Learn Security Team
     `,
   }),
 
@@ -1001,8 +1001,8 @@ Review your account settings at: ${config.frontendUrl}/parent/settings
 
     return {
       subject: isUrgent
-        ? `⚠️ Only ${creditsRemaining} Credits Remaining! - OrbitLearn for Teachers`
-        : `📊 You've Used ${threshold}% of Your Monthly Credits - OrbitLearn for Teachers`,
+        ? `⚠️ Only ${creditsRemaining} Credits Remaining! - Orbit Learn for Teachers`
+        : `📊 You've Used ${threshold}% of Your Monthly Credits - Orbit Learn for Teachers`,
       html: `
 <!DOCTYPE html>
 <html>
@@ -1015,7 +1015,7 @@ Review your account settings at: ${config.frontendUrl}/parent/settings
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
     <tr>
       <td style="background: linear-gradient(135deg, ${urgencyColor} 0%, ${isUrgent ? '#F87171' : '#FBBF24'} 100%); border-radius: 24px 24px 0 0; padding: 30px; text-align: center;">
-        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="Orbit Learn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
         <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">
           ${isUrgent ? '⚠️ Credits Running Low!' : '📊 Credit Usage Update'}
         </h1>
@@ -1078,7 +1078,7 @@ Review your account settings at: ${config.frontendUrl}/parent/settings
         </div>
 
         <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
-          <span style="color: #a78bfa;">- The OrbitLearn Team 💜</span>
+          <span style="color: #a78bfa;">- The Orbit Learn Team 💜</span>
         </p>
       </td>
     </tr>
@@ -1105,7 +1105,7 @@ ${isUrgent
 
 Manage your billing at: ${config.frontendUrl}/teacher/billing
 
-- The OrbitLearn Team
+- The Orbit Learn Team
       `,
     };
   },
@@ -1118,7 +1118,7 @@ Manage your billing at: ${config.frontendUrl}/teacher/billing
     creditsTotal: number,
     tier: string
   ) => ({
-    subject: `🚫 Monthly Credit Limit Reached - OrbitLearn for Teachers`,
+    subject: `🚫 Monthly Credit Limit Reached - Orbit Learn for Teachers`,
     html: `
 <!DOCTYPE html>
 <html>
@@ -1131,7 +1131,7 @@ Manage your billing at: ${config.frontendUrl}/teacher/billing
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
     <tr>
       <td style="background: linear-gradient(135deg, #DC2626 0%, #EF4444 100%); border-radius: 24px 24px 0 0; padding: 30px; text-align: center;">
-        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="Orbit Learn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
         <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">
           Monthly Credit Limit Reached
         </h1>
@@ -1186,7 +1186,7 @@ Manage your billing at: ${config.frontendUrl}/teacher/billing
         </div>
 
         <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
-          <span style="color: #a78bfa;">- The OrbitLearn Team 💜</span>
+          <span style="color: #a78bfa;">- The Orbit Learn Team 💜</span>
         </p>
       </td>
     </tr>
@@ -1213,7 +1213,7 @@ Your Options:
 
 Manage your billing at: ${config.frontendUrl}/teacher/billing
 
-- The OrbitLearn Team
+- The Orbit Learn Team
     `,
   }),
 };
@@ -1232,7 +1232,7 @@ export const emailService = {
       const template = templates.welcome(parentName);
 
       const { error } = await resend.emails.send({
-        from: `OrbitLearn <${config.email.fromEmail}>`,
+        from: `Orbit Learn <${config.email.fromEmail}>`,
         to: email,
         subject: template.subject,
         html: template.html,
@@ -1269,7 +1269,7 @@ export const emailService = {
       const template = templates.otp(otp, purpose);
 
       const { error } = await resend.emails.send({
-        from: `OrbitLearn <${config.email.fromEmail}>`,
+        from: `Orbit Learn <${config.email.fromEmail}>`,
         to: email,
         subject: template.subject,
         html: template.html,
@@ -1306,7 +1306,7 @@ export const emailService = {
       const template = templates.childAdded(parentName, childName);
 
       const { error } = await resend.emails.send({
-        from: `OrbitLearn <${config.email.fromEmail}>`,
+        from: `Orbit Learn <${config.email.fromEmail}>`,
         to: email,
         subject: template.subject,
         html: template.html,
@@ -1350,7 +1350,7 @@ export const emailService = {
       const template = templates.weeklyProgress(parentName, childName, stats);
 
       const { error } = await resend.emails.send({
-        from: `OrbitLearn <${config.email.fromEmail}>`,
+        from: `Orbit Learn <${config.email.fromEmail}>`,
         to: email,
         subject: template.subject,
         html: template.html,
@@ -1388,7 +1388,7 @@ export const emailService = {
       const template = templates.securityAlert(parentName, alertType, details);
 
       const { error } = await resend.emails.send({
-        from: `OrbitLearn Security <${config.email.fromEmail}>`,
+        from: `Orbit Learn Security <${config.email.fromEmail}>`,
         to: email,
         subject: template.subject,
         html: template.html,
@@ -1421,7 +1421,7 @@ export const emailService = {
       const template = templates.teacherWelcome(teacherName);
 
       const { error } = await resend.emails.send({
-        from: `OrbitLearn <${config.email.fromEmail}>`,
+        from: `Orbit Learn <${config.email.fromEmail}>`,
         to: email,
         subject: template.subject,
         html: template.html,
@@ -1458,7 +1458,7 @@ export const emailService = {
       const template = templates.teacherOtp(otp, purpose);
 
       const { error } = await resend.emails.send({
-        from: `OrbitLearn <${config.email.fromEmail}>`,
+        from: `Orbit Learn <${config.email.fromEmail}>`,
         to: email,
         subject: template.subject,
         html: template.html,
@@ -1504,7 +1504,7 @@ export const emailService = {
       );
 
       const { error } = await resend.emails.send({
-        from: `OrbitLearn <${config.email.fromEmail}>`,
+        from: `Orbit Learn <${config.email.fromEmail}>`,
         to: email,
         subject: template.subject,
         html: template.html,
@@ -1541,7 +1541,7 @@ export const emailService = {
       const template = templates.limitReached(parentName, lessonsLimit);
 
       const { error } = await resend.emails.send({
-        from: `OrbitLearn <${config.email.fromEmail}>`,
+        from: `Orbit Learn <${config.email.fromEmail}>`,
         to: email,
         subject: template.subject,
         html: template.html,
@@ -1593,7 +1593,7 @@ export const emailService = {
       );
 
       const { error } = await resend.emails.send({
-        from: `OrbitLearn <${config.email.fromEmail}>`,
+        from: `Orbit Learn <${config.email.fromEmail}>`,
         to: email,
         subject: template.subject,
         html: template.html,
@@ -1631,7 +1631,7 @@ export const emailService = {
       const template = templates.teacherCreditLimitReached(teacherName, creditsTotal, tier);
 
       const { error } = await resend.emails.send({
-        from: `OrbitLearn <${config.email.fromEmail}>`,
+        from: `Orbit Learn <${config.email.fromEmail}>`,
         to: email,
         subject: template.subject,
         html: template.html,
@@ -1691,7 +1691,7 @@ export const emailService = {
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
     <tr>
       <td style="background: linear-gradient(135deg, ${portalColor} 0%, #2DD4BF 100%); border-radius: 24px 24px 0 0; padding: 30px; text-align: center;">
-        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="OrbitLearn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="Orbit Learn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
         <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">
           📬 New Suggestion Received
         </h1>
@@ -1756,7 +1756,7 @@ export const emailService = {
         </div>
 
         <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
-          This suggestion was submitted via the OrbitLearn suggestion box.
+          This suggestion was submitted via the Orbit Learn suggestion box.
         </p>
       </td>
     </tr>
@@ -1783,10 +1783,10 @@ Details:
       `;
 
       const { error } = await resend.emails.send({
-        from: `OrbitLearn Suggestions <${config.email.fromEmail}>`,
+        from: `Orbit Learn Suggestions <${config.email.fromEmail}>`,
         to: 'support@orbitlearn.app',
         replyTo: userEmail || undefined,
-        subject: `[${portal.toUpperCase()}] New Suggestion - OrbitLearn`,
+        subject: `[${portal.toUpperCase()}] New Suggestion - Orbit Learn`,
         html,
         text,
       });

@@ -23,7 +23,7 @@ const MAILBOX_DEFINITIONS = [
   {
     id: 'student_mailbox',
     name: 'Student Suggestion Mailbox',
-    prompt: `Create a cute, cartoon-style mailbox for a children's educational app called OrbitLearn.
+    prompt: `Create a cute, cartoon-style mailbox for a children's educational app called Orbit Learn.
 
 IMPORTANT DESIGN GUIDELINES:
 - STYLE: Playful cartoon style suitable for children ages 4-12
@@ -194,7 +194,7 @@ async function main() {
   }
 
   console.log('='.repeat(60));
-  console.log('OrbitLearn Suggestion Box Image Generator');
+  console.log('Orbit Learn Suggestion Box Image Generator');
   console.log('='.repeat(60));
   console.log(`Output directory: ${outputDir}`);
   console.log(`Total images to generate: ${MAILBOX_DEFINITIONS.length}\n`);
