@@ -26,6 +26,10 @@ const teacherLoginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
+const googleSignInSchema = z.object({
+  idToken: z.string().min(1, 'Google ID token is required'),
+});
+
 const refreshTokenSchema = z.object({
   refreshToken: z.string().min(1, 'Refresh token is required'),
 });
@@ -45,12 +49,12 @@ const resetPasswordSchema = z.object({
 });
 
 const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1, 'Current password is required'),
+  currentPassword: z.string().optional(), // Optional for Google-only users setting password for the first time
   newPassword: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
 const deleteAccountSchema = z.object({
-  password: z.string().min(1, 'Password is required to confirm account deletion'),
+  password: z.string().optional(), // Optional for Google-only users who don't have a password
 });
 
 // ============================================
@@ -117,6 +121,57 @@ router.post(
             remaining: result.quota.remaining.toString(),
             resetDate: result.quota.resetDate,
           },
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /api/teacher/auth/google
+ * Google Sign-In/Sign-Up for teachers
+ * - New users: Creates account with emailVerified=true, returns isNewUser=true
+ * - Existing users: Logs them in, returns isNewUser=false
+ * - Email-only users: Links Google account to existing account
+ */
+router.post(
+  '/google',
+  authRateLimit,
+  validateInput(googleSignInSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { idToken } = req.body;
+      const deviceInfo = req.headers['user-agent'];
+      const ipAddress = req.ip;
+
+      const result = await teacherAuthService.googleSignIn(idToken, deviceInfo, ipAddress);
+
+      // Add new Google sign-in users to Brevo for email marketing (fire-and-forget)
+      if (result.isNewUser) {
+        addContactToBrevo({
+          email: result.teacher.email,
+          firstName: result.teacher.firstName || undefined,
+          lastName: result.teacher.lastName || undefined,
+          userType: 'TEACHER',
+          subscriptionTier: result.teacher.subscriptionTier,
+        }).catch(() => {}); // Silently ignore errors - don't block sign-in
+      }
+
+      res.json({
+        success: true,
+        data: {
+          token: result.accessToken,
+          refreshToken: result.refreshToken,
+          teacher: result.teacher,
+          quota: {
+            monthlyLimit: result.quota.monthlyLimit.toString(),
+            used: result.quota.used.toString(),
+            remaining: result.quota.remaining.toString(),
+            resetDate: result.quota.resetDate,
+          },
+          isNewUser: result.isNewUser,
         },
       });
     } catch (error) {
@@ -376,6 +431,8 @@ router.post(
 /**
  * POST /api/teacher/auth/change-password
  * Change password (authenticated)
+ * - Email users: Requires current password
+ * - Google-only users: Can set password with empty currentPassword
  */
 router.post(
   '/change-password',
@@ -385,7 +442,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { currentPassword, newPassword } = req.body;
-      await teacherAuthService.changePassword(req.teacher!.id, currentPassword, newPassword);
+      await teacherAuthService.changePassword(req.teacher!.id, currentPassword || '', newPassword);
 
       res.json({
         success: true,
@@ -493,7 +550,8 @@ router.patch(
 /**
  * DELETE /api/teacher/auth/delete-account
  * Delete teacher account and all data
- * Requires password confirmation for security
+ * - Email users: Requires password confirmation
+ * - Google-only users: No password required (authenticated via Google)
  * Cancels any active Stripe subscription immediately
  */
 router.delete(
@@ -504,7 +562,7 @@ router.delete(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { password } = req.body;
-      await teacherAuthService.deleteAccount(req.teacher!.id, password);
+      await teacherAuthService.deleteAccount(req.teacher!.id, password || '');
 
       res.json({
         success: true,

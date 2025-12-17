@@ -1,6 +1,7 @@
 // Teacher Authentication Service
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
+import { OAuth2Client } from 'google-auth-library';
 import { prisma } from '../../config/database.js';
 import { sessionService } from '../auth/sessionService.js';
 import { emailService, otpService } from '../email/index.js';
@@ -15,6 +16,21 @@ import { TeacherRole, TeacherSubscriptionTier } from '@prisma/client';
 import { logger } from '../../utils/logger.js';
 
 const SALT_ROUNDS = 12;
+
+// Google OAuth client - initialized lazily to ensure env var is available
+let googleClient: OAuth2Client | null = null;
+
+function getGoogleClient(): OAuth2Client {
+  if (!googleClient) {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      throw new Error('GOOGLE_CLIENT_ID environment variable is not set');
+    }
+    googleClient = new OAuth2Client(clientId);
+    logger.info('Google OAuth client initialized for teacher auth', { clientId: clientId.substring(0, 20) + '...' });
+  }
+  return googleClient;
+}
 
 export interface TeacherSignupParams {
   email: string;
@@ -150,6 +166,11 @@ export const teacherAuthService = {
       throw new UnauthorizedError('Invalid email or password');
     }
 
+    // Check if teacher signed up via Google and has no password
+    if (!teacher.passwordHash) {
+      throw new UnauthorizedError('This account uses Google Sign-In. Please sign in with Google.');
+    }
+
     // Verify password
     const isValid = await bcrypt.compare(password, teacher.passwordHash);
 
@@ -209,6 +230,188 @@ export const teacherAuthService = {
         remaining: monthlyLimit - used,
         resetDate,
       },
+    };
+  },
+
+  /**
+   * Google Sign-In - handles both new teachers and returning teachers
+   * For new teachers: creates account with emailVerified=true, isNewUser=true
+   * For returning teachers: logs them in, isNewUser=false
+   */
+  async googleSignIn(
+    idToken: string,
+    deviceInfo?: string,
+    ipAddress?: string
+  ): Promise<TeacherLoginResult & { isNewUser: boolean }> {
+    // Verify the Google ID token
+    let ticket;
+    try {
+      const client = getGoogleClient();
+      const clientId = process.env.GOOGLE_CLIENT_ID;
+      logger.info('Verifying Google ID token for teacher', { audience: clientId?.substring(0, 20) + '...' });
+      ticket = await client.verifyIdToken({
+        idToken,
+        audience: clientId,
+      });
+    } catch (error: any) {
+      logger.error('Google ID token verification failed for teacher', {
+        error: error?.message || error,
+        stack: error?.stack,
+        clientId: process.env.GOOGLE_CLIENT_ID?.substring(0, 30),
+      });
+      throw new UnauthorizedError('Invalid Google credentials');
+    }
+
+    const payload = ticket.getPayload();
+    if (!payload) {
+      throw new UnauthorizedError('Invalid Google credentials');
+    }
+
+    const { sub: googleId, email, given_name: firstName, family_name: lastName, email_verified } = payload;
+
+    if (!email) {
+      throw new ValidationError('Google account must have an email address');
+    }
+
+    // Check if teacher exists by googleId or email
+    let teacher = await prisma.teacher.findFirst({
+      where: {
+        OR: [
+          { googleId },
+          { email: email.toLowerCase() },
+        ],
+      },
+      include: {
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            monthlyTokenQuota: true,
+            currentMonthUsage: true,
+            quotaResetDate: true,
+          },
+        },
+      },
+    });
+
+    let isNewUser = false;
+
+    if (!teacher) {
+      // New teacher - create account
+      isNewUser = true;
+      teacher = await prisma.teacher.create({
+        data: {
+          email: email.toLowerCase(),
+          googleId,
+          authProvider: 'google',
+          firstName: firstName || null,
+          lastName: lastName || null,
+          emailVerified: email_verified ?? true, // Google verifies emails
+          emailVerifiedAt: email_verified ? new Date() : null,
+          subscriptionTier: 'FREE',
+          quotaResetDate: getNextMonthStart(),
+        },
+        include: {
+          organization: {
+            select: {
+              id: true,
+              name: true,
+              monthlyTokenQuota: true,
+              currentMonthUsage: true,
+              quotaResetDate: true,
+            },
+          },
+        },
+      });
+
+      // Send welcome email for new teachers
+      logger.info(`Sending welcome email for new Google teacher: ${teacher.email}`);
+      emailService.sendTeacherWelcomeEmail(
+        teacher.email,
+        teacher.firstName || 'Teacher'
+      ).catch(err => {
+        logger.error('Failed to send teacher welcome email for Google signup', { error: err, teacherId: teacher!.id });
+      });
+    } else if (!teacher.googleId) {
+      // Existing teacher with email - link Google account
+      teacher = await prisma.teacher.update({
+        where: { id: teacher.id },
+        data: {
+          googleId,
+          authProvider: teacher.authProvider === 'email' ? 'google' : teacher.authProvider,
+          emailVerified: true,
+          emailVerifiedAt: teacher.emailVerifiedAt || new Date(),
+        },
+        include: {
+          organization: {
+            select: {
+              id: true,
+              name: true,
+              monthlyTokenQuota: true,
+              currentMonthUsage: true,
+              quotaResetDate: true,
+            },
+          },
+        },
+      });
+      logger.info(`Linked Google account to existing teacher: ${teacher.email}`);
+    }
+
+    // Generate tokens
+    const accessToken = generateTeacherAccessToken(teacher);
+    const { token: refreshToken, jti, fid } = generateTeacherRefreshToken(teacher.id);
+
+    // Create session with hashed token
+    await sessionService.createSession({
+      userId: teacher.id,
+      type: 'teacher',
+      refreshTokenId: jti,
+      refreshTokenHash: hashRefreshToken(refreshToken),
+      tokenFamilyId: fid,
+      deviceInfo,
+      ipAddress,
+    });
+
+    // Update last login
+    await prisma.teacher.update({
+      where: { id: teacher.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    // Calculate quota info
+    const monthlyLimit = teacher.organization
+      ? teacher.organization.monthlyTokenQuota
+      : teacher.monthlyTokenQuota;
+    const used = teacher.organization
+      ? teacher.organization.currentMonthUsage
+      : teacher.currentMonthUsage;
+    const resetDate = teacher.organization
+      ? teacher.organization.quotaResetDate
+      : teacher.quotaResetDate;
+
+    logger.info(`Teacher Google sign-in successful: ${teacher.email}`, { isNewUser });
+
+    return {
+      accessToken,
+      refreshToken,
+      teacher: {
+        id: teacher.id,
+        email: teacher.email,
+        firstName: teacher.firstName,
+        lastName: teacher.lastName,
+        emailVerified: teacher.emailVerified,
+        role: teacher.role,
+        subscriptionTier: teacher.subscriptionTier,
+        organizationId: teacher.organizationId,
+        organizationName: teacher.organization?.name || null,
+      },
+      quota: {
+        monthlyLimit,
+        used,
+        remaining: monthlyLimit - used,
+        resetDate,
+      },
+      isNewUser,
     };
   },
 
@@ -452,6 +655,7 @@ export const teacherAuthService = {
 
   /**
    * Change password (authenticated)
+   * Note: Google-only users can use this to set a password for the first time
    */
   async changePassword(
     teacherId: string,
@@ -466,11 +670,18 @@ export const teacherAuthService = {
       throw new NotFoundError('Account not found');
     }
 
-    // Verify current password
-    const isValid = await bcrypt.compare(currentPassword, teacher.passwordHash);
-
-    if (!isValid) {
-      throw new UnauthorizedError('Current password is incorrect');
+    // If teacher has a password, verify it
+    if (teacher.passwordHash) {
+      const isValid = await bcrypt.compare(currentPassword, teacher.passwordHash);
+      if (!isValid) {
+        throw new UnauthorizedError('Current password is incorrect');
+      }
+    } else {
+      // Google-only user - they're setting a password for the first time
+      // Just validate that currentPassword is empty or they acknowledge they don't have one
+      if (currentPassword && currentPassword.length > 0) {
+        throw new ValidationError('This account uses Google Sign-In and has no current password. Leave current password empty to set one.');
+      }
     }
 
     // Validate new password
@@ -614,6 +825,8 @@ export const teacherAuthService = {
   /**
    * Delete teacher account
    * Cancels any active Stripe subscription and deletes all associated data
+   * For email users: requires password verification
+   * For Google-only users: password can be empty (they don't have one)
    */
   async deleteAccount(teacherId: string, password: string): Promise<void> {
     // Get teacher data including subscription info
@@ -623,6 +836,7 @@ export const teacherAuthService = {
         id: true,
         email: true,
         passwordHash: true,
+        authProvider: true,
         stripeSubscriptionId: true,
         stripeCustomerId: true,
       },
@@ -632,11 +846,14 @@ export const teacherAuthService = {
       throw new NotFoundError('Account not found');
     }
 
-    // Verify password before allowing deletion
-    const isValid = await bcrypt.compare(password, teacher.passwordHash);
-    if (!isValid) {
-      throw new UnauthorizedError('Invalid password');
+    // Verify password for users who have one
+    if (teacher.passwordHash) {
+      const isValid = await bcrypt.compare(password, teacher.passwordHash);
+      if (!isValid) {
+        throw new UnauthorizedError('Invalid password');
+      }
     }
+    // For Google-only users (no passwordHash), deletion is allowed since they're already authenticated
 
     // Cancel active Stripe subscription if exists
     if (teacher.stripeSubscriptionId) {

@@ -715,9 +715,13 @@ model Organization {
 model Teacher {
   id               String   @id @default(uuid())
   email            String   @unique
-  passwordHash     String
+  passwordHash     String?  // Optional for OAuth users
   firstName        String?
   lastName         String?
+
+  // OAuth providers
+  googleId         String?  @unique  // Google OAuth sub (unique identifier)
+  authProvider     String   @default("email")  // "email" | "google"
 
   // Profile details
   schoolName       String?              // School or organization name
