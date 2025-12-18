@@ -484,7 +484,7 @@ router.post(
         teacherId: req.teacher!.id,
         operation: TokenOperation.CONTENT_ANALYSIS,
         tokensUsed: result.tokensUsed,
-        modelUsed: 'gemini-2.5-flash',
+        modelUsed: 'gemini-3-flash-preview',
         resourceType: 'pdf_analysis',
       });
 
@@ -571,7 +571,7 @@ router.post(
         teacherId: req.teacher!.id,
         operation: TokenOperation.CONTENT_ANALYSIS,
         tokensUsed: result.tokensUsed,
-        modelUsed: 'gemini-2.5-flash',
+        modelUsed: 'gemini-3-flash-preview',
         resourceType: 'ppt_analysis',
       });
 

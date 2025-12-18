@@ -60,11 +60,11 @@ export const config = {
   gemini: {
     apiKey: process.env.GEMINI_API_KEY!,
     models: {
-      // Gemini 3 Pro - Most advanced model (November 2025)
-      pro: 'gemini-3-pro-preview',       // State-of-the-art reasoning with thinking
-      // Gemini 2.5 models for different use cases
-      flash: 'gemini-2.5-flash',         // Best price-performance, well-rounded
-      flashLite: 'gemini-2.5-flash-lite', // Fastest, cost-efficient
+      // Gemini 3 models (December 2025) - Latest generation
+      pro: 'gemini-3-pro-preview',         // Most advanced reasoning with thinking
+      flash: 'gemini-3-flash-preview',     // Best speed + intelligence, superior search/grounding
+      // Gemini 2.5 models for cost-efficient use cases
+      flashLite: 'gemini-2.5-flash-lite',  // Fastest, ultra cost-efficient
       image: 'gemini-3-pro-image-preview', // Image generation with better text rendering
     },
   },

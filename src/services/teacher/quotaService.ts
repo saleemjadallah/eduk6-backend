@@ -10,9 +10,13 @@ import { emailService } from '../email/emailService.js';
 // =============================================================================
 // These are BLENDED costs (input + output) per 1K tokens
 // Assuming typical 25% input, 75% output distribution for educational content
-// Source: https://ai.google.dev/gemini-api/docs/pricing (Updated Dec 5, 2025)
+// Source: https://ai.google.dev/gemini-api/docs/pricing (Updated Dec 17, 2025)
 const TOKEN_COSTS = {
-  // Gemini 2.5 Flash: $0.30/1M input, $2.50/1M output → ~$1.85/1M blended
+  // Gemini 3 Flash Preview (December 2025): ~$1.85/1M blended (same as 2.5 Flash pricing tier)
+  'gemini-3-flash': 0.00185,
+  'gemini-3-flash-preview': 0.00185,
+
+  // Gemini 2.5 Flash (legacy): $0.30/1M input, $2.50/1M output → ~$1.85/1M blended
   'gemini-2.5-flash': 0.00185,
 
   // Gemini 2.5 Flash-Lite: $0.10/1M input, $0.40/1M output → ~$0.325/1M blended

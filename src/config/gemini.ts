@@ -52,10 +52,10 @@ export const OLDER_CHILD_CONFIG = {
   temperature: 1.0,
 };
 
-// Gemini 3 Pro specific config for content analysis (uses HIGH thinking for better reasoning)
+// Gemini 3 Flash specific config for content analysis (uses thinking for better reasoning)
 export const GEMINI_3_PRO_ANALYSIS_CONFIG = {
   temperature: 0.3, // Lower for more consistent analysis output
-  maxOutputTokens: 65536, // Max for Gemini 2.5 Flash - model only uses what it needs
+  maxOutputTokens: 65536, // Max for Gemini 3 Flash - model only uses what it needs
   responseMimeType: 'application/json',
 };
 

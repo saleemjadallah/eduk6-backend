@@ -243,7 +243,7 @@ export class GeminiService {
     const history = this.formatConversationHistory(context.conversationHistory);
 
     // 4. Get appropriate config for age group
-    // Use Gemini 2.5 Flash for Jeffrey - fast and reliable for text-based chat
+    // Use Gemini 3 Flash for Jeffrey - fast and intelligent for text-based chat
     const baseConfig = context.ageGroup === 'YOUNG' ? YOUNG_CHILD_CONFIG : OLDER_CHILD_CONFIG;
     const generationConfig = {
       temperature: 1.0,
@@ -252,15 +252,15 @@ export class GeminiService {
       maxOutputTokens: baseConfig.maxOutputTokens, // Age-appropriate length
     };
 
-    // 5. Call Gemini 2.5 Flash for Jeffrey AI tutor
+    // 5. Call Gemini 3 Flash for Jeffrey AI tutor
     const model = genAI.getGenerativeModel({
-      model: config.gemini.models.flash, // gemini-2.5-flash
+      model: config.gemini.models.flash, // gemini-3-flash-preview
       safetySettings: CHILD_SAFETY_SETTINGS,
       generationConfig,
       systemInstruction: systemPrompt,
     });
 
-    logger.info(`Using Gemini 2.5 Flash for Jeffrey chat`, {
+    logger.info(`Using Gemini 3 Flash for Jeffrey chat`, {
       model: config.gemini.models.flash,
       ageGroup: context.ageGroup,
     });
@@ -323,7 +323,7 @@ export class GeminiService {
 
   /**
    * Analyze content and extract structured lesson data
-   * Uses Gemini 2.5 Flash for metadata extraction (exercises, vocabulary, etc.)
+   * Uses Gemini 3 Flash for metadata extraction (exercises, vocabulary, etc.)
    *
    * Note: Formatting is handled separately by the deterministic DocumentFormatter
    * service, which provides 100% reliable output without AI variability.
@@ -345,11 +345,11 @@ export class GeminiService {
       model: config.gemini.models.flash,
     });
 
-    // Use Gemini 2.5 Flash for analysis - stable and fast
+    // Use Gemini 3 Flash for analysis - fast with superior intelligence
     // Set maxOutputTokens high (65536 is the max for Flash) to prevent truncation
     // The model only generates what it needs - this just removes the ceiling
     const analysisModel = genAI.getGenerativeModel({
-      model: config.gemini.models.flash, // gemini-2.5-flash
+      model: config.gemini.models.flash, // gemini-3-flash-preview
       safetySettings: CHILD_SAFETY_SETTINGS,
       generationConfig: {
         temperature: 0.3,
@@ -400,7 +400,7 @@ export class GeminiService {
     // Process analysis result
     const analysisResponseText = analysisResult.response.text();
 
-    logger.info(`Gemini 2.5 Flash analysis completed`, {
+    logger.info(`Gemini 3 Flash analysis completed`, {
       responseLength: analysisResponseText.length,
       tokensUsed: analysisResult.response.usageMetadata?.totalTokenCount,
     });
