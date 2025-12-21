@@ -156,40 +156,63 @@ export async function analyzePPT(
     },
   });
 
-  const prompt = `You are an expert educator analyzing a PowerPoint presentation (converted to PDF) to extract educational content.
+  const prompt = `You are an expert educator extracting COMPLETE content from a PowerPoint presentation for a learning platform.
 
-Analyze this document and extract:
-1. ALL text content from every slide/page in the presentation
-2. A suggested title for teaching this content
-3. A brief summary (2-3 sentences)
-4. The subject area (MATH, SCIENCE, ENGLISH, SOCIAL_STUDIES, ART, MUSIC, or OTHER)
-5. The appropriate grade level (K, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, or a range like "3-5")
-6. Key topics covered (3-8 topics)
-7. Important vocabulary terms with definitions (5-15 terms)
-8. The number of slides/pages in the presentation
+CRITICAL INSTRUCTION: You must extract EVERY piece of text from EVERY slide. Be EXHAUSTIVE and THOROUGH. Do NOT summarize or abbreviate - we need the FULL content.
 
-IMPORTANT - Image handling rules:
-- DO extract and describe data from charts, graphs, diagrams, tables, and infographics (these contain important educational data)
-- DO NOT attempt to extract or transcribe text from static images, photos, clipart, or decorative graphics
-- If a slide contains only images without actual text, note "[Slide contains visual content]" and move on
-- Focus on the actual typed/written text content in the presentation
+Go through the presentation slide by slide and extract:
 
-Return JSON with this exact structure:
+1. **EXTRACTED TEXT** - This is the most important part. For EACH slide:
+   - Start with "--- SLIDE X: [Title] ---"
+   - Include ALL text: titles, subtitles, bullet points, sub-bullets
+   - Include ALL examples, definitions, rules, formulas
+   - Include ALL activity instructions, questions, practice problems
+   - Include text from tables, charts, diagrams
+   - Preserve the structure (use bullet points, numbered lists as they appear)
+   - Do NOT skip any text content, no matter how small
+
+2. **METADATA**:
+   - suggestedTitle: A clear title for this lesson
+   - summary: 2-3 sentence overview
+   - detectedSubject: MATH, SCIENCE, ENGLISH, SOCIAL_STUDIES, ART, MUSIC, or OTHER
+   - detectedGradeLevel: K through 12 or a range like "5-6"
+   - keyTopics: 3-8 main topics covered
+   - vocabulary: Important terms with definitions (extract from the content)
+   - slideCount: Total number of slides
+
+IMAGE HANDLING:
+- DO extract text/data from charts, graphs, tables, diagrams
+- DO describe educational visuals briefly
+- SKIP decorative images, clipart, photos
+
+EXAMPLE of thorough extraction for one slide:
+--- SLIDE 6: a/an (Indefinite Article) ---
+Use:
+• For indefinite (nonspecific) nouns
+  Example: Builders created a network of pipes and tunnels.
+• When making a general statement about a singular noun
+  Example: A network is essential for water distribution.
+• 'a' with words starting with consonants
+  Example: A builder designed the layout.
+• 'an' with words starting with vowels or vowel sounds
+  Example: An engineer inspected the site.
+
+Return JSON:
 {
-  "extractedText": "Full text content from all slides, organized by slide...",
+  "extractedText": "--- SLIDE 1: [Title] ---\\n[Complete slide 1 content]\\n\\n--- SLIDE 2: [Title] ---\\n[Complete slide 2 content]\\n\\n... continue for ALL slides",
   "suggestedTitle": "Title for the lesson",
-  "summary": "Brief summary of what this presentation covers...",
-  "detectedSubject": "SCIENCE",
-  "detectedGradeLevel": "5",
+  "summary": "Brief summary...",
+  "detectedSubject": "ENGLISH",
+  "detectedGradeLevel": "6",
   "keyTopics": ["topic1", "topic2", "topic3"],
   "vocabulary": [
     {"term": "word1", "definition": "definition1"},
     {"term": "word2", "definition": "definition2"}
   ],
-  "slideCount": 10
+  "slideCount": 18
 }
 
-If the document is unreadable or contains no educational content, still return the JSON structure with empty/null values where appropriate.`;
+Remember: Extract EVERYTHING. The extracted text should be comprehensive enough that someone could recreate the lesson from it.`;
 
   try {
     const result = await model.generateContent([
