@@ -665,12 +665,13 @@ export class GeminiService {
     });
 
     // Use Gemini Flash for vision - fast and accurate for OCR
+    // Set maxOutputTokens high to prevent truncation on dense worksheets/documents
     const model = genAI.getGenerativeModel({
       model: config.gemini.models.flash,
       safetySettings: CHILD_SAFETY_SETTINGS,
       generationConfig: {
         temperature: 0.1, // Very low for accurate text extraction
-        maxOutputTokens: 8000,
+        maxOutputTokens: 65536,
       },
     });
 
@@ -756,11 +757,13 @@ If no text is visible, return "[No text detected]".`;
     });
 
     // Use Gemini Flash for PDF analysis
+    // Set maxOutputTokens high (65536 is the max for Flash) to prevent truncation
+    // for large documents - the model only generates what it needs
     const model = genAI.getGenerativeModel({
       model: config.gemini.models.flash,
       generationConfig: {
         temperature: 0.3,
-        maxOutputTokens: 8000,
+        maxOutputTokens: 65536,
         responseMimeType: 'application/json',
       },
     });

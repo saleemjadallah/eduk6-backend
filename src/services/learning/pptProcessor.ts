@@ -145,11 +145,13 @@ export async function analyzePPT(
   const pdfBase64 = await convertPPTtoPDF(pptBase64, mimeType, filename);
 
   // Step 2: Use Gemini Flash for PDF analysis
+  // Set maxOutputTokens high (65536 is the max for Flash) to prevent truncation
+  // for large presentations with many slides - the model only generates what it needs
   const model = genAI.getGenerativeModel({
     model: config.gemini.models.flash,
     generationConfig: {
       temperature: 0.3,
-      maxOutputTokens: 8000,
+      maxOutputTokens: 65536,
       responseMimeType: 'application/json',
     },
   });

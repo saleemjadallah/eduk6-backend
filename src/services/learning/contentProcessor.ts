@@ -359,11 +359,13 @@ async function extractTextFromPDF(fileUrl: string): Promise<string> {
 async function extractTextFromPDFWithVision(pdfBuffer: Buffer): Promise<string> {
   const pdfBase64 = pdfBuffer.toString('base64');
 
+  // Set maxOutputTokens high (65536 is the max for Flash) to prevent truncation
+  // for large scanned documents - the model only generates what it needs
   const model = genAI.getGenerativeModel({
     model: config.gemini.models.flash,
     generationConfig: {
       temperature: 0.1,
-      maxOutputTokens: 8000,
+      maxOutputTokens: 65536,
     },
   });
 
