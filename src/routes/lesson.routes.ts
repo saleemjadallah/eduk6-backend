@@ -1045,8 +1045,9 @@ router.post(
         userId: req.parent?.id || req.child?.id,
       });
 
-      // Dynamically import PPT processor
+      // Dynamically import PPT processor and image extractor
       const { analyzePPT, PPT_MIME_TYPES } = await import('../services/learning/pptProcessor.js');
+      const { extractAndUploadPPTXImages, insertImagesIntoContent } = await import('../services/learning/pptxImageExtractor.js');
 
       // Analyze the PPT
       const result = await analyzePPT(
@@ -1116,11 +1117,46 @@ router.post(
         subject: finalSubject,
       });
 
+      // Extract and upload images from PPTX (only for modern .pptx format)
+      let finalFormattedContent = formattedContent;
+      let imageCount = 0;
+
+      if (result.originalFormat === 'pptx') {
+        try {
+          logger.info('Extracting images from PPTX', { lessonId: lesson.id });
+
+          const imageResult = await extractAndUploadPPTXImages(
+            pptBase64,
+            lesson.id,
+            child.parentId, // familyId
+            childId
+          );
+
+          if (imageResult.slideImages.length > 0) {
+            // Insert images into the formatted content
+            finalFormattedContent = insertImagesIntoContent(formattedContent, imageResult.slideImages);
+            imageCount = imageResult.totalImages;
+
+            logger.info('PPTX images inserted into content', {
+              lessonId: lesson.id,
+              totalImages: imageResult.totalImages,
+              mappedToSlides: imageResult.slideImages.filter(i => i.slideNumber > 0).length,
+            });
+          }
+        } catch (imageError) {
+          // Log error but don't fail the lesson creation - images are optional
+          logger.error('Failed to extract PPTX images, continuing without images', {
+            lessonId: lesson.id,
+            error: imageError instanceof Error ? imageError.message : 'Unknown error',
+          });
+        }
+      }
+
       // Update with analysis results - use full analysis data for rich content (sanitize text fields)
       await lessonService.update(lesson.id, {
         summary: sanitizeForPostgres(analysis.summary || result.summary),
         gradeLevel: gradeLevel || String(analysis.gradeLevel) || result.detectedGradeLevel || String(child.gradeLevel),
-        formattedContent: sanitizeForPostgres(formattedContent),
+        formattedContent: sanitizeForPostgres(finalFormattedContent),
         chapters: analysis.chapters ? sanitizeObjectForPostgres(JSON.parse(JSON.stringify(analysis.chapters))) : undefined,
         keyConcepts: (analysis.keyConcepts || result.keyTopics)?.map(c => sanitizeForPostgres(c) || c),
         vocabulary: analysis.vocabulary ? sanitizeObjectForPostgres(JSON.parse(JSON.stringify(analysis.vocabulary))) :
@@ -1155,7 +1191,8 @@ router.post(
           slideCount: result.slideCount,
           originalFormat: result.originalFormat,
           tokensUsed: result.tokensUsed,
-          formattedContent,
+          formattedContent: finalFormattedContent,
+          imageCount, // Number of images extracted and inserted
         },
       });
     } catch (error) {

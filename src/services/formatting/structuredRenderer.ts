@@ -1210,6 +1210,37 @@ export const structuredRendererStyles = `
 }
 
 /* ============================================
+   SLIDE IMAGES (from PPTX extraction)
+   ============================================ */
+
+.slide-image {
+  margin: 1rem 0;
+  text-align: center;
+}
+
+.slide-image img.lesson-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Multiple images in a slide */
+.slide-images-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: center;
+  margin: 1rem 0;
+}
+
+.slide-images-container .slide-image {
+  flex: 1 1 300px;
+  max-width: 100%;
+  margin: 0;
+}
+
+/* ============================================
    MATH EXPRESSIONS (from mathFormatter)
    ============================================ */
 
