@@ -39,6 +39,7 @@
     "jsonwebtoken": "^9.0.2",
     "mime-types": "^2.1.35",
     "morgan": "^1.10.0",
+    "node-pptx-parser": "^1.0.1",
     "pdf-parse": "^1.1.1",
     "puppeteer": "^24.32.0",
     "resend": "^6.5.2",

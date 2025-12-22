@@ -1,14 +1,21 @@
 /**
  * PowerPoint Processing Service
- * Converts PPT/PPTX to PDF using CloudConvert, then uses Gemini for analysis
  *
- * Note: Gemini only supports PDF for document understanding, not PPT/PPTX directly.
- * See: https://ai.google.dev/gemini-api/docs/document-processing
+ * For PPTX files: Uses node-pptx-parser for direct text extraction (more reliable)
+ * For PPT files: Falls back to CloudConvert → PDF → Gemini pipeline
  */
 import CloudConvert from 'cloudconvert';
+// Use dynamic import to work around TypeScript typing issues with node-pptx-parser
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const PptxParser = require('node-pptx-parser').default as new (filePath: string) => {
+  extractText(): Promise<Array<{ id: string; text: string[] }>>;
+};
 import { genAI } from '../../config/gemini.js';
 import { config } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 
 // MIME type constants for PowerPoint files
 export const PPT_MIME_TYPES = [
@@ -31,15 +38,86 @@ export interface PPTProcessingResult {
   tokensUsed: number;
 }
 
-// Initialize CloudConvert client
+// Initialize CloudConvert client (for legacy PPT files)
 const cloudConvert = new CloudConvert(process.env.CLOUDCONVERT_API_KEY || '');
 
 /**
- * Convert PPT/PPTX to PDF using CloudConvert
- * @param pptBase64 - Base64-encoded PPT/PPTX file
- * @param mimeType - MIME type of the file
- * @param filename - Original filename
- * @returns Base64-encoded PDF
+ * Extract text directly from a PPTX file using node-pptx-parser
+ * This is much more reliable than CloudConvert → PDF → Gemini
+ */
+async function extractTextFromPPTX(pptBase64: string, filename: string): Promise<{ text: string; slideCount: number }> {
+  // Clean base64 - remove data URL prefix if present
+  let cleanBase64 = pptBase64;
+  if (pptBase64.includes(',')) {
+    cleanBase64 = pptBase64.split(',')[1];
+  }
+
+  // Write to temp file (node-pptx-parser requires a file path)
+  const tempDir = os.tmpdir();
+  const tempFile = path.join(tempDir, `pptx-${Date.now()}-${Math.random().toString(36).slice(2)}.pptx`);
+
+  try {
+    // Write base64 to temp file
+    const buffer = Buffer.from(cleanBase64, 'base64');
+    fs.writeFileSync(tempFile, buffer);
+
+    logger.info('Extracting text from PPTX using node-pptx-parser', { filename, tempFile });
+
+    // Parse the PPTX file
+    const parser = new PptxParser(tempFile);
+    const slides = await parser.extractText();
+
+    // Sort slides by their ID (rId2, rId3, etc. -> extract number)
+    const sortedSlides = [...slides].sort((a, b) => {
+      const numA = parseInt(a.id.replace(/\D/g, '')) || 0;
+      const numB = parseInt(b.id.replace(/\D/g, '')) || 0;
+      return numA - numB;
+    });
+
+    // Build formatted text with slide markers
+    let slideNumber = 1;
+    const textParts: string[] = [];
+
+    for (const slide of sortedSlides) {
+      const slideText = slide.text.join('\n').trim();
+      if (slideText) {
+        // Try to extract a title from the first line
+        const lines = slideText.split('\n');
+        const title = lines[0]?.trim() || `Slide ${slideNumber}`;
+
+        textParts.push(`--- SLIDE ${slideNumber}: ${title} ---`);
+        textParts.push(slideText);
+        textParts.push(''); // Empty line between slides
+      }
+      slideNumber++;
+    }
+
+    const extractedText = textParts.join('\n');
+
+    logger.info('PPTX text extraction completed', {
+      filename,
+      slideCount: slides.length,
+      textLength: extractedText.length,
+    });
+
+    return {
+      text: extractedText,
+      slideCount: slides.length,
+    };
+  } finally {
+    // Clean up temp file
+    try {
+      if (fs.existsSync(tempFile)) {
+        fs.unlinkSync(tempFile);
+      }
+    } catch {
+      // Ignore cleanup errors
+    }
+  }
+}
+
+/**
+ * Convert PPT/PPTX to PDF using CloudConvert (fallback for legacy PPT files)
  */
 async function convertPPTtoPDF(
   pptBase64: string,
@@ -48,17 +126,14 @@ async function convertPPTtoPDF(
 ): Promise<string> {
   logger.info('Converting PPT to PDF via CloudConvert', { filename, mimeType });
 
-  // Clean base64 - remove data URL prefix if present
   let cleanBase64 = pptBase64;
   if (pptBase64.includes(',')) {
     cleanBase64 = pptBase64.split(',')[1];
   }
 
-  // Get the input format
   const inputFormat = mimeType === 'application/vnd.ms-powerpoint' ? 'ppt' : 'pptx';
 
   try {
-    // Create a job with import, convert, and export tasks
     const job = await cloudConvert.jobs.create({
       tasks: {
         'import-ppt': {
@@ -80,10 +155,7 @@ async function convertPPTtoPDF(
       },
     });
 
-    // Wait for the job to complete
     const completedJob = await cloudConvert.jobs.wait(job.id);
-
-    // Get the export task
     const exportTask = completedJob.tasks?.find(
       (task) => task.operation === 'export/url' && task.status === 'finished'
     );
@@ -92,7 +164,6 @@ async function convertPPTtoPDF(
       throw new Error('CloudConvert conversion failed - no output file');
     }
 
-    // Download the PDF
     const pdfUrl = exportTask.result.files[0].url;
     const response = await fetch(pdfUrl);
 
@@ -103,11 +174,7 @@ async function convertPPTtoPDF(
     const pdfBuffer = await response.arrayBuffer();
     const pdfBase64 = Buffer.from(pdfBuffer).toString('base64');
 
-    logger.info('PPT to PDF conversion successful', {
-      filename,
-      pdfSize: pdfBase64.length
-    });
-
+    logger.info('PPT to PDF conversion successful', { filename, pdfSize: pdfBase64.length });
     return pdfBase64;
   } catch (error) {
     logger.error('CloudConvert PPT to PDF conversion failed', {
@@ -119,12 +186,108 @@ async function convertPPTtoPDF(
 }
 
 /**
- * Process a PPT/PPTX file and extract educational content using Gemini
- * First converts to PDF, then sends to Gemini for analysis
+ * Analyze extracted text with Gemini to get metadata (vocabulary, topics, etc.)
+ */
+async function analyzeExtractedText(
+  extractedText: string,
+  slideCount: number
+): Promise<{
+  suggestedTitle: string;
+  summary: string;
+  detectedSubject: string | null;
+  detectedGradeLevel: string | null;
+  keyTopics: string[];
+  vocabulary: Array<{ term: string; definition: string }>;
+  tokensUsed: number;
+}> {
+  const model = genAI.getGenerativeModel({
+    model: config.gemini.models.flash,
+    generationConfig: {
+      temperature: 0.3,
+      maxOutputTokens: 8192,
+      responseMimeType: 'application/json',
+    },
+  });
+
+  const prompt = `You are an expert educator analyzing educational content extracted from a PowerPoint presentation.
+
+EXTRACTED CONTENT FROM ${slideCount} SLIDES:
+${extractedText}
+
+Analyze this content and provide:
+
+1. **suggestedTitle**: A clear, descriptive title for this lesson
+2. **summary**: A 2-3 sentence overview of what this lesson teaches
+3. **detectedSubject**: One of: MATH, SCIENCE, ENGLISH, SOCIAL_STUDIES, ART, MUSIC, or OTHER
+4. **detectedGradeLevel**: The appropriate grade level (K, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, or a range like "5-6")
+5. **keyTopics**: 3-8 main topics/concepts covered in this lesson
+6. **vocabulary**: Important terms with their definitions (extract 5-15 terms that are taught in this lesson)
+
+Return JSON:
+{
+  "suggestedTitle": "Understanding Articles: a, an, the",
+  "summary": "This lesson teaches students about definite and indefinite articles...",
+  "detectedSubject": "ENGLISH",
+  "detectedGradeLevel": "6",
+  "keyTopics": ["indefinite articles", "definite articles", "a vs an", "article usage rules"],
+  "vocabulary": [
+    {"term": "article", "definition": "A word used before a noun to indicate whether the noun refers to something specific or general"},
+    {"term": "indefinite article", "definition": "The articles 'a' and 'an' used for non-specific nouns"}
+  ]
+}`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const responseText = response.text();
+    const tokensUsed = response.usageMetadata?.totalTokenCount || 1000;
+
+    // Extract JSON from response
+    let jsonText = responseText;
+    const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) {
+      jsonText = jsonMatch[1].trim();
+    } else if (responseText.includes('{')) {
+      const startIndex = responseText.indexOf('{');
+      const endIndex = responseText.lastIndexOf('}');
+      if (startIndex !== -1 && endIndex !== -1) {
+        jsonText = responseText.slice(startIndex, endIndex + 1);
+      }
+    }
+
+    const analysis = JSON.parse(jsonText);
+
+    return {
+      suggestedTitle: analysis.suggestedTitle || 'Untitled Presentation',
+      summary: analysis.summary || '',
+      detectedSubject: analysis.detectedSubject || null,
+      detectedGradeLevel: analysis.detectedGradeLevel || null,
+      keyTopics: analysis.keyTopics || [],
+      vocabulary: analysis.vocabulary || [],
+      tokensUsed,
+    };
+  } catch (error) {
+    logger.error('Failed to analyze extracted text', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    // Return defaults if analysis fails - we still have the extracted text
+    return {
+      suggestedTitle: 'Untitled Presentation',
+      summary: '',
+      detectedSubject: null,
+      detectedGradeLevel: null,
+      keyTopics: [],
+      vocabulary: [],
+      tokensUsed: 0,
+    };
+  }
+}
+
+/**
+ * Process a PPT/PPTX file and extract educational content
  *
- * @param pptBase64 - Base64-encoded PPT/PPTX file
- * @param mimeType - MIME type of the file
- * @param filename - Original filename (for format detection)
+ * For PPTX: Uses direct parsing with node-pptx-parser (most reliable)
+ * For PPT: Falls back to CloudConvert → PDF → Gemini pipeline
  */
 export async function analyzePPT(
   pptBase64: string,
@@ -137,16 +300,50 @@ export async function analyzePPT(
     base64Length: pptBase64.length,
   });
 
-  // Determine original format from MIME type
   const originalFormat: 'ppt' | 'pptx' =
     mimeType === 'application/vnd.ms-powerpoint' ? 'ppt' : 'pptx';
 
-  // Step 1: Convert PPT to PDF
+  // For PPTX files, use direct parsing (much more reliable)
+  if (originalFormat === 'pptx') {
+    try {
+      // Step 1: Extract text directly from PPTX
+      const { text: extractedText, slideCount } = await extractTextFromPPTX(pptBase64, filename);
+
+      // Step 2: Analyze extracted text with Gemini for metadata
+      const analysis = await analyzeExtractedText(extractedText, slideCount);
+
+      logger.info('PPTX analysis completed (direct parsing)', {
+        filename,
+        slideCount,
+        textLength: extractedText.length,
+        subject: analysis.detectedSubject,
+        tokensUsed: analysis.tokensUsed,
+      });
+
+      return {
+        extractedText,
+        suggestedTitle: analysis.suggestedTitle,
+        summary: analysis.summary,
+        detectedSubject: analysis.detectedSubject,
+        detectedGradeLevel: analysis.detectedGradeLevel,
+        keyTopics: analysis.keyTopics,
+        vocabulary: analysis.vocabulary,
+        slideCount,
+        originalFormat,
+        tokensUsed: analysis.tokensUsed,
+      };
+    } catch (error) {
+      logger.warn('Direct PPTX parsing failed, falling back to CloudConvert', {
+        filename,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      // Fall through to CloudConvert method
+    }
+  }
+
+  // For PPT files or if PPTX parsing fails, use CloudConvert → PDF → Gemini
   const pdfBase64 = await convertPPTtoPDF(pptBase64, mimeType, filename);
 
-  // Step 2: Use Gemini Flash for PDF analysis
-  // Set maxOutputTokens high (65536 is the max for Flash) to prevent truncation
-  // for large presentations with many slides - the model only generates what it needs
   const model = genAI.getGenerativeModel({
     model: config.gemini.models.flash,
     generationConfig: {
@@ -180,23 +377,6 @@ Go through the presentation slide by slide and extract:
    - vocabulary: Important terms with definitions (extract from the content)
    - slideCount: Total number of slides
 
-IMAGE HANDLING:
-- DO extract text/data from charts, graphs, tables, diagrams
-- DO describe educational visuals briefly
-- SKIP decorative images, clipart, photos
-
-EXAMPLE of thorough extraction for one slide:
---- SLIDE 6: a/an (Indefinite Article) ---
-Use:
-• For indefinite (nonspecific) nouns
-  Example: Builders created a network of pipes and tunnels.
-• When making a general statement about a singular noun
-  Example: A network is essential for water distribution.
-• 'a' with words starting with consonants
-  Example: A builder designed the layout.
-• 'an' with words starting with vowels or vowel sounds
-  Example: An engineer inspected the site.
-
 Return JSON:
 {
   "extractedText": "--- SLIDE 1: [Title] ---\\n[Complete slide 1 content]\\n\\n--- SLIDE 2: [Title] ---\\n[Complete slide 2 content]\\n\\n... continue for ALL slides",
@@ -219,7 +399,7 @@ Remember: Extract EVERYTHING. The extracted text should be comprehensive enough 
       { text: prompt },
       {
         inlineData: {
-          mimeType: 'application/pdf',  // Now sending as PDF
+          mimeType: 'application/pdf',
           data: pdfBase64,
         },
       },
@@ -229,13 +409,11 @@ Remember: Extract EVERYTHING. The extracted text should be comprehensive enough 
     const responseText = response.text();
     const tokensUsed = response.usageMetadata?.totalTokenCount || 4000;
 
-    // Extract JSON from response (handle potential markdown wrapping)
     let jsonText = responseText;
     const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (jsonMatch) {
       jsonText = jsonMatch[1].trim();
     } else if (responseText.includes('{')) {
-      // Try to extract JSON object directly
       const startIndex = responseText.indexOf('{');
       const endIndex = responseText.lastIndexOf('}');
       if (startIndex !== -1 && endIndex !== -1) {
@@ -245,13 +423,12 @@ Remember: Extract EVERYTHING. The extracted text should be comprehensive enough 
 
     const analysis = JSON.parse(jsonText);
 
-    logger.info('PPT analysis completed', {
+    logger.info('PPT analysis completed (CloudConvert path)', {
       filename,
       originalFormat,
       slideCount: analysis.slideCount || 1,
       textLength: analysis.extractedText?.length || 0,
       subject: analysis.detectedSubject,
-      gradeLevel: analysis.detectedGradeLevel,
       tokensUsed,
     });
 
