@@ -314,45 +314,8 @@ export async function analyzePPT(
   const originalFormat: 'ppt' | 'pptx' =
     mimeType === 'application/vnd.ms-powerpoint' ? 'ppt' : 'pptx';
 
-  // For PPTX files, use direct parsing (much more reliable)
-  if (originalFormat === 'pptx') {
-    try {
-      // Step 1: Extract text directly from PPTX
-      const { text: extractedText, slideCount } = await extractTextFromPPTX(pptBase64, filename);
-
-      // Step 2: Analyze extracted text with Gemini for metadata
-      const analysis = await analyzeExtractedText(extractedText, slideCount);
-
-      logger.info('PPTX analysis completed (direct parsing)', {
-        filename,
-        slideCount,
-        textLength: extractedText.length,
-        subject: analysis.detectedSubject,
-        tokensUsed: analysis.tokensUsed,
-      });
-
-      return {
-        extractedText,
-        suggestedTitle: analysis.suggestedTitle,
-        summary: analysis.summary,
-        detectedSubject: analysis.detectedSubject,
-        detectedGradeLevel: analysis.detectedGradeLevel,
-        keyTopics: analysis.keyTopics,
-        vocabulary: analysis.vocabulary,
-        slideCount,
-        originalFormat,
-        tokensUsed: analysis.tokensUsed,
-      };
-    } catch (error) {
-      logger.warn('Direct PPTX parsing failed, falling back to CloudConvert', {
-        filename,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-      // Fall through to CloudConvert method
-    }
-  }
-
-  // For PPT files or if PPTX parsing fails, use CloudConvert → PDF → Gemini
+  // Use CloudConvert → PDF → Gemini for all PPT/PPTX files
+  // This preserves visual formatting and ensures Gemini can see the full document
   const pdfBase64 = await convertPPTtoPDF(pptBase64, mimeType, filename);
 
   const model = genAI.getGenerativeModel({
