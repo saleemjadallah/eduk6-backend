@@ -5,17 +5,27 @@
  * For PPT files: Falls back to CloudConvert → PDF → Gemini pipeline
  */
 import CloudConvert from 'cloudconvert';
-// Use dynamic import to work around TypeScript typing issues with node-pptx-parser
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const PptxParser = require('node-pptx-parser').default as new (filePath: string) => {
-  extractText(): Promise<Array<{ id: string; text: string[] }>>;
-};
 import { genAI } from '../../config/gemini.js';
 import { config } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+
+// Type for the PptxParser class (loaded dynamically due to ESM/CJS interop)
+type PptxParserClass = new (filePath: string) => {
+  extractText(): Promise<Array<{ id: string; text: string[] }>>;
+};
+
+// Lazy-loaded PptxParser to handle ESM dynamic import
+let _PptxParser: PptxParserClass | null = null;
+async function getPptxParser(): Promise<PptxParserClass> {
+  if (!_PptxParser) {
+    const module = await import('node-pptx-parser');
+    _PptxParser = module.default as unknown as PptxParserClass;
+  }
+  return _PptxParser;
+}
 
 // MIME type constants for PowerPoint files
 export const PPT_MIME_TYPES = [
@@ -64,6 +74,7 @@ async function extractTextFromPPTX(pptBase64: string, filename: string): Promise
     logger.info('Extracting text from PPTX using node-pptx-parser', { filename, tempFile });
 
     // Parse the PPTX file
+    const PptxParser = await getPptxParser();
     const parser = new PptxParser(tempFile);
     const slides = await parser.extractText();
 
