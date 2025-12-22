@@ -98,8 +98,9 @@ app.use(requestLogger);
 app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
 
 // Body parsing (for all other routes)
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Increased limit to 50mb to support PPTX files with images
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Rate limiting (global)
 app.use(standardRateLimit);
