@@ -19,11 +19,13 @@ export const BUCKETS = {
   static: config.cloudflare.r2.buckets.static,
 } as const;
 
-// CDN path prefixes for each bucket (used with single CDN domain)
+// CDN path prefixes for each bucket
+// When using R2.dev public URLs (one URL per bucket), set these to empty strings
+// When using a unified CDN domain with routing, use path prefixes
 export const CDN_PATHS = {
-  uploads: '/uploads',
-  aiContent: '/ai',
-  static: '/static',
+  uploads: '',      // R2.dev URLs point directly to bucket root
+  aiContent: '',
+  static: '',
 } as const;
 
 export type BucketName = keyof typeof BUCKETS;
