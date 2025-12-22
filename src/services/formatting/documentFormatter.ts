@@ -142,6 +142,37 @@ const PATTERNS = {
   durationPattern: /(?:Duration|Time|Length):\s*[\d-]+\s*(?:minutes?|mins?|hours?|hrs?)/i,
   gradeLevelPattern: /(?:Grade|Level|Year)(?:\s*Level)?:\s*(?:K|\d+)(?:st|nd|rd|th)?(?:\s*Grade)?/i,
   subjectPattern: /(?:Subject|Topic|Course):\s*[A-Za-z\s]+/i,
+
+  // ============================================================================
+  // SEMANTIC BLOCK PATTERNS (for smart heuristic formatting)
+  // ============================================================================
+
+  // Tip patterns - match "Tip:", "💡 Tip:", etc.
+  tipPattern: /^(?:💡\s*)?(?:Tip|Hint|Pro Tip|Quick Tip)\s*[:!]\s*(.+)$/i,
+
+  // Note patterns - match "Note:", "📝 Note:", etc.
+  notePattern: /^(?:📝\s*)?(?:Note|Remember|Keep in mind|FYI)\s*[:!]\s*(.+)$/i,
+
+  // Warning patterns - match "Warning:", "⚠️ Warning:", "Caution:", etc.
+  warningPattern: /^(?:⚠️\s*)?(?:Warning|Caution|Watch out|Be careful|Common mistake|Avoid)\s*[:!]\s*(.+)$/i,
+
+  // Important/Key concept patterns
+  keyConceptPattern: /^(?:💡\s*)?(?:Key Concept|Important|Key Point|Key Idea|Main Idea|Essential|Fundamental)\s*[:!]\s*(.+)$/i,
+
+  // Definition patterns - "Term: definition" or "Term - definition" or "Term means..."
+  definitionPattern: /^(?:📖\s*)?([A-Z][a-zA-Z\s]+?)(?:\s*[-:–]\s*|\s+(?:means?|is defined as|refers to|is when|is a|are)\s+)(.+)$/,
+
+  // Rule patterns - "Rule:", "The rule is:", "Remember the rule:"
+  rulePattern: /^(?:📐\s*)?(?:Rule|The Rule|Grammar Rule|Math Rule|Spelling Rule)\s*[:!]\s*(.+)$/i,
+
+  // Formula patterns - "Formula:", equations with = sign
+  formulaPattern: /^(?:🔢\s*)?(?:Formula|Equation)\s*[:!]\s*(.+)$/i,
+
+  // Example patterns - "Example:", "For example:", "e.g.:"
+  examplePattern: /^(?:📝\s*)?(?:Example|For example|For instance|e\.g\.|Such as|Like)\s*[:!]\s*(.+)$/i,
+
+  // Slide marker from PPT extraction
+  slideMarker: /^---\s*SLIDE\s*(\d+)\s*:\s*(.+?)\s*---$/i,
 };
 
 // ============================================================================
@@ -547,6 +578,100 @@ export class DocumentFormatter {
     return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
   }
 
+  // ============================================================================
+  // SEMANTIC BLOCK RENDERERS (mimics StructuredRenderer styling)
+  // ============================================================================
+
+  /**
+   * Render a tip block with green styling
+   */
+  private renderTipBlock(text: string): string {
+    return `<div class="tip-block">
+  <div class="tip-header"><span class="icon">💡</span><span class="tip-label">Tip</span></div>
+  <p class="tip-text">${this.formatInlineText(text)}</p>
+</div>`;
+  }
+
+  /**
+   * Render a note block with blue styling
+   */
+  private renderNoteBlock(text: string): string {
+    return `<div class="note-block">
+  <div class="note-header"><span class="icon">📝</span><span class="note-label">Note</span></div>
+  <p class="note-text">${this.formatInlineText(text)}</p>
+</div>`;
+  }
+
+  /**
+   * Render a warning block with yellow/orange styling
+   */
+  private renderWarningBlock(text: string): string {
+    return `<div class="warning-block">
+  <div class="warning-header"><span class="icon">⚠️</span><span class="warning-label">Watch Out!</span></div>
+  <p class="warning-text">${this.formatInlineText(text)}</p>
+</div>`;
+  }
+
+  /**
+   * Render a key concept box with yellow gradient styling
+   */
+  private renderKeyConceptBlock(title: string, text: string): string {
+    return `<div class="key-concept-box">
+  <div class="concept-header"><span class="icon">💡</span><span class="concept-title">${this.escapeHtml(title)}</span></div>
+  <p class="concept-text">${this.formatInlineText(text)}</p>
+</div>`;
+  }
+
+  /**
+   * Render a definition block with purple styling
+   */
+  private renderDefinitionBlock(term: string, definition: string): string {
+    return `<div class="definition-block">
+  <span class="term">${this.escapeHtml(term)}</span>
+  <span class="definition-text">${this.formatInlineText(definition)}</span>
+</div>`;
+  }
+
+  /**
+   * Render a rule box with blue gradient styling
+   */
+  private renderRuleBlock(text: string): string {
+    return `<div class="rule-box">
+  <div class="rule-header"><span class="icon">📐</span><span class="rule-title">Rule</span></div>
+  <p class="rule-description">${this.formatInlineText(text)}</p>
+</div>`;
+  }
+
+  /**
+   * Render a formula block with yellow dashed border
+   */
+  private renderFormulaBlock(formula: string): string {
+    const formattedFormula = this.mathFormatter.formatMathExpressions(this.escapeHtml(formula));
+    return `<div class="formula-block">
+  <div class="formula-display"><span class="icon">🔢</span>${formattedFormula}</div>
+</div>`;
+  }
+
+  /**
+   * Render an example block
+   */
+  private renderExampleBlock(title: string, content: string): string {
+    return `<div class="example-block">
+  <div class="example-header"><span class="icon">📝</span><span class="example-title">${this.escapeHtml(title)}</span></div>
+  <div class="example-content">${this.formatInlineText(content)}</div>
+</div>`;
+  }
+
+  /**
+   * Render a slide header (from PPT extraction)
+   */
+  private renderSlideHeader(slideNum: string, title: string): string {
+    return `<div class="slide-header">
+  <span class="slide-number">Slide ${this.escapeHtml(slideNum)}</span>
+  <h2 class="slide-title">${this.escapeHtml(title)}</h2>
+</div>`;
+  }
+
   /**
    * Format inline text (bold, math)
    */
@@ -635,6 +760,73 @@ export class DocumentFormatter {
   }
 
   /**
+   * Check if a line matches a semantic pattern and return the render result
+   */
+  private checkSemanticPattern(trimmed: string): string | null {
+    // Slide marker (from PPT extraction)
+    const slideMatch = trimmed.match(PATTERNS.slideMarker);
+    if (slideMatch) {
+      return this.renderSlideHeader(slideMatch[1], slideMatch[2]);
+    }
+
+    // Tip pattern
+    const tipMatch = trimmed.match(PATTERNS.tipPattern);
+    if (tipMatch) {
+      return this.renderTipBlock(tipMatch[1]);
+    }
+
+    // Note pattern
+    const noteMatch = trimmed.match(PATTERNS.notePattern);
+    if (noteMatch) {
+      return this.renderNoteBlock(noteMatch[1]);
+    }
+
+    // Warning pattern
+    const warningMatch = trimmed.match(PATTERNS.warningPattern);
+    if (warningMatch) {
+      return this.renderWarningBlock(warningMatch[1]);
+    }
+
+    // Key concept pattern
+    const keyConceptMatch = trimmed.match(PATTERNS.keyConceptPattern);
+    if (keyConceptMatch) {
+      return this.renderKeyConceptBlock('Key Concept', keyConceptMatch[1]);
+    }
+
+    // Rule pattern
+    const ruleMatch = trimmed.match(PATTERNS.rulePattern);
+    if (ruleMatch) {
+      return this.renderRuleBlock(ruleMatch[1]);
+    }
+
+    // Formula pattern
+    const formulaMatch = trimmed.match(PATTERNS.formulaPattern);
+    if (formulaMatch) {
+      return this.renderFormulaBlock(formulaMatch[1]);
+    }
+
+    // Example pattern
+    const exampleMatch = trimmed.match(PATTERNS.examplePattern);
+    if (exampleMatch) {
+      return this.renderExampleBlock('Example', exampleMatch[1]);
+    }
+
+    // Definition pattern (only match if it looks like a real definition, not regular text)
+    // Must start with a capitalized term and have proper definition structure
+    const definitionMatch = trimmed.match(PATTERNS.definitionPattern);
+    if (definitionMatch) {
+      const term = definitionMatch[1].trim();
+      const definition = definitionMatch[2].trim();
+      // Only render as definition if term is short enough and looks like a vocabulary term
+      if (term.length <= 40 && term.split(' ').length <= 4) {
+        return this.renderDefinitionBlock(term, definition);
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Convert processed text to HTML
    */
   private convertToHtml(text: string, options: DocumentFormatterOptions): string {
@@ -685,6 +877,15 @@ export class DocumentFormatter {
         flushParagraph();
         const sectionNum = sectionMatch[1];
         result.push(`<div class="section-break" data-section="${sectionNum}"><span class="section-marker">Section ${sectionNum}</span></div>`);
+        continue;
+      }
+
+      // Check for semantic patterns FIRST (tip, note, warning, key concept, etc.)
+      const semanticHtml = this.checkSemanticPattern(trimmed);
+      if (semanticHtml) {
+        flushList();
+        flushParagraph();
+        result.push(semanticHtml);
         continue;
       }
 

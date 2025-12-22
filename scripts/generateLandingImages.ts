@@ -33,11 +33,11 @@ const OUTPUT_DIR = path.join(__dirname, '../../frontend/public/assets/images/lan
 const IMAGE_PROMPTS = [
   {
     name: 'hero-jeffrey-teaching',
-    prompt: `Create a heartwarming scene of Jeffrey, a friendly anthropomorphic banana character with large round glasses, teaching a small group of diverse elementary school children in a bright, welcoming classroom.
+    prompt: `Create a heartwarming scene of Jeffrey, a friendly AI tutor character, teaching a small group of diverse elementary school children in a bright, welcoming classroom.
 
 SCENE COMPOSITION: Jeffrey stands at the front of the classroom, gesturing enthusiastically toward a colorful chalkboard covered with simple educational drawings. Four to five children of different ethnicities sit at desks in a semi-circle, their faces lit up with curiosity and delight. One child has their hand raised eagerly.
 
-JEFFREY'S CHARACTER: Jeffrey should have a warm yellow color with a gentle gradient, wearing his signature large round glasses that make him look wise yet approachable. His expression radiates kindness and enthusiasm - think of a favorite teacher everyone remembers fondly. He has simple cartoon arms and a welcoming posture.
+JEFFREY'S CHARACTER: Jeffrey is a friendly 3D cartoon character with soft lavender/purple skin and a slightly elongated face shape. He wears large, round gold-framed glasses that make him look wise yet approachable. He has wavy purple hair, neatly styled, and wears a brown herringbone tweed jacket over a light blue shirt with a purple bow tie. His expression radiates kindness and enthusiasm - think of a favorite teacher everyone remembers fondly. He has a welcoming posture.
 
 ENVIRONMENT: A cozy classroom with warm wooden floors, soft natural light streaming through large windows, and educational posters on the walls (shown as colorful shapes, not readable text). Potted plants add life to the space. Books are neatly arranged on shelves.
 
@@ -47,9 +47,9 @@ STYLE: Polished Pixar-style 3D animation aesthetic with smooth surfaces, warm co
   },
   {
     name: 'meet-jeffrey',
-    prompt: `Create an endearing portrait of Jeffrey, the friendly banana mascot, introducing himself to the viewer with a warm, welcoming wave.
+    prompt: `Create an endearing portrait of Jeffrey, the friendly AI tutor mascot, introducing himself to the viewer with a warm, welcoming wave.
 
-CHARACTER DESIGN: Jeffrey is a cheerful anthropomorphic banana with a soft yellow gradient from lighter at the top to slightly deeper yellow at the bottom. He wears large, round glasses that give him an intellectual yet friendly appearance - like a favorite librarian or beloved teacher. His expression is genuinely warm and inviting, with a gentle smile and kind eyes behind his glasses.
+CHARACTER DESIGN: Jeffrey is a cheerful 3D cartoon character with soft lavender/purple skin and a slightly elongated face shape. He wears large, round gold-framed glasses that give him an intellectual yet friendly appearance - like a favorite librarian or beloved teacher. He has wavy purple hair, neatly styled, and wears a brown herringbone tweed jacket over a light blue shirt with a purple bow tie. His expression is genuinely warm and inviting, with a gentle smile and kind eyes behind his glasses.
 
 POSE & GESTURE: Jeffrey waves hello with one hand while his other hand rests comfortably at his side. His body language should convey openness and friendliness - slightly leaning forward as if eager to meet a new friend. His posture is confident but not intimidating.
 
