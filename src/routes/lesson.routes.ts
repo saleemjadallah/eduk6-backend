@@ -1081,8 +1081,11 @@ router.post(
         contentBlockCount: analysis.contentBlocks?.length || 0,
       });
 
-      // Format content using DocumentFormatter with full analysis context
-      // The contentBlocks enable the rich hybrid rendering (styled boxes, formulas, etc.)
+      // Format content using DocumentFormatter with analysis context
+      // NOTE: For PPT files, we DON'T use contentBlocks because:
+      // 1. We already have well-structured extracted text with slide markers
+      // 2. ContentBlocks from AI tend to summarize rather than preserve all content
+      // 3. The heuristic formatter will preserve the full original text
       const formattedContent = documentFormatter.format(result.extractedText, {
         ageGroup: child.ageGroup,
         chapters: analysis.chapters,
@@ -1099,7 +1102,8 @@ router.post(
           difficulty: ex.difficulty,
           locationInContent: ex.locationInContent,
         })),
-        contentBlocks: analysis.contentBlocks,
+        // Don't pass contentBlocks - use heuristic formatting to preserve full text
+        // contentBlocks: analysis.contentBlocks,
       });
 
       // Create lesson record with analyzed content
