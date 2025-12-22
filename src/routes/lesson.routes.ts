@@ -1137,10 +1137,18 @@ router.post(
             finalFormattedContent = insertImagesIntoContent(formattedContent, imageResult.slideImages);
             imageCount = imageResult.totalImages;
 
+            // DEBUG: Verify images are in the content
+            const imgTagsBefore = (formattedContent.match(/<img[^>]*>/gi) || []).length;
+            const imgTagsAfter = (finalFormattedContent.match(/<img[^>]*>/gi) || []).length;
+
             logger.info('PPTX images inserted into content', {
               lessonId: lesson.id,
               totalImages: imageResult.totalImages,
               mappedToSlides: imageResult.slideImages.filter(i => i.slideNumber > 0).length,
+              imgTagsBefore,
+              imgTagsAfter,
+              firstImageUrl: imageResult.slideImages[0]?.url || 'none',
+              contentHasImages: imgTagsAfter > 0,
             });
           }
         } catch (imageError) {
@@ -1170,6 +1178,14 @@ router.post(
 
       // Get updated lesson
       const updatedLesson = await lessonService.getById(lesson.id);
+
+      // DEBUG: Verify images are in the saved lesson
+      const savedImgTags = (updatedLesson?.formattedContent?.match(/<img[^>]*>/gi) || []).length;
+      logger.info('DEBUG: Lesson saved with formattedContent', {
+        lessonId: lesson.id,
+        imgTagsInSaved: savedImgTags,
+        formattedContentLength: updatedLesson?.formattedContent?.length || 0,
+      });
 
       // Record lesson creation for usage tracking
       await parentUsageService.recordLessonCreation(child.parentId);
