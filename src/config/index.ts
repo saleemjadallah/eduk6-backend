@@ -44,6 +44,11 @@ export const config = {
       },
     },
     cdnBaseUrl: process.env.CDN_BASE_URL!,
+    cdnBaseUrls: {
+      uploads: process.env.CDN_BASE_URL_UPLOADS || process.env.CDN_BASE_URL!,
+      aiContent: process.env.CDN_BASE_URL_AI_CONTENT || process.env.CDN_BASE_URL!,
+      static: process.env.CDN_BASE_URL_STATIC || process.env.CDN_BASE_URL!,
+    },
   },
 
   // Upload limits

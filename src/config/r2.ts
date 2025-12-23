@@ -32,7 +32,8 @@ export type BucketName = keyof typeof BUCKETS;
 
 // Helper to get full CDN URL for a bucket and path
 export function getCdnUrl(bucket: BucketName, storagePath: string = ''): string {
-  const baseUrl = config.cloudflare.cdnBaseUrl;
+  // Use bucket-specific CDN URL if available, otherwise fall back to default
+  const baseUrl = config.cloudflare.cdnBaseUrls?.[bucket] || config.cloudflare.cdnBaseUrl;
   const prefix = CDN_PATHS[bucket];
   return `${baseUrl}${prefix}/${storagePath}`.replace(/\/+$/, '');
 }
