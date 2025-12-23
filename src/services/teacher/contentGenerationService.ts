@@ -902,6 +902,58 @@ function extractJSON(text: string): string {
       }
     }
 
+    // Check if there are MORE closing braces than opening (AI wrapped response in extra object)
+    if (closeBraces > openBraces) {
+      logger.warn('Detected extra wrapping in JSON response, attempting to unwrap', {
+        openBraces,
+        closeBraces,
+        textLength: text.length,
+      });
+
+      // Try to remove trailing extra braces
+      let unwrapped = candidate;
+      const extraBraces = closeBraces - openBraces;
+      for (let i = 0; i < extraBraces; i++) {
+        // Remove the last closing brace
+        unwrapped = unwrapped.replace(/\}\s*$/, '');
+      }
+
+      try {
+        JSON.parse(unwrapped);
+        logger.info('Successfully unwrapped JSON with extra braces');
+        return unwrapped;
+      } catch {
+        // Try to find and extract nested JSON object with expected lesson structure
+        // Look for "title" field which should be in the lesson object
+        const titleMatch = candidate.match(/\{\s*"title"\s*:/);
+        if (titleMatch && titleMatch.index !== undefined) {
+          // Find the matching closing brace for this object
+          let depth = 0;
+          let endIndex = -1;
+          for (let i = titleMatch.index; i < candidate.length; i++) {
+            if (candidate[i] === '{') depth++;
+            if (candidate[i] === '}') {
+              depth--;
+              if (depth === 0) {
+                endIndex = i;
+                break;
+              }
+            }
+          }
+          if (endIndex > titleMatch.index) {
+            const extracted = candidate.substring(titleMatch.index, endIndex + 1);
+            try {
+              JSON.parse(extracted);
+              logger.info('Successfully extracted nested lesson JSON');
+              return extracted;
+            } catch {
+              // Extraction failed
+            }
+          }
+        }
+      }
+    }
+
     // Not a truncation issue, return original for standard error handling
     return candidate;
   }
