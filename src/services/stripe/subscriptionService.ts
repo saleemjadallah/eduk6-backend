@@ -12,7 +12,7 @@ import Stripe from 'stripe';
 import { prisma } from '../../config/database.js';
 import { config } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
-import { TeacherSubscriptionTier } from '@prisma/client';
+import { TeacherSubscriptionTier, SubscriptionStatus } from '@prisma/client';
 import {
   getProductByTier,
   getProductByPriceId,
@@ -321,31 +321,61 @@ export const subscriptionService = {
     }
 
     const product = getProductByTier(tier);
+    if (!product) {
+      logger.error('Could not find product for tier during sync', {
+        teacherId,
+        subscriptionId: subscription.id,
+        tier,
+      });
+      return;
+    }
+
+    // Stripe API returns current_period_end as a number (Unix timestamp)
+    // Use type assertion since Stripe types don't expose this property directly
     const currentPeriodEnd = (subscription as any).current_period_end as number;
 
     // Calculate trial end if applicable
     let trialEndsAt: Date | null = null;
-    if (subscription.trial_end) {
-      trialEndsAt = new Date(subscription.trial_end * 1000);
+    const trialEnd = (subscription as any).trial_end;
+    if (trialEnd && typeof trialEnd === 'number') {
+      trialEndsAt = new Date(trialEnd * 1000);
     }
+
+    // Determine status - use enum values
+    const subscriptionStatus: SubscriptionStatus =
+      subscription.status === 'active' || subscription.status === 'trialing'
+        ? SubscriptionStatus.ACTIVE
+        : SubscriptionStatus.PAST_DUE;
+
+    // Calculate token quota
+    const tokenQuota = creditsToTokens(product.credits);
+
+    logger.info('Syncing subscription from Stripe to database', {
+      teacherId,
+      subscriptionId: subscription.id,
+      tier,
+      status: subscription.status,
+      subscriptionStatus,
+      tokenQuota,
+      currentPeriodEnd,
+    });
 
     await prisma.teacher.update({
       where: { id: teacherId },
       data: {
         subscriptionTier: tier,
-        subscriptionStatus: subscription.status === 'active' || subscription.status === 'trialing' ? 'ACTIVE' : 'PAST_DUE',
+        subscriptionStatus,
         stripeSubscriptionId: subscription.id,
         subscriptionExpiresAt: new Date(currentPeriodEnd * 1000),
-        monthlyTokenQuota: BigInt(creditsToTokens(product.credits)),
+        monthlyTokenQuota: BigInt(tokenQuota),
         trialEndsAt,
       },
     });
 
-    logger.info('Synced subscription from Stripe to database', {
+    logger.info('Successfully synced subscription from Stripe to database', {
       teacherId,
       subscriptionId: subscription.id,
       tier,
-      status: subscription.status,
     });
   },
 
