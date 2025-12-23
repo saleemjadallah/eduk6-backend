@@ -54,6 +54,38 @@ export interface SubscriptionInfo {
 }
 
 // =============================================================================
+// HELPER: Determine tier from Stripe price ID with fallback
+// =============================================================================
+
+function determineTierFromSubscription(subscription: Stripe.Subscription): TeacherSubscriptionTier | null {
+  const priceId = subscription.items.data[0]?.price?.id;
+  if (!priceId) return null;
+
+  // First try the configured price IDs
+  const tier = getTierFromPriceId(priceId);
+  if (tier) return tier;
+
+  // Fallback: check price amount to determine tier
+  const price = subscription.items.data[0]?.price;
+  if (price) {
+    const amount = price.unit_amount || 0;
+    const interval = price.recurring?.interval;
+
+    // Monthly pricing: BASIC = $9.99 (999 cents), PROFESSIONAL = $24.99 (2499 cents)
+    // Annual pricing: BASIC = $95.90 (9590 cents), PROFESSIONAL = $239.90 (23990 cents)
+    if (interval === 'month') {
+      if (amount >= 2000) return 'PROFESSIONAL';
+      if (amount >= 500) return 'BASIC';
+    } else if (interval === 'year') {
+      if (amount >= 20000) return 'PROFESSIONAL';
+      if (amount >= 5000) return 'BASIC';
+    }
+  }
+
+  return null;
+}
+
+// =============================================================================
 // SUBSCRIPTION SERVICE
 // =============================================================================
 
@@ -273,7 +305,53 @@ export const subscriptionService = {
   },
 
   /**
+   * Sync subscription from Stripe to database
+   * This is called as a fallback when webhook didn't update the database
+   */
+  async syncSubscriptionFromStripe(teacherId: string, subscription: Stripe.Subscription): Promise<void> {
+    const tier = determineTierFromSubscription(subscription);
+
+    if (!tier) {
+      logger.warn('Could not determine tier from Stripe subscription during sync', {
+        teacherId,
+        subscriptionId: subscription.id,
+        priceId: subscription.items.data[0]?.price?.id,
+      });
+      return;
+    }
+
+    const product = getProductByTier(tier);
+    const currentPeriodEnd = (subscription as any).current_period_end as number;
+
+    // Calculate trial end if applicable
+    let trialEndsAt: Date | null = null;
+    if (subscription.trial_end) {
+      trialEndsAt = new Date(subscription.trial_end * 1000);
+    }
+
+    await prisma.teacher.update({
+      where: { id: teacherId },
+      data: {
+        subscriptionTier: tier,
+        subscriptionStatus: subscription.status === 'active' || subscription.status === 'trialing' ? 'ACTIVE' : 'PAST_DUE',
+        stripeSubscriptionId: subscription.id,
+        subscriptionExpiresAt: new Date(currentPeriodEnd * 1000),
+        monthlyTokenQuota: BigInt(creditsToTokens(product.credits)),
+        trialEndsAt,
+      },
+    });
+
+    logger.info('Synced subscription from Stripe to database', {
+      teacherId,
+      subscriptionId: subscription.id,
+      tier,
+      status: subscription.status,
+    });
+  },
+
+  /**
    * Get current subscription info for a teacher
+   * Includes automatic sync if subscription exists in Stripe but not in database
    */
   async getSubscriptionInfo(teacherId: string): Promise<SubscriptionInfo | null> {
     if (!stripe) {
@@ -289,31 +367,79 @@ export const subscriptionService = {
       },
     });
 
-    if (!teacher?.stripeSubscriptionId) {
+    if (!teacher) {
       return null;
     }
 
-    try {
-      const subscription = await stripe.subscriptions.retrieve(teacher.stripeSubscriptionId);
+    // If we have a subscription ID, fetch it directly
+    if (teacher.stripeSubscriptionId) {
+      try {
+        const subscription = await stripe.subscriptions.retrieve(teacher.stripeSubscriptionId);
 
-      const priceId = subscription.items.data[0]?.price?.id;
-      const tier = priceId ? getTierFromPriceId(priceId) : teacher.subscriptionTier;
+        const priceId = subscription.items.data[0]?.price?.id;
+        const tier = determineTierFromSubscription(subscription) || teacher.subscriptionTier;
 
-      // Stripe API returns current_period_end as a number (Unix timestamp)
-      const currentPeriodEnd = (subscription as any).current_period_end as number;
+        // Stripe API returns current_period_end as a number (Unix timestamp)
+        const currentPeriodEnd = (subscription as any).current_period_end as number;
 
-      return {
-        id: subscription.id,
-        status: subscription.status,
-        tier: tier || teacher.subscriptionTier,
-        currentPeriodEnd: new Date(currentPeriodEnd * 1000),
-        cancelAtPeriodEnd: subscription.cancel_at_period_end,
-        isAnnual: priceId ? isAnnualSubscription(priceId) : false,
-      };
-    } catch (error) {
-      logger.error('Failed to retrieve subscription', { error, teacherId });
-      return null;
+        return {
+          id: subscription.id,
+          status: subscription.status,
+          tier: tier || teacher.subscriptionTier,
+          currentPeriodEnd: new Date(currentPeriodEnd * 1000),
+          cancelAtPeriodEnd: subscription.cancel_at_period_end,
+          isAnnual: priceId ? isAnnualSubscription(priceId) : false,
+        };
+      } catch (error) {
+        logger.error('Failed to retrieve subscription', { error, teacherId });
+        return null;
+      }
     }
+
+    // No subscription ID in database - check if customer has subscriptions in Stripe
+    // This handles the case where webhook failed to update the database
+    if (teacher.stripeCustomerId) {
+      try {
+        const subscriptions = await stripe.subscriptions.list({
+          customer: teacher.stripeCustomerId,
+          status: 'all',
+          limit: 5,
+        });
+
+        // Find the most recent active/trialing subscription
+        const activeSubscription = subscriptions.data.find(
+          sub => sub.status === 'active' || sub.status === 'trialing'
+        );
+
+        if (activeSubscription) {
+          logger.info('Found active subscription in Stripe that was missing from database - syncing', {
+            teacherId,
+            subscriptionId: activeSubscription.id,
+            customerId: teacher.stripeCustomerId,
+          });
+
+          // Sync the subscription to the database
+          await this.syncSubscriptionFromStripe(teacherId, activeSubscription);
+
+          const priceId = activeSubscription.items.data[0]?.price?.id;
+          const tier = determineTierFromSubscription(activeSubscription);
+          const currentPeriodEnd = (activeSubscription as any).current_period_end as number;
+
+          return {
+            id: activeSubscription.id,
+            status: activeSubscription.status,
+            tier: tier || 'BASIC',
+            currentPeriodEnd: new Date(currentPeriodEnd * 1000),
+            cancelAtPeriodEnd: activeSubscription.cancel_at_period_end,
+            isAnnual: priceId ? isAnnualSubscription(priceId) : false,
+          };
+        }
+      } catch (error) {
+        logger.error('Failed to list subscriptions for customer', { error, teacherId, customerId: teacher.stripeCustomerId });
+      }
+    }
+
+    return null;
   },
 
   /**
@@ -388,20 +514,45 @@ export const subscriptionService = {
 
     const teacherId = subscription.metadata.teacherId;
     if (!teacherId) {
-      logger.warn('Subscription has no teacherId in metadata', {
+      // Try to find teacher by customer ID if teacherId is missing from metadata
+      const customerId = typeof subscription.customer === 'string'
+        ? subscription.customer
+        : subscription.customer?.id;
+
+      if (customerId) {
+        const teacher = await prisma.teacher.findFirst({
+          where: { stripeCustomerId: customerId },
+          select: { id: true },
+        });
+
+        if (teacher) {
+          logger.info('Found teacher by customer ID since metadata was missing', {
+            subscriptionId: subscription.id,
+            customerId,
+            teacherId: teacher.id,
+          });
+          // Use syncSubscriptionFromStripe which handles all the updates
+          await this.syncSubscriptionFromStripe(teacher.id, subscription);
+          return;
+        }
+      }
+
+      logger.warn('Subscription has no teacherId in metadata and could not find by customer', {
         subscriptionId: subscription.id,
         metadata: subscription.metadata,
+        customerId,
       });
       return;
     }
 
-    const priceId = subscription.items.data[0]?.price?.id;
-    const tier = priceId ? getTierFromPriceId(priceId) : null;
+    // Use the helper function with price-based fallback
+    const tier = determineTierFromSubscription(subscription);
 
     if (!tier) {
-      logger.warn('Could not determine tier from price', {
+      logger.warn('Could not determine tier from subscription', {
         subscriptionId: subscription.id,
-        priceId,
+        priceId: subscription.items.data[0]?.price?.id,
+        priceAmount: subscription.items.data[0]?.price?.unit_amount,
       });
       return;
     }
