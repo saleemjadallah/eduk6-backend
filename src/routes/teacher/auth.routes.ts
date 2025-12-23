@@ -493,7 +493,7 @@ const updateProfileSchema = z.object({
   firstName: z.string().max(100).optional(),
   lastName: z.string().max(100).optional(),
   schoolName: z.string().max(255).optional().nullable(),
-  primarySubject: z.enum(['MATH', 'SCIENCE', 'ENGLISH', 'ARABIC', 'ISLAMIC_STUDIES', 'SOCIAL_STUDIES', 'ART', 'MUSIC', 'OTHER']).optional().nullable(),
+  primarySubject: z.enum(['MATH', 'SCIENCE', 'ENGLISH', 'ARABIC', 'ISLAMIC_STUDIES', 'SOCIAL_STUDIES', 'HISTORY', 'GEOGRAPHY', 'PHYSICAL_EDUCATION', 'HEALTH', 'COMPUTER_SCIENCE', 'READING', 'FOREIGN_LANGUAGE', 'ECONOMICS', 'DRAMA', 'ENVIRONMENTAL_STUDIES', 'ART', 'MUSIC', 'OTHER']).optional().nullable(),
   gradeRange: z.enum(['ELEMENTARY', 'MIDDLE', 'HIGH', 'MIXED']).optional().nullable(),
   // Notification preferences
   notifyProductUpdates: z.boolean().optional(),
