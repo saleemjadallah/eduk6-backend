@@ -107,6 +107,8 @@ export const contentService = {
       contentId: content.id,
       teacherId,
       contentType: input.contentType,
+      hasInfographicUrl: !!input.infographicUrl,
+      infographicUrl: input.infographicUrl?.substring(0, 100), // Log first 100 chars
     });
 
     return content;
