@@ -778,6 +778,9 @@ model Teacher {
   templates        ContentTemplate[]
   tokenUsageLogs   TokenUsageLog[]
   classrooms       Classroom[]
+  audioUpdates     TeacherAudioUpdate[]
+  substitutePlans  SubstitutePlan[]
+  iepGoalSessions  IEPGoalSession[]
 
   // Timestamps
   createdAt        DateTime @default(now())
@@ -1061,6 +1064,175 @@ model Classroom {
 
   @@index([teacherId])
   @@index([accessCode])
+}
+
+// ============================================
+// TEACHER PORTAL - AUDIO CLASS UPDATES
+// ============================================
+
+model TeacherAudioUpdate {
+  id            String      @id @default(uuid())
+  teacherId     String
+  teacher       Teacher     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  // Content
+  title         String                           // e.g., "Week of Dec 23 - Math & Science Update"
+  script        String      @db.Text             // AI-generated podcast script
+  customNotes   String?     @db.Text             // Teacher's optional custom notes to include
+
+  // Audio file
+  audioUrl      String?                          // GCS/R2 URL to the generated audio file
+  duration      Int?                             // Audio duration in seconds
+
+  // Configuration
+  language      String      @default("en")       // Audio language (en, ar, es, fr, etc.)
+  voiceId       String?                          // Selected TTS voice ID
+
+  // Source lessons
+  lessonIds     String[]                         // IDs of TeacherContent used to generate this update
+
+  // Status tracking
+  status        AudioStatus @default(DRAFT)
+
+  // Generation metadata
+  tokensUsed    Int         @default(0)          // Tokens used for script generation
+  modelUsed     String?                          // AI model used (gemini-3-flash, etc.)
+
+  // Timestamps
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  publishedAt   DateTime?                        // When status changed to PUBLISHED
+
+  @@index([teacherId])
+  @@index([teacherId, status])
+  @@index([teacherId, createdAt])
+}
+
+// ============================================
+// TEACHER PORTAL - SUBSTITUTE PLANS
+// ============================================
+
+model SubstitutePlan {
+  id            String      @id @default(uuid())
+  teacherId     String
+  teacher       Teacher     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  // Plan metadata
+  title         String                           // e.g., "Sub Plan - Dec 23, 2025"
+  date          DateTime    @db.Date             // Date the sub plan is for
+  gradeLevel    String?                          // Grade level (e.g., "3rd Grade", "K-2")
+
+  // Schedule
+  schedule      Json                             // Array of time blocks with activities
+
+  // Classroom info (optional, teacher can choose to include)
+  classroomInfo Json?                            // Seating chart ref, routines, attention signals
+
+  // Generated content sections
+  activities    Json                             // Detailed activity instructions
+  materials     Json?                            // Materials list with locations
+  emergencyInfo Json?                            // Emergency contacts, procedures
+  studentNotes  Json?                            // Helpful students, special needs notes
+
+  // Backup plans
+  backupActivities Json?                         // "If tech fails" alternatives
+
+  // Source lessons
+  lessonIds     String[]                         // IDs of TeacherContent used to generate
+
+  // Export
+  pdfUrl        String?                          // Generated PDF URL
+
+  // Generation metadata
+  tokensUsed    Int         @default(0)
+  modelUsed     String?
+
+  // Timestamps
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([teacherId])
+  @@index([teacherId, date])
+  @@index([teacherId, createdAt])
+}
+
+// ============================================
+// TEACHER PORTAL - IEP GOAL WRITER
+// ============================================
+
+model IEPGoalSession {
+  id                String   @id @default(uuid())
+  teacherId         String
+  teacher           Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  // Student info (privacy-safe - no names stored, just reference)
+  studentIdentifier String?                      // Optional teacher reference (e.g., "Student A")
+  gradeLevel        String                       // e.g., "3rd Grade", "K", "5th"
+
+  // IEP Context
+  disabilityCategory DisabilityCategory
+  subjectArea       IEPSubjectArea
+
+  // Present Levels
+  presentLevels     String   @db.Text            // Current performance description
+  strengths         String?  @db.Text            // Student strengths
+  challenges        String?  @db.Text            // Areas of difficulty
+
+  // Generated Content
+  generatedGoals    Json                         // Array of SMART goal objects
+  selectedGoals     Json?                        // Goals teacher selected/edited
+  accommodations    Json                         // Suggested accommodations by category
+  progressMonitoring Json?                       // Progress monitoring suggestions
+
+  // Goal timeline
+  goalStartDate     DateTime? @db.Date
+  goalEndDate       DateTime? @db.Date           // Typically 1 year from start
+
+  // Generation metadata
+  tokensUsed        Int      @default(0)
+  modelUsed         String?
+
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([teacherId])
+  @@index([teacherId, disabilityCategory])
+  @@index([teacherId, createdAt])
+}
+
+enum DisabilityCategory {
+  SPECIFIC_LEARNING_DISABILITY    // SLD - Dyslexia, Dyscalculia, Dysgraphia
+  SPEECH_LANGUAGE_IMPAIRMENT      // Speech/Language
+  OTHER_HEALTH_IMPAIRMENT         // ADHD, health conditions
+  AUTISM_SPECTRUM                 // ASD
+  EMOTIONAL_DISTURBANCE           // ED/EBD
+  INTELLECTUAL_DISABILITY         // ID
+  DEVELOPMENTAL_DELAY             // DD (ages 3-9)
+  MULTIPLE_DISABILITIES           // More than one category
+  HEARING_IMPAIRMENT              // DHH
+  VISUAL_IMPAIRMENT               // VI
+  ORTHOPEDIC_IMPAIRMENT           // OI
+  TRAUMATIC_BRAIN_INJURY          // TBI
+  DEAF_BLINDNESS                  // Combined hearing and vision loss
+}
+
+enum IEPSubjectArea {
+  READING_FLUENCY
+  READING_COMPREHENSION
+  WRITTEN_EXPRESSION
+  MATH_CALCULATION
+  MATH_PROBLEM_SOLVING
+  SPEECH_ARTICULATION
+  EXPRESSIVE_LANGUAGE
+  RECEPTIVE_LANGUAGE
+  SOCIAL_SKILLS
+  BEHAVIOR_SELF_REGULATION
+  EXECUTIVE_FUNCTIONING
+  FINE_MOTOR
+  GROSS_MOTOR
+  ADAPTIVE_LIVING_SKILLS
+  TRANSITION_VOCATIONAL
 }
 
 // ============================================
@@ -1434,6 +1606,9 @@ enum TokenOperation {
   GRADING_BATCH
   FEEDBACK_GENERATION
   CHAT
+  AUDIO_UPDATE        // Podcast-style audio class updates for parents
+  SUB_PLAN_GENERATION // Emergency substitute teacher plans
+  IEP_GOAL_GENERATION // SMART IEP goals and accommodations
 }
 
 enum ScoringType {
@@ -1459,4 +1634,11 @@ enum SubmissionStatus {
   REVIEWED
   FINALIZED
   ERROR
+}
+
+enum AudioStatus {
+  DRAFT       // Script generated, not yet converted to audio
+  GENERATING  // Audio generation in progress
+  READY       // Audio ready for review
+  PUBLISHED   // Published and available to parents
 }

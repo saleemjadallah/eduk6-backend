@@ -43,3 +43,6 @@ temp/
 test-*.jpg
 test-*.png
 uploads/
+
+# GCP Service Account Credentials (NEVER commit)
+credentials/

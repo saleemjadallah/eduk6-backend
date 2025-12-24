@@ -50,6 +50,9 @@ const OPERATION_ESTIMATES: Record<TokenOperation, number> = {
   GRADING_BATCH: 4000,           // Per submission
   FEEDBACK_GENERATION: 1500,     // ~500 input + ~1K output
   CHAT: 800,                     // ~300 input + ~500 output
+  AUDIO_UPDATE: 7500,            // ~3K input + ~4.5K output (podcast script generation)
+  SUB_PLAN_GENERATION: 4000,     // ~1.5K input + ~2.5K output (sub plan ~40 credits)
+  IEP_GOAL_GENERATION: 5000,     // ~1.5K input + ~3.5K output (IEP goals ~50 credits)
 };
 
 // =============================================================================

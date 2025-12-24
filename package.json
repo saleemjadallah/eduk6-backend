@@ -21,6 +21,7 @@
     "@aws-sdk/client-s3": "^3.654.0",
     "@aws-sdk/s3-request-presigner": "^3.654.0",
     "@getbrevo/brevo": "^3.0.1",
+    "@google-cloud/text-to-speech": "^6.4.0",
     "@google-cloud/translate": "^9.3.0",
     "@google/genai": "^1.30.0",
     "@google/generative-ai": "^0.21.0",
