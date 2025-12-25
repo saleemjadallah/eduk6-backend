@@ -136,8 +136,8 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
       // Also extract text for reference (chat context, search, etc.)
       extractedText = await extractTextFromPDF(fileUrl!);
 
-      // Format using heuristic formatting (skip contentBlocks for now)
-      // Vision provides metadata (title, summary, vocabulary) but formatting is deterministic
+      // Format using AI-generated contentBlocks from vision analysis
+      // The "Master Educator" prompt creates beautifully structured lesson blocks
       formattedContent = documentFormatter.format(extractedText, {
         ageGroup,
         chapters: analysis.chapters,
@@ -154,13 +154,14 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
           difficulty: ex.difficulty,
           locationInContent: ex.locationInContent,
         })),
-        // No contentBlocks - use heuristic formatting instead
+        contentBlocks: analysis.contentBlocks, // Master Educator structured blocks
       });
 
-      logger.info(`PDF processed with vision (heuristic formatting)`, {
+      logger.info(`PDF processed with Master Educator vision`, {
         extractedTextLength: extractedText.length,
         formattedLength: formattedContent.length,
-        visionBlockCount: analysis.contentBlocks?.length || 0, // For reference only
+        contentBlockCount: analysis.contentBlocks?.length || 0,
+        blockTypes: analysis.contentBlocks?.map(b => b.type).slice(0, 10),
       });
     }
     // ==========================================================================

@@ -556,61 +556,120 @@ export class GeminiService {
       required: ['title', 'summary', 'contentBlocks']
     };
 
-    const prompt = `You are an expert educational content analyzer with vision capabilities.
+    // Age-specific instructions
+    const ageInstructions = isYoung
+      ? `TARGET AUDIENCE: Children ages 4-7 (Kindergarten to Grade 2)
+- Use VERY simple words (1-2 syllables when possible)
+- Short sentences (5-10 words max)
+- Relate everything to things kids know: toys, animals, family, playground
+- Use fun comparisons: "As tall as 10 school buses stacked up!"
+- Add wonder and excitement: "Guess what? Scientists discovered..."
+- Emojis help young readers: 🌟 ⭐ 🎨 🦁 🌈`
+      : `TARGET AUDIENCE: Children ages 8-12 (Grades 3-7)
+- Use grade-appropriate vocabulary with clear explanations
+- Sentences can be longer but stay engaging
+- Connect to their world: video games, sports, social media, movies
+- Challenge them with "Did you know?" facts
+- Encourage critical thinking: "Why do you think...?"
+- Emojis add visual interest: 🔬 💡 🌍 📚 🎯`;
 
-LOOK at this PDF document visually and extract its structure into content blocks.
+    const prompt = `ROLE: You are an expert K-8 Instructional Designer for Orbit Learn, a children's educational platform. You specialize in transforming dense educational content into vibrant, engaging lessons that make kids excited to learn.
 
-YOUR TASK:
-1. VISUALLY identify the document structure:
-   - Headers (look for larger/bold text)
-   - Tables (look for grid structures with rows and columns)
-   - Bullet lists (look for • or - markers)
-   - Numbered lists (look for 1. 2. 3. sequences)
-   - Paragraphs of text
-   - Key concepts or highlighted boxes
-   - Definitions and vocabulary terms
+PEDAGOGICAL APPROACH: Student-Centered Learning with Visual Scaffolding
+- Every concept needs a "hook" that connects to kids' real lives
+- Break complex ideas into digestible chunks
+- Use analogies and real-world examples extensively
+- Make abstract concepts concrete and visual
 
-2. Convert what you SEE into structured content blocks.
+${ageInstructions}
 
-CRITICAL RULES FOR CONTENT BLOCKS:
+=============================================================================
+YOUR TASK: Transform this PDF into a beautifully structured lesson
+=============================================================================
 
-HEADERS:
-- Use "header" with level 2 for main section titles
-- Use "header" with level 3 for sub-sections
-- MUST have "level" (1-4) and "text" properties
+LOOK at this PDF document visually. Notice the layout, headers, tables, images, and text formatting.
 
-PARAGRAPHS:
-- Use "paragraph" for regular text content
-- Keep paragraphs SHORT (3-5 sentences max)
-- NEVER create walls of text - split into multiple paragraphs
-- MUST have "text" property
+STEP 1 - UNDERSTAND THE CONTENT
+- What is the main topic?
+- What are the 3-5 "Big Ideas" students should remember?
+- What vocabulary terms need explaining?
+- What visual elements (tables, diagrams, lists) are present?
 
-TABLES:
-- Use "table" when you SEE tabular data with rows and columns
-- MUST have "headers" (array of column names) and "rows" (array of arrays)
-- Each row is an array of cell values
+STEP 2 - TRANSFORM INTO ENGAGING LESSON BLOCKS
 
-LISTS:
-- Use "bulletList" for unordered lists (• markers)
-- Use "numberedList" for ordered lists (1. 2. 3.)
-- MUST have "items" array with each list item as a string
-- Optionally include "title" for the list header
+For each section of the document, create content blocks that follow this structure:
 
-DEFINITIONS:
-- Use "definition" for vocabulary terms
-- MUST have "term" and "definition" properties
+📌 SECTION OPENER (header + hook)
+- Use "header" (level 2) for main sections with engaging titles
+- Follow with "keyConceptBox" containing a hook: "What if..." or "Imagine..." or "Did you know..."
 
-KEY CONCEPTS:
-- Use "keyConceptBox" for important highlighted ideas
-- MUST have "text" property, optionally "title"
+📖 EXPLANATION (paragraphs + visuals)
+- Use "paragraph" blocks - keep them SHORT (3-4 sentences MAX)
+- NEVER create walls of text - if content is long, split into multiple paragraphs
+- After every 2-3 paragraphs, add a "tip" or "note" block with a fun fact or analogy
 
-DIVIDERS:
-- Use "divider" between major sections
-- Include "style": "section" and optionally "label"
+📊 DATA & COMPARISONS (tables + lists)
+- Use "table" for any comparative information (MUST have "headers" and "rows")
+- Use "bulletList" for features, characteristics, or unordered items
+- Use "numberedList" for sequences, steps, or ranked items
+- Add engaging "title" to lists when possible
 
-LANGUAGE: ${isYoung ? 'Use very simple words for ages 4-7' : 'Use grade-appropriate language for ages 8-12'}
+🔤 VOCABULARY (definitions)
+- Use "definition" blocks for key terms
+- MUST include "term", "definition", and "example" using kid-friendly analogies
+- Example: "Mesopotamia = 'Land between rivers' - like building your house between two water slides!"
 
-Extract ALL visible content - do not skip anything you can see in the document.`;
+💡 KEY TAKEAWAYS (concept boxes)
+- Use "keyConceptBox" for the most important ideas
+- Include "title" (with emoji) and "text" that summarizes the concept
+- Make it memorable: use rhymes, acronyms, or vivid imagery
+
+🔀 SECTION BREAKS (dividers)
+- Use "divider" with "style": "section" between major topics
+- Add "label" to preview what's coming next
+
+=============================================================================
+CONTENT BLOCK SPECIFICATIONS (MUST FOLLOW EXACTLY)
+=============================================================================
+
+HEADER: { type: "header", level: 2|3|4, text: "Title with emoji 🎯" }
+
+PARAGRAPH: { type: "paragraph", text: "Short, engaging text. 3-4 sentences max." }
+
+TABLE: {
+  type: "table",
+  title: "Comparison Title",
+  headers: ["Column 1", "Column 2", "Column 3"],
+  rows: [["data", "data", "data"], ["data", "data", "data"]]
+}
+
+BULLET LIST: { type: "bulletList", title: "Optional Title", items: ["Item 1", "Item 2"] }
+
+NUMBERED LIST: { type: "numberedList", title: "Steps to...", items: ["First...", "Then..."] }
+
+DEFINITION: { type: "definition", term: "Word", definition: "Simple meaning", example: "Real-world example" }
+
+KEY CONCEPT BOX: { type: "keyConceptBox", title: "💡 Big Idea", text: "The main point to remember" }
+
+TIP: { type: "tip", title: "Fun Fact!", text: "Interesting related information" }
+
+NOTE: { type: "note", title: "Remember!", text: "Important point to keep in mind" }
+
+DIVIDER: { type: "divider", style: "section", label: "Next: Topic Name" }
+
+=============================================================================
+QUALITY CHECKLIST
+=============================================================================
+✅ Every section has an engaging header with emoji
+✅ No paragraph exceeds 4 sentences
+✅ Tables preserve ALL data from the original document
+✅ Vocabulary terms have kid-friendly definitions with examples
+✅ Key concepts are highlighted in boxes
+✅ Content flows logically with clear section breaks
+✅ Language matches the target age group
+✅ Abstract concepts have concrete analogies
+
+Transform ALL content from the PDF - do not skip any information. Make learning FUN!`;
 
     // Use Gemini 3 Pro with native PDF vision
     const model = genAI.getGenerativeModel({
