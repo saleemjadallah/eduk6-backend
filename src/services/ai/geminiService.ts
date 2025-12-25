@@ -658,6 +658,21 @@ NOTE: { type: "note", title: "Remember!", text: "Important point to keep in mind
 DIVIDER: { type: "divider", style: "section", label: "Next: Topic Name" }
 
 =============================================================================
+⚠️ TEXT FORMATTING RULES (CRITICAL)
+=============================================================================
+
+NEVER use HTML tags in text content. The renderer will escape them as literal text.
+
+WRONG: <b>important</b>, <p>text</p>, <i>emphasis</i>
+RIGHT: **important**, just plain text, *emphasis*
+
+For bold text: Use **double asterisks** like **this is bold**
+For italic text: Use _underscores_ like _this is italic_
+For plain text: Just write normally without any HTML tags
+
+All text fields (text, definition, example, items, etc.) should use this markdown-style formatting.
+
+=============================================================================
 QUALITY CHECKLIST
 =============================================================================
 ✅ Every section has an engaging header with emoji
