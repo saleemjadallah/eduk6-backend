@@ -146,6 +146,13 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
 
     // 4. Format content using deterministic DocumentFormatter (100% reliable)
     // Uses AI-extracted metadata (chapters, vocabulary, exercises) to enhance formatting
+    //
+    // HYBRID APPROACH by source type:
+    // - PDF: Use AI-extracted contentBlocks for semantic structure (PDFs lose structure when extracted)
+    // - PPT: Skip contentBlocks - slides already have natural structure preserved
+    // - Other: Use heuristic formatting
+    const shouldUseContentBlocks = sourceType === 'PDF';
+
     const formattedContent = documentFormatter.format(extractedText, {
       ageGroup,
       chapters: analysis.chapters,
@@ -162,11 +169,17 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
         difficulty: ex.difficulty,
         locationInContent: ex.locationInContent,
       })),
+      // Only pass contentBlocks for PDFs - they need AI to reconstruct semantic structure
+      // PPTs keep their slide structure, so heuristic formatting works better
+      contentBlocks: shouldUseContentBlocks ? analysis.contentBlocks : undefined,
     });
 
     logger.info(`Content formatted successfully`, {
       rawLength: extractedText.length,
       formattedLength: formattedContent.length,
+      sourceType,
+      usedContentBlocks: shouldUseContentBlocks && !!analysis.contentBlocks?.length,
+      contentBlockCount: analysis.contentBlocks?.length || 0,
       hasChapters: !!analysis.chapters?.length,
       hasVocabulary: !!analysis.vocabulary?.length,
       hasExercises: !!analysis.exercises?.length,
