@@ -1,4 +1,4 @@
-// Chat routes for Jeffrey AI assistant
+// Chat routes for Ollie AI assistant
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth.js';
@@ -90,7 +90,7 @@ router.post(
       });
 
       // Build a simple, engaging prompt for demo users
-      const systemPrompt = `You are Jeffrey, a friendly AI tutor for kids. Answer ANY educational question the child asks - math, science, history, language, or anything else they're curious about.
+      const systemPrompt = `You are Ollie, a friendly AI tutor for kids. Answer ANY educational question the child asks - math, science, history, language, or anything else they're curious about.
 
 RESPONSE GUIDELINES:
 - Keep responses short (2-3 sentences)
@@ -100,13 +100,13 @@ RESPONSE GUIDELINES:
 
 EXAMPLES:
 User: "How do I simplify fractions?"
-Jeffrey: "Great question! To simplify a fraction, find a number that divides evenly into both the top and bottom. For example, 4/8 becomes 1/2 when you divide both by 4! 🎯"
+Ollie: "Great question! To simplify a fraction, find a number that divides evenly into both the top and bottom. For example, 4/8 becomes 1/2 when you divide both by 4! 🎯"
 
 User: "What are dinosaurs?"
-Jeffrey: "Dinosaurs were incredible reptiles that ruled Earth for over 160 million years! Some were tiny like chickens, while others like T-Rex were massive predators. 🦕"
+Ollie: "Dinosaurs were incredible reptiles that ruled Earth for over 160 million years! Some were tiny like chickens, while others like T-Rex were massive predators. 🦕"
 
 User: "How do plants grow?"
-Jeffrey: "Plants are amazing! They use sunlight, water, and air to make their own food through photosynthesis. The roots drink water while leaves catch sunshine! 🌱"
+Ollie: "Plants are amazing! They use sunlight, water, and air to make their own food through photosynthesis. The roots drink water while leaves catch sunshine! 🌱"
 
 IMPORTANT: Always answer the actual question asked. Never redirect to unrelated topics.`;
 
@@ -172,7 +172,7 @@ IMPORTANT: Always answer the actual question asked. Never redirect to unrelated 
 
 /**
  * POST /api/chat
- * Send a message to Jeffrey AI assistant
+ * Send a message to Ollie AI assistant
  */
 router.post(
   '/',
@@ -226,8 +226,8 @@ router.post(
           effectiveAgeGroup
         );
 
-        // Generate a friendly Jeffrey response to accompany the image
-        const jeffreyResponse = generateJeffreyImageResponse(
+        // Generate a friendly Ollie response to accompany the image
+        const ollieResponse = generateOllieImageResponse(
           imageIntent.imagePrompt || message,
           effectiveAgeGroup
         );
@@ -235,7 +235,7 @@ router.post(
         res.json({
           success: true,
           data: {
-            content: jeffreyResponse,
+            content: ollieResponse,
             role: 'assistant',
             type: 'image',
             imageData: imageResult.imageData,
@@ -246,7 +246,7 @@ router.post(
       }
 
       // Regular text chat - Build the prompt based on context
-      const systemPrompt = buildJeffreyPrompt(effectiveAgeGroup, lessonContext, selectedText);
+      const systemPrompt = buildOlliePrompt(effectiveAgeGroup, lessonContext, selectedText);
 
       // Build conversation history for context
       const history = conversationHistory?.map((msg: { role: string; content: string }) => ({
@@ -653,16 +653,16 @@ CRITICAL REQUIREMENTS:
 }
 
 /**
- * Build Jeffrey's system prompt based on context
+ * Build Ollie's system prompt based on context
  */
-function buildJeffreyPrompt(
+function buildOlliePrompt(
   ageGroup: AgeGroup,
   lessonContext?: { title?: string; subject?: string; keyConcepts?: string[]; content?: string; summary?: string } | null,
   selectedText?: string
 ): string {
   const isYoung = ageGroup === 'YOUNG';
 
-  let prompt = `You are Jeffrey, a friendly and encouraging AI tutor for ${isYoung ? 'young children ages 4-7' : 'children ages 8-12'}.
+  let prompt = `You are Ollie, a friendly and encouraging AI tutor for ${isYoung ? 'young children ages 4-7' : 'children ages 8-12'}.
 
 Your personality:
 - Warm, patient, and encouraging
@@ -694,7 +694,7 @@ Guidelines:
       prompt += `\n\nLesson Summary:\n${lessonContext.summary.substring(0, 1000)}`;
     }
     if (lessonContext.content) {
-      // Include lesson content for Jeffrey to reference
+      // Include lesson content for Ollie to reference
       // This allows answering contextual questions like "what does question 3 mean?"
       // Using 8000 chars to allow referencing most lesson content while staying within token limits
       const truncatedContent = lessonContext.content.substring(0, 8000);
@@ -834,9 +834,9 @@ CRITICAL REQUIREMENTS:
 }
 
 /**
- * Generate Jeffrey's friendly response to accompany an image
+ * Generate Ollie's friendly response to accompany an image
  */
-function generateJeffreyImageResponse(imagePrompt: string, ageGroup: AgeGroup): string {
+function generateOllieImageResponse(imagePrompt: string, ageGroup: AgeGroup): string {
   const isYoung = ageGroup === 'YOUNG';
 
   const responses = isYoung

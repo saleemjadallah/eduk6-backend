@@ -59,7 +59,7 @@ export const GEMINI_3_PRO_ANALYSIS_CONFIG = {
   responseMimeType: 'application/json',
 };
 
-// Gemini 3 Pro config for chat (Jeffrey) - balanced for conversational use
+// Gemini 3 Pro config for chat (Ollie) - balanced for conversational use
 export const GEMINI_3_PRO_CHAT_CONFIG = {
   temperature: 1.0,
   topP: 0.95,

@@ -112,7 +112,7 @@ const BADGE_DEFINITIONS = [
   {
     code: 'question_asker',
     name: 'Curious Mind',
-    description: 'Ask Jeffrey 50 questions',
+    description: 'Ask Ollie 50 questions',
     icon: '❓',
     category: 'MASTERY' as BadgeCategory,
     rarity: 'RARE' as BadgeRarity,

@@ -86,7 +86,7 @@
 │   ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐            │
 │   │  Google Vertex  │    │   ElevenLabs    │    │     Stripe      │            │
 │   │                 │    │                 │    │                 │            │
-│   │ - Gemini Chat   │    │ - Jeffrey TTS   │    │ - Subscriptions │            │
+│   │ - Gemini Chat   │    │ - Ollie TTS     │    │ - Subscriptions │            │
 │   │ - Content Gen   │    │ - Arabic Voice  │    │ - Consent CC    │            │
 │   │ - Vision API    │    │ - Child Voices  │    │ - Payments      │            │
 │   │ - Safety Filter │    │                 │    │                 │            │
@@ -1029,7 +1029,7 @@ POST   /api/lessons/:lessonId/progress
   Response: { xpAwarded, newProgress }
 
 # ============================================
-# CHAT (JEFFREY AI)
+# CHAT (OLLIE AI)
 # ============================================
 
 GET    /api/chat/:lessonId/history
@@ -1038,7 +1038,7 @@ GET    /api/chat/:lessonId/history
   Response: { messages: [...] }
 
 POST   /api/chat/:lessonId/message
-  # Send message to Jeffrey
+  # Send message to Ollie
   Body: { content }
   Response: { 
     userMessage,
@@ -1060,8 +1060,8 @@ DELETE /api/chat/:lessonId/history
 # TEXT SELECTIONS
 # ============================================
 
-POST   /api/selections/ask-jeffrey
-  # Ask Jeffrey about selected text
+POST   /api/selections/ask-ollie
+  # Ask Ollie about selected text
   Body: { lessonId, selectedText, context, userQuestion? }
   Response: { answer, voiceUrl?, xpAwarded }
 
@@ -1254,7 +1254,7 @@ POST   /api/parent/subscription/manage
 
 POST   /api/voice/generate
   # Generate TTS audio
-  Body: { text, voice?: "jeffrey", language?: "en" }
+  Body: { text, voice?: "ollie", language?: "en" }
   Response: { audioUrl }
 
 GET    /api/voice/voices
@@ -1583,7 +1583,7 @@ export class PromptBuilder {
     const instructions: string[] = [];
     
     // Core identity
-    instructions.push(this.getJeffreyIdentity());
+    instructions.push(this.getOllieIdentity());
     
     // Safety rules (CRITICAL)
     instructions.push(this.getSafetyRules());
@@ -1599,8 +1599,8 @@ export class PromptBuilder {
     return instructions.join('\n\n');
   }
   
-  private getJeffreyIdentity(): string {
-    return `You are Jeffrey, a friendly and enthusiastic AI learning buddy for children on the Orbit Learn platform.
+  private getOllieIdentity(): string {
+    return `You are Ollie, a friendly and enthusiastic AI learning buddy for children on the Orbit Learn platform.
 
 PERSONALITY:
 - Always positive, encouraging, and patient
@@ -2682,7 +2682,7 @@ R2_CDN_DOMAIN=cdn.nanobanana.com
 # ELEVENLABS (TTS)
 # ============================================
 ELEVENLABS_API_KEY=your-elevenlabs-key
-ELEVENLABS_VOICE_ID=voice-id-for-jeffrey
+ELEVENLABS_VOICE_ID=voice-id-for-ollie
 
 # ============================================
 # STRIPE (Payments)
@@ -2996,7 +2996,7 @@ CMD ["npm", "start"]
 | 11-12 | R2 storage setup, presigned uploads | File upload working |
 | 13-14 | Content processing pipeline (PDF/image) | Text extraction working |
 | 15-16 | Gemini integration, safety filters | AI chat with safety |
-| 17-18 | Chat API with lesson context | Jeffrey responds to lessons |
+| 17-18 | Chat API with lesson context | Ollie responds to lessons |
 | 19-20 | Flashcard generation | AI-generated flashcards |
 
 **Deliverables:**

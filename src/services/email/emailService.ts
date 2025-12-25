@@ -39,12 +39,12 @@ const templates = {
           Thank you for joining Orbit Learn! We're thrilled to have you and your family as part of our learning community.
         </p>
 
-        <!-- Jeffrey Introduction Box -->
+        <!-- Ollie Introduction Box -->
         <div style="background: linear-gradient(135deg, #EDE9FE 0%, #CCFBF1 100%); border-radius: 16px; padding: 24px; margin: 28px 0; text-align: center;">
-          <img src="${config.frontendUrl}/assets/images/jeffrey-avatar.png" alt="Jeffrey" style="width: 80px; height: 80px; border-radius: 50%; border: 4px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.15); margin-bottom: 16px;">
-          <h3 style="color: #5B21B6; margin: 0 0 12px 0; font-size: 20px;">Meet Jeffrey, Your Child's AI Tutor!</h3>
+          <img src="${config.frontendUrl}/assets/images/ollie-avatar.png" alt="Ollie" style="width: 80px; height: 80px; border-radius: 50%; border: 4px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.15); margin-bottom: 16px;">
+          <h3 style="color: #5B21B6; margin: 0 0 12px 0; font-size: 20px;">Meet Ollie, Your Child's AI Tutor!</h3>
           <p style="color: #4b5563; margin: 0; line-height: 1.6;">
-            Jeffrey is a friendly, patient AI tutor who adapts to each child's learning style. With his lavender skin and warm smile, he makes education fun with interactive lessons and personalized encouragement from kindergarten through middle school!
+            Ollie is a friendly, patient AI tutor who adapts to each child's learning style. With a warm smile and playful personality, Ollie makes education fun with interactive lessons and personalized encouragement from kindergarten through middle school!
           </p>
         </div>
 
@@ -75,7 +75,7 @@ const templates = {
               <table role="presentation" cellspacing="0" cellpadding="0">
                 <tr>
                   <td style="background: #F59E0B; color: white; width: 32px; height: 32px; border-radius: 50%; text-align: center; font-weight: bold; font-size: 16px; vertical-align: middle;">3</td>
-                  <td style="padding-left: 16px; color: #4b5563; font-size: 15px;"><strong>Watch them learn!</strong> - Jeffrey will guide them through interactive lessons</td>
+                  <td style="padding-left: 16px; color: #4b5563; font-size: 15px;"><strong>Watch them learn!</strong> - Ollie will guide them through interactive lessons</td>
                 </tr>
               </table>
             </td>
@@ -105,13 +105,13 @@ Hi ${parentName}!
 
 Thank you for joining Orbit Learn! We're thrilled to have you and your family as part of our learning community.
 
-Meet Jeffrey, Your Child's AI Tutor!
-Jeffrey is a friendly, patient AI tutor who adapts to each child's learning style. With his lavender skin and warm smile, he makes education fun with interactive lessons and personalized encouragement from kindergarten through middle school!
+Meet Ollie, Your Child's AI Tutor!
+Ollie is a friendly, patient AI tutor who adapts to each child's learning style. With a warm smile and playful personality, Ollie makes education fun with interactive lessons and personalized encouragement from kindergarten through middle school!
 
 Getting Started:
 1. Add your children - Set up profiles for each child
 2. Upload lesson content - PDFs, images, or YouTube videos
-3. Watch them learn! - Jeffrey will guide them through interactive lessons
+3. Watch them learn! - Ollie will guide them through interactive lessons
 
 Start learning at: ${config.frontendUrl}/dashboard
 
@@ -251,11 +251,11 @@ If you didn't request this ${action}, please ignore this email or contact suppor
           Great news! <strong>${childName}</strong>'s learning profile has been created and they're ready to start their educational adventure!
         </p>
 
-        <!-- Jeffrey Excited Box -->
+        <!-- Ollie Excited Box -->
         <div style="background: linear-gradient(135deg, #CCFBF1 0%, #EDE9FE 100%); border-radius: 16px; padding: 24px; margin: 28px 0; text-align: center;">
-          <img src="${config.frontendUrl}/assets/images/jeffrey-avatar.png" alt="Jeffrey" style="width: 70px; height: 70px; border-radius: 50%; border: 4px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.15); margin-bottom: 12px;">
+          <img src="${config.frontendUrl}/assets/images/ollie-avatar.png" alt="Ollie" style="width: 70px; height: 70px; border-radius: 50%; border: 4px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.15); margin-bottom: 12px;">
           <p style="color: #065f46; margin: 0; font-size: 16px; font-weight: 500;">
-            Jeffrey is excited to meet <strong>${childName}</strong> and help them explore fun lessons! 🚀
+            Ollie is excited to meet <strong>${childName}</strong> and help them explore fun lessons! 🚀
           </p>
         </div>
 
@@ -276,7 +276,7 @@ If you didn't request this ${action}, please ignore this email or contact suppor
               <table role="presentation" cellspacing="0" cellpadding="0">
                 <tr>
                   <td style="color: #7C3AED; font-size: 20px; vertical-align: middle; padding-right: 12px;">💬</td>
-                  <td style="color: #4b5563; font-size: 15px;">Let ${childName} chat with Jeffrey</td>
+                  <td style="color: #4b5563; font-size: 15px;">Let ${childName} chat with Ollie</td>
                 </tr>
               </table>
             </td>
@@ -313,13 +313,13 @@ ${childName}'s Profile is Ready!
 
 Hi ${parentName},
 
-Great news! ${childName}'s learning profile has been created and they're ready to start their educational adventure with Jeffrey!
+Great news! ${childName}'s learning profile has been created and they're ready to start their educational adventure with Ollie!
 
-Jeffrey is excited to meet ${childName} and help them explore fun lessons!
+Ollie is excited to meet ${childName} and help them explore fun lessons!
 
 Next Steps:
 - Upload your first lesson for ${childName}
-- Let ${childName} chat with Jeffrey
+- Let ${childName} chat with Ollie
 - Track their progress in your parent dashboard
 
 View profile at: ${config.frontendUrl}/dashboard/children
@@ -368,7 +368,7 @@ View profile at: ${config.frontendUrl}/dashboard/children
         </p>
 
         <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
-          Here's what <strong>${childName}</strong> accomplished this week with Jeffrey:
+          Here's what <strong>${childName}</strong> accomplished this week with Ollie:
         </p>
 
         <!-- Stats Grid -->
@@ -408,9 +408,9 @@ View profile at: ${config.frontendUrl}/dashboard/children
         </div>
         ` : ''}
 
-        <!-- Jeffrey Encouragement -->
+        <!-- Ollie Encouragement -->
         <div style="background-color: #F5F3FF; border-radius: 16px; padding: 20px; margin: 24px 0; text-align: center; border: 2px dashed #C4B5FD;">
-          <img src="${config.frontendUrl}/assets/images/jeffrey-avatar.png" alt="Jeffrey" style="width: 50px; height: 50px; border-radius: 50%; margin-bottom: 10px;">
+          <img src="${config.frontendUrl}/assets/images/ollie-avatar.png" alt="Ollie" style="width: 50px; height: 50px; border-radius: 50%; margin-bottom: 10px;">
           <p style="color: #5B21B6; margin: 0; font-size: 15px; font-style: italic;">
             "Keep up the amazing work, ${childName}! Every lesson brings you closer to your goals!" 🌟
           </p>
@@ -437,7 +437,7 @@ ${childName}'s Weekly Learning Report
 
 Hi ${parentName},
 
-Here's what ${childName} accomplished this week with Jeffrey:
+Here's what ${childName} accomplished this week with Ollie:
 
 - Lessons Completed: ${stats.lessonsCompleted}
 - Learning Time: ${stats.timeSpent}
@@ -445,7 +445,7 @@ Here's what ${childName} accomplished this week with Jeffrey:
 - Day Streak: ${stats.streak}
 ${stats.badgesEarned.length > 0 ? `- New Badges: ${stats.badgesEarned.join(', ')}` : ''}
 
-"Keep up the amazing work, ${childName}! Every lesson brings you closer to your goals!" - Jeffrey
+"Keep up the amazing work, ${childName}! Every lesson brings you closer to your goals!" - Ollie
 
 View full report at: ${config.frontendUrl}/dashboard/progress
 

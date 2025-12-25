@@ -1,5 +1,5 @@
 // Gemini AI Service for chat and content generation
-// Uses Gemini 3 Pro for advanced reasoning and Jeffrey AI tutor
+// Uses Gemini 3 Pro for advanced reasoning and Ollie AI tutor
 import {
   genAI,
   CHILD_SAFETY_SETTINGS,
@@ -204,7 +204,7 @@ export class GeminiService {
   }
 
   /**
-   * Chat with Jeffrey AI tutor
+   * Chat with Ollie AI tutor
    * Now supports curriculum-aware teaching style personalization
    */
   async chat(
@@ -243,7 +243,7 @@ export class GeminiService {
     const history = this.formatConversationHistory(context.conversationHistory);
 
     // 4. Get appropriate config for age group
-    // Use Gemini 3 Flash for Jeffrey - fast and intelligent for text-based chat
+    // Use Gemini 3 Flash for Ollie - fast and intelligent for text-based chat
     const baseConfig = context.ageGroup === 'YOUNG' ? YOUNG_CHILD_CONFIG : OLDER_CHILD_CONFIG;
     const generationConfig = {
       temperature: 1.0,
@@ -252,7 +252,7 @@ export class GeminiService {
       maxOutputTokens: baseConfig.maxOutputTokens, // Age-appropriate length
     };
 
-    // 5. Call Gemini 3 Flash for Jeffrey AI tutor
+    // 5. Call Gemini 3 Flash for Ollie AI tutor
     const model = genAI.getGenerativeModel({
       model: config.gemini.models.flash, // gemini-3-flash-preview
       safetySettings: CHILD_SAFETY_SETTINGS,
@@ -260,7 +260,7 @@ export class GeminiService {
       systemInstruction: systemPrompt,
     });
 
-    logger.info(`Using Gemini 3 Flash for Jeffrey chat`, {
+    logger.info(`Using Gemini 3 Flash for Ollie chat`, {
       model: config.gemini.models.flash,
       ageGroup: context.ageGroup,
     });

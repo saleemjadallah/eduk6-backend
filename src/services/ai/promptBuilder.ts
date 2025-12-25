@@ -23,14 +23,14 @@ export interface PromptContext {
 
 export class PromptBuilder {
   /**
-   * Build system instructions for Jeffrey AI tutor
+   * Build system instructions for Ollie AI tutor
    * Now includes curriculum-aware teaching approach
    */
   buildSystemInstructions(context: PromptContext): string {
     const instructions: string[] = [];
 
     // Core identity
-    instructions.push(this.getJeffreyIdentity());
+    instructions.push(this.getOllieIdentity());
 
     // Safety rules (CRITICAL)
     instructions.push(this.getSafetyRules());
@@ -53,8 +53,8 @@ export class PromptBuilder {
     return instructions.join('\n\n');
   }
 
-  private getJeffreyIdentity(): string {
-    return `You are Jeffrey, a friendly and enthusiastic AI learning buddy for children on the Orbit Learn platform.
+  private getOllieIdentity(): string {
+    return `You are Ollie, a friendly and enthusiastic AI learning buddy for children on the Orbit Learn platform.
 
 PERSONALITY:
 - Always positive, encouraging, and patient
@@ -268,7 +268,7 @@ Return ONLY valid JSON with this structure:
     }
   ],
   "suggestedQuestions": [
-    "Question the student might want to ask Jeffrey about this content",
+    "Question the student might want to ask Ollie about this content",
     "Another curiosity-sparking question"
   ],
   "confidence": 0.8,
@@ -463,7 +463,7 @@ Return ONLY valid JSON with this exact structure (no additional text):
     const gradeConfig = getGradeLevelConfig(context.gradeLevel ?? (isYoung ? 1 : 4));
     const curriculumGuidance = getCurriculumGuidance(context.curriculumType, context.ageGroup, context.gradeLevel);
 
-    return `You are Jeffrey, a warm and enthusiastic AI learning buddy helping ${isYoung
+    return `You are Ollie, a warm and enthusiastic AI learning buddy helping ${isYoung
       ? 'a young child aged 4-7 who is just starting their learning journey and responds best to simple, playful explanations with lots of familiar examples'
       : 'an elementary school student aged 8-12 who is curious and capable of understanding more detailed explanations with reasoning'}.
 
@@ -599,7 +599,7 @@ CRITICAL: Only detect exercises that ALREADY EXIST in the content. Do not invent
   ): string {
     const isYoung = ageGroup === 'YOUNG';
 
-    return `You are Jeffrey, a warm and encouraging AI learning buddy who celebrates effort and learning. A ${isYoung
+    return `You are Ollie, a warm and encouraging AI learning buddy who celebrates effort and learning. A ${isYoung
       ? 'young child aged 4-7 who is still building confidence with learning and needs lots of encouragement'
       : 'student aged 8-12 who appreciates honest feedback and wants to understand their mistakes'} just submitted an answer to a practice exercise.
 
