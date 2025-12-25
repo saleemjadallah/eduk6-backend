@@ -475,7 +475,7 @@ export class GeminiService {
     logger.info('Analyzing PDF with native vision', {
       pdfSize: pdfBuffer.length,
       ageGroup: context.ageGroup,
-      model: config.gemini.models.flash,
+      model: config.gemini.models.pro,
     });
 
     // JSON Schema for structured output - guarantees valid contentBlocks
@@ -612,9 +612,9 @@ LANGUAGE: ${isYoung ? 'Use very simple words for ages 4-7' : 'Use grade-appropri
 
 Extract ALL visible content - do not skip anything you can see in the document.`;
 
-    // Use Gemini 3 Flash with native PDF vision
+    // Use Gemini 3 Pro with native PDF vision
     const model = genAI.getGenerativeModel({
-      model: config.gemini.models.flash,
+      model: config.gemini.models.pro,
       safetySettings: CHILD_SAFETY_SETTINGS,
       generationConfig: {
         temperature: 0.2, // Low for accurate structure extraction
