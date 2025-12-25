@@ -136,7 +136,8 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
       // Also extract text for reference (chat context, search, etc.)
       extractedText = await extractTextFromPDF(fileUrl!);
 
-      // Format using the vision-extracted contentBlocks
+      // Format using heuristic formatting (skip contentBlocks for now)
+      // Vision provides metadata (title, summary, vocabulary) but formatting is deterministic
       formattedContent = documentFormatter.format(extractedText, {
         ageGroup,
         chapters: analysis.chapters,
@@ -153,14 +154,13 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
           difficulty: ex.difficulty,
           locationInContent: ex.locationInContent,
         })),
-        contentBlocks: analysis.contentBlocks, // Vision-extracted blocks!
+        // No contentBlocks - use heuristic formatting instead
       });
 
-      logger.info(`PDF processed with native vision`, {
+      logger.info(`PDF processed with vision (heuristic formatting)`, {
         extractedTextLength: extractedText.length,
         formattedLength: formattedContent.length,
-        contentBlockCount: analysis.contentBlocks?.length || 0,
-        blockTypes: analysis.contentBlocks?.map(b => b.type).slice(0, 10),
+        visionBlockCount: analysis.contentBlocks?.length || 0, // For reference only
       });
     }
     // ==========================================================================
