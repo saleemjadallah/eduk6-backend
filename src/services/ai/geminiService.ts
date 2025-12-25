@@ -342,18 +342,20 @@ export class GeminiService {
     logger.info(`Starting content analysis`, {
       contentLength: content.length,
       ageGroup: context.ageGroup,
-      model: config.gemini.models.flash,
+      model: config.gemini.models.pro,
     });
 
-    // Use Gemini 3 Flash for analysis - fast with superior intelligence
-    // Set maxOutputTokens high (65536 is the max for Flash) to prevent truncation
-    // The model only generates what it needs - this just removes the ceiling
+    // Use Gemini 3 Pro for content analysis - better reasoning for:
+    // - Complex content structure detection (tables, sections, hierarchies)
+    // - Accurate contentBlocks extraction for beautiful PDF formatting
+    // - Higher quality metadata extraction (exercises, vocabulary)
+    // Set maxOutputTokens high to prevent truncation on large documents
     const analysisModel = genAI.getGenerativeModel({
-      model: config.gemini.models.flash, // gemini-3-flash-preview
+      model: config.gemini.models.pro, // gemini-3-pro-preview
       safetySettings: CHILD_SAFETY_SETTINGS,
       generationConfig: {
         temperature: 0.3,
-        maxOutputTokens: 65536,
+        maxOutputTokens: 32768, // Pro max is 32K
         responseMimeType: 'application/json',
       },
     });
