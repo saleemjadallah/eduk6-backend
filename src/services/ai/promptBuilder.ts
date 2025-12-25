@@ -273,64 +273,79 @@ Return ONLY valid JSON with this structure:
   ],
   "confidence": 0.8,
   "contentBlocks": [
-    // IMPORTANT: Parse the content into structured blocks for beautiful rendering.
-    // Identify each distinct element and classify it. Go through the content in order.
+    // CRITICAL: Transform the content into well-structured blocks for beautiful, readable rendering.
+    //
+    // STRUCTURE GUIDELINES:
+    // 1. Start with a header (level 2) for each major section/topic
+    // 2. Break long text into multiple paragraph blocks (3-5 sentences each)
+    // 3. Use dividers between major sections
+    // 4. Identify and preserve tables, lists, and special formatting
+    // 5. Don't lose ANY content - every piece of text should be in a block
+    //
+    // PARAGRAPH RULES:
+    // - Use "paragraph" for regular explanatory text (NOT "explanation")
+    // - Keep paragraphs focused on ONE idea or sub-topic
+    // - Never put more than 5-6 sentences in a single paragraph block
+    // - If text discusses multiple topics, split into separate paragraphs with headers
 
     // Metadata at the start (if present):
-    { "type": "metadata", "gradeLevel": "5th Grade", "subject": "Mathematics", "topic": "Fractions", "duration": "60-75 minutes" },
+    { "type": "metadata", "gradeLevel": "5th Grade", "subject": "History", "topic": "Ancient Civilizations", "duration": "45 minutes" },
 
-    // Section headers (major topics):
-    { "type": "header", "level": 2, "text": "What Does It Mean to Multiply Fractions?" },
+    // Major section header (level 2 for main topics):
+    { "type": "header", "level": 2, "text": "Social Structure in Mesopotamia" },
 
-    // Explanatory paragraphs:
-    { "type": "explanation", "text": "When we multiply fractions, we're finding a part of a part." },
+    // Introductory paragraph - keep it focused and digestible:
+    { "type": "paragraph", "text": "Mesopotamian society was hierarchical, with clear social classes. A person's position was usually determined by birth, though some social mobility was possible through military service or business success." },
 
-    // Examples with relatable scenarios:
-    { "type": "example", "title": "Pizza Example", "content": "If you have 1/2 of a pizza and want to share 3/4 of your piece..." },
+    // TABLES - Use for any tabular/comparison data:
+    { "type": "table", "title": "Social Classes of Mesopotamia", "headers": ["Social Class", "Who They Were", "Rights and Responsibilities"], "rows": [["Kings and Priests", "Rulers and religious leaders", "Ultimate authority, religious duties"], ["Upper Class", "Government officials, wealthy merchants", "Owned land, could read/write"], ["Middle Class", "Farmers, artisans, scribes", "Worked land, paid taxes"], ["Lower Class", "Laborers, servants", "Limited rights"], ["Slaves", "War captives, debt slaves", "Property of owners"]] },
 
-    // Key concepts (highlight important ideas):
-    { "type": "keyConceptBox", "title": "Key Concept", "text": "Multiplying fractions means finding a fraction of another fraction. The word 'of' in math often means multiply." },
+    // Sub-section header (level 3 for sub-topics):
+    { "type": "header", "level": 3, "text": "Daily Life in Ancient Mesopotamia" },
 
-    // Rules with steps:
-    { "type": "rule", "title": "The Simple Rule for Multiplying Fractions", "steps": ["Multiply the numerators (top numbers) together", "Multiply the denominators (bottom numbers) together", "Simplify the answer (if possible)"], "formula": "a/b × c/d = (a × c) / (b × d)" },
+    // Another focused paragraph:
+    { "type": "paragraph", "text": "Most Mesopotamians lived in mud-brick houses with flat roofs. The wealthy had multi-story homes with interior courtyards." },
 
-    // Formulas (standalone):
-    { "type": "formula", "formula": "a/b × c/d = (a × c) / (b × d)", "explanation": "Multiply tops, multiply bottoms" },
+    // Key concept box for important ideas:
+    { "type": "keyConceptBox", "title": "Key Concept", "text": "The word 'of' in math often means multiply." },
 
-    // Word problems (multi-step problems with solution):
-    { "type": "wordProblem", "title": "Pizza Party!", "icon": "🍕", "problem": "Sarah has 2/3 of a pizza left. She wants to give 3/4 of what she has to her brother. What fraction of the whole pizza will her brother get?", "understand": "We need to find 3/4 of 2/3", "setup": "3/4 × 2/3", "calculate": "(3 × 2) / (4 × 3) = 6/12", "simplify": "6/12 = 1/2", "answer": "Sarah's brother gets 1/2 of the whole pizza." },
+    // Rules with steps (for procedures/methods):
+    { "type": "rule", "title": "The Simple Rule", "steps": ["Step one", "Step two", "Step three"], "formula": "a/b × c/d = (a × c) / (b × d)" },
 
-    // Bullet lists:
-    { "type": "bulletList", "title": "Learning Objectives", "items": ["Multiply fractions by fractions", "Multiply fractions by whole numbers", "Simplify fraction products"] },
+    // Bullet lists for related items:
+    { "type": "bulletList", "title": "Specialized Workers", "items": ["Scribes: Highly respected, took years to learn cuneiform", "Priests: Performed religious ceremonies", "Merchants: Traded goods across the region"] },
 
-    // Numbered lists:
-    { "type": "numberedList", "title": "Steps to Solve", "items": ["Read the problem", "Identify the fractions", "Multiply", "Simplify"] },
+    // Numbered lists for sequences/rankings:
+    { "type": "numberedList", "title": "Steps to Solve", "items": ["Read the problem", "Identify key information", "Solve", "Check your answer"] },
 
-    // Step-by-step instructions:
-    { "type": "stepByStep", "title": "How to Multiply", "steps": [{ "label": "Step 1", "content": "Multiply the numerators" }, { "label": "Step 2", "content": "Multiply the denominators" }] },
+    // Definitions for vocabulary terms:
+    { "type": "definition", "term": "Cuneiform", "definition": "The wedge-shaped writing system used in ancient Mesopotamia", "example": "Scribes used cuneiform to record laws and stories" },
 
-    // Tips:
-    { "type": "tip", "text": "Remember: 'of' usually means multiply!" },
+    // Tips for helpful hints:
+    { "type": "tip", "text": "Remember: Beer was safer than water in ancient times!" },
 
-    // Notes:
-    { "type": "note", "text": "This rule works for any two fractions." },
+    // Notes for additional information:
+    { "type": "note", "text": "This applies to all ancient river valley civilizations." },
 
-    // Warnings:
-    { "type": "warning", "text": "Don't forget to simplify your final answer!" },
+    // Warnings for common mistakes:
+    { "type": "warning", "text": "Don't confuse Mesopotamia with Egypt - they had different writing systems!" },
 
-    // Questions:
-    { "type": "question", "text": "What is 1/2 × 1/4?" },
+    // Section dividers between major topics:
+    { "type": "divider", "style": "section", "label": "Food and Diet" },
 
-    // Answers:
-    { "type": "answer", "text": "1/8", "explanation": "1×1=1 for the top, 2×4=8 for the bottom" },
-
-    // Definitions:
-    { "type": "definition", "term": "Numerator", "definition": "The top number in a fraction", "example": "In 3/4, the numerator is 3" },
-
-    // Section dividers:
-    { "type": "divider", "style": "section", "label": "Practice Problems" }
+    // Continue with more paragraphs after divider...
+    { "type": "paragraph", "text": "The diet centered on bread and beer made from barley. Fish from the rivers was common, while wealthy people also ate meat, dates, and vegetables." }
   ]
 }
+
+CONTENT BLOCK PRIORITIES:
+1. HEADERS: Create clear section structure with level 2 for main topics, level 3 for sub-topics
+2. PARAGRAPHS: Break text into digestible chunks (3-5 sentences). Never create wall-of-text!
+3. TABLES: Preserve ANY tabular data - comparisons, lists with multiple attributes, schedules
+4. LISTS: Use bulletList for unordered items, numberedList for sequences/steps
+5. KEY CONCEPTS: Highlight important ideas that students must remember
+6. DEFINITIONS: Extract vocabulary terms with clear definitions
+7. DIVIDERS: Separate major sections for visual clarity
 
 LANGUAGE FOR SUMMARIES AND VOCABULARY:
 - Maximum sentence length: ${gradeConfig.maxSentenceLength} words
