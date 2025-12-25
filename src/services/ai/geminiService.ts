@@ -453,6 +453,221 @@ export class GeminiService {
   }
 
   /**
+   * Analyze a PDF document using native vision for superior structure detection.
+   *
+   * This method sends the PDF directly to Gemini (not extracted text), allowing
+   * the model to SEE the visual layout: tables, headers, bullet points, etc.
+   *
+   * Uses structured output with JSON schema to guarantee contentBlocks format.
+   */
+  async analyzePDFWithVision(
+    pdfBuffer: Buffer,
+    context: {
+      ageGroup: AgeGroup;
+      curriculumType?: CurriculumType | null;
+      gradeLevel?: number | null;
+      subject?: Subject | null;
+    }
+  ): Promise<LessonAnalysis> {
+    const isYoung = context.ageGroup === 'YOUNG';
+    const pdfBase64 = pdfBuffer.toString('base64');
+
+    logger.info('Analyzing PDF with native vision', {
+      pdfSize: pdfBuffer.length,
+      ageGroup: context.ageGroup,
+      model: config.gemini.models.flash,
+    });
+
+    // JSON Schema for structured output - guarantees valid contentBlocks
+    const contentBlocksSchema = {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Engaging title for the lesson' },
+        summary: { type: 'string', description: 'Brief summary of the content (2-4 sentences)' },
+        subject: {
+          type: 'string',
+          enum: ['MATH', 'SCIENCE', 'ENGLISH', 'ARABIC', 'ISLAMIC_STUDIES', 'SOCIAL_STUDIES', 'ART', 'MUSIC', 'OTHER'],
+          description: 'The subject area'
+        },
+        gradeLevel: { type: 'string', description: 'Estimated grade level (K-8)' },
+        keyConcepts: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Key concepts covered (3-8 items)'
+        },
+        vocabulary: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              term: { type: 'string' },
+              definition: { type: 'string' },
+              example: { type: 'string' }
+            },
+            required: ['term', 'definition']
+          }
+        },
+        contentBlocks: {
+          type: 'array',
+          description: 'Structured content blocks representing the document layout',
+          items: {
+            type: 'object',
+            properties: {
+              type: {
+                type: 'string',
+                enum: ['metadata', 'header', 'paragraph', 'explanation', 'example',
+                       'keyConceptBox', 'rule', 'formula', 'wordProblem', 'bulletList',
+                       'numberedList', 'stepByStep', 'tip', 'note', 'warning',
+                       'question', 'answer', 'definition', 'vocabulary', 'table', 'divider']
+              },
+              // Header fields
+              level: { type: 'integer', minimum: 1, maximum: 4 },
+              text: { type: 'string' },
+              // List fields
+              title: { type: 'string' },
+              items: { type: 'array', items: { type: 'string' } },
+              // Table fields
+              headers: { type: 'array', items: { type: 'string' } },
+              rows: { type: 'array', items: { type: 'array', items: { type: 'string' } } },
+              // Definition fields
+              term: { type: 'string' },
+              definition: { type: 'string' },
+              example: { type: 'string' },
+              // Divider fields
+              style: { type: 'string', enum: ['solid', 'dashed', 'section'] },
+              label: { type: 'string' },
+              // Step-by-step fields
+              steps: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    label: { type: 'string' },
+                    content: { type: 'string' }
+                  }
+                }
+              }
+            },
+            required: ['type']
+          }
+        },
+        confidence: { type: 'number', minimum: 0, maximum: 1 }
+      },
+      required: ['title', 'summary', 'contentBlocks']
+    };
+
+    const prompt = `You are an expert educational content analyzer with vision capabilities.
+
+LOOK at this PDF document visually and extract its structure into content blocks.
+
+YOUR TASK:
+1. VISUALLY identify the document structure:
+   - Headers (look for larger/bold text)
+   - Tables (look for grid structures with rows and columns)
+   - Bullet lists (look for • or - markers)
+   - Numbered lists (look for 1. 2. 3. sequences)
+   - Paragraphs of text
+   - Key concepts or highlighted boxes
+   - Definitions and vocabulary terms
+
+2. Convert what you SEE into structured content blocks.
+
+CRITICAL RULES FOR CONTENT BLOCKS:
+
+HEADERS:
+- Use "header" with level 2 for main section titles
+- Use "header" with level 3 for sub-sections
+- MUST have "level" (1-4) and "text" properties
+
+PARAGRAPHS:
+- Use "paragraph" for regular text content
+- Keep paragraphs SHORT (3-5 sentences max)
+- NEVER create walls of text - split into multiple paragraphs
+- MUST have "text" property
+
+TABLES:
+- Use "table" when you SEE tabular data with rows and columns
+- MUST have "headers" (array of column names) and "rows" (array of arrays)
+- Each row is an array of cell values
+
+LISTS:
+- Use "bulletList" for unordered lists (• markers)
+- Use "numberedList" for ordered lists (1. 2. 3.)
+- MUST have "items" array with each list item as a string
+- Optionally include "title" for the list header
+
+DEFINITIONS:
+- Use "definition" for vocabulary terms
+- MUST have "term" and "definition" properties
+
+KEY CONCEPTS:
+- Use "keyConceptBox" for important highlighted ideas
+- MUST have "text" property, optionally "title"
+
+DIVIDERS:
+- Use "divider" between major sections
+- Include "style": "section" and optionally "label"
+
+LANGUAGE: ${isYoung ? 'Use very simple words for ages 4-7' : 'Use grade-appropriate language for ages 8-12'}
+
+Extract ALL visible content - do not skip anything you can see in the document.`;
+
+    // Use Gemini 3 Flash with native PDF vision
+    const model = genAI.getGenerativeModel({
+      model: config.gemini.models.flash,
+      safetySettings: CHILD_SAFETY_SETTINGS,
+      generationConfig: {
+        temperature: 0.2, // Low for accurate structure extraction
+        maxOutputTokens: 65536,
+        responseMimeType: 'application/json',
+        responseSchema: contentBlocksSchema as any,
+      },
+    });
+
+    try {
+      const result = await model.generateContent([
+        { text: prompt },
+        {
+          inlineData: {
+            mimeType: 'application/pdf',
+            data: pdfBase64,
+          },
+        },
+      ]);
+
+      const responseText = result.response.text();
+
+      logger.info('PDF vision analysis completed', {
+        responseLength: responseText.length,
+        tokensUsed: result.response.usageMetadata?.totalTokenCount,
+      });
+
+      const analysis = JSON.parse(responseText) as LessonAnalysis;
+
+      // Log what we got
+      logger.info('PDF vision extracted content blocks', {
+        blockCount: analysis.contentBlocks?.length || 0,
+        blockTypes: analysis.contentBlocks?.map(b => b.type).slice(0, 15),
+        hasTable: analysis.contentBlocks?.some(b => b.type === 'table'),
+        hasBulletList: analysis.contentBlocks?.some(b => b.type === 'bulletList'),
+      });
+
+      // Validate content is child-appropriate
+      const safetyCheck = await safetyFilters.validateContent(analysis, context.ageGroup);
+      if (!safetyCheck.passed) {
+        throw new Error('Content contains inappropriate material');
+      }
+
+      return analysis;
+    } catch (error) {
+      logger.error('PDF vision analysis failed', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw new Error('Failed to analyze PDF with vision');
+    }
+  }
+
+  /**
    * Generate flashcards from lesson content
    * Now supports curriculum-aware flashcard style
    */

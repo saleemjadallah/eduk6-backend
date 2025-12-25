@@ -104,86 +104,128 @@ async function processContentJob(job: Job<ContentProcessingJobData>): Promise<vo
   const { lessonId, fileUrl, youtubeUrl, sourceType, childId, ageGroup, curriculumType, gradeLevel } = job.data;
 
   try {
-    // 1. Extract text based on source type
-    let extractedText: string;
-
-    switch (sourceType) {
-      case 'PDF':
-        extractedText = await extractTextFromPDF(fileUrl!);
-        break;
-      case 'PPT':
-        extractedText = await extractTextFromPPT(fileUrl!);
-        break;
-      case 'IMAGE':
-        extractedText = await extractTextFromImage(fileUrl!);
-        break;
-      case 'YOUTUBE':
-        extractedText = await extractYouTubeTranscript(youtubeUrl!);
-        break;
-      case 'TEXT':
-        // Text is already extracted, fetch from lesson
-        const lesson = await lessonService.getById(lessonId);
-        extractedText = lesson?.extractedText || '';
-        break;
-      default:
-        throw new Error(`Unsupported source type: ${sourceType}`);
-    }
-
-    if (!extractedText || extractedText.trim().length < 50) {
-      throw new Error('Could not extract sufficient text from content');
-    }
-
-    // 2. Get lesson to check subject
+    // Get lesson to check subject
     const lesson = await lessonService.getById(lessonId);
 
-    // 3. Analyze content with AI (curriculum-aware)
-    const analysis = await geminiService.analyzeContent(extractedText, {
-      ageGroup,
-      curriculumType,
-      gradeLevel,
-      subject: lesson?.subject,
-    });
+    let extractedText: string;
+    let analysis: Awaited<ReturnType<typeof geminiService.analyzeContent>>;
+    let formattedContent: string;
 
-    // 4. Format content using deterministic DocumentFormatter (100% reliable)
-    // Uses AI-extracted metadata (chapters, vocabulary, exercises) to enhance formatting
-    //
-    // HYBRID APPROACH by source type:
-    // - PDF: Use AI-extracted contentBlocks for semantic structure (PDFs lose structure when extracted)
-    // - PPT: Skip contentBlocks - slides already have natural structure preserved
-    // - Other: Use heuristic formatting
-    const shouldUseContentBlocks = sourceType === 'PDF';
+    // ==========================================================================
+    // PDF: Use NATIVE VISION for superior structure detection
+    // Gemini SEES the PDF visually - tables, headers, formatting are preserved!
+    // ==========================================================================
+    if (sourceType === 'PDF') {
+      logger.info(`Processing PDF with native vision: ${fileUrl}`);
 
-    const formattedContent = documentFormatter.format(extractedText, {
-      ageGroup,
-      chapters: analysis.chapters,
-      vocabulary: analysis.vocabulary,
-      exercises: analysis.exercises?.map(ex => ({
-        id: ex.id,
-        type: ex.type,
-        questionText: ex.questionText,
-        expectedAnswer: ex.expectedAnswer,
-        acceptableAnswers: ex.acceptableAnswers,
-        hint1: ex.hint1,
-        hint2: ex.hint2,
-        explanation: ex.explanation,
-        difficulty: ex.difficulty,
-        locationInContent: ex.locationInContent,
-      })),
-      // Only pass contentBlocks for PDFs - they need AI to reconstruct semantic structure
-      // PPTs keep their slide structure, so heuristic formatting works better
-      contentBlocks: shouldUseContentBlocks ? analysis.contentBlocks : undefined,
-    });
+      // Download PDF as buffer (not text extraction)
+      const response = await fetch(fileUrl!);
+      if (!response.ok) {
+        throw new Error(`Failed to download PDF: ${response.status}`);
+      }
+      const pdfBuffer = Buffer.from(await response.arrayBuffer());
 
-    logger.info(`Content formatted successfully`, {
-      rawLength: extractedText.length,
-      formattedLength: formattedContent.length,
-      sourceType,
-      usedContentBlocks: shouldUseContentBlocks && !!analysis.contentBlocks?.length,
-      contentBlockCount: analysis.contentBlocks?.length || 0,
-      hasChapters: !!analysis.chapters?.length,
-      hasVocabulary: !!analysis.vocabulary?.length,
-      hasExercises: !!analysis.exercises?.length,
-    });
+      // Use vision-based analysis - Gemini SEES the document
+      analysis = await geminiService.analyzePDFWithVision(pdfBuffer, {
+        ageGroup,
+        curriculumType,
+        gradeLevel,
+        subject: lesson?.subject,
+      });
+
+      // Also extract text for reference (chat context, search, etc.)
+      extractedText = await extractTextFromPDF(fileUrl!);
+
+      // Format using the vision-extracted contentBlocks
+      formattedContent = documentFormatter.format(extractedText, {
+        ageGroup,
+        chapters: analysis.chapters,
+        vocabulary: analysis.vocabulary,
+        exercises: analysis.exercises?.map(ex => ({
+          id: ex.id,
+          type: ex.type,
+          questionText: ex.questionText,
+          expectedAnswer: ex.expectedAnswer,
+          acceptableAnswers: ex.acceptableAnswers,
+          hint1: ex.hint1,
+          hint2: ex.hint2,
+          explanation: ex.explanation,
+          difficulty: ex.difficulty,
+          locationInContent: ex.locationInContent,
+        })),
+        contentBlocks: analysis.contentBlocks, // Vision-extracted blocks!
+      });
+
+      logger.info(`PDF processed with native vision`, {
+        extractedTextLength: extractedText.length,
+        formattedLength: formattedContent.length,
+        contentBlockCount: analysis.contentBlocks?.length || 0,
+        blockTypes: analysis.contentBlocks?.map(b => b.type).slice(0, 10),
+      });
+    }
+    // ==========================================================================
+    // Other formats: Extract text first, then analyze
+    // ==========================================================================
+    else {
+      // Extract text based on source type
+      switch (sourceType) {
+        case 'PPT':
+          extractedText = await extractTextFromPPT(fileUrl!);
+          break;
+        case 'IMAGE':
+          extractedText = await extractTextFromImage(fileUrl!);
+          break;
+        case 'YOUTUBE':
+          extractedText = await extractYouTubeTranscript(youtubeUrl!);
+          break;
+        case 'TEXT':
+          extractedText = lesson?.extractedText || '';
+          break;
+        default:
+          throw new Error(`Unsupported source type: ${sourceType}`);
+      }
+
+      if (!extractedText || extractedText.trim().length < 50) {
+        throw new Error('Could not extract sufficient text from content');
+      }
+
+      // Analyze content with AI (text-based)
+      analysis = await geminiService.analyzeContent(extractedText, {
+        ageGroup,
+        curriculumType,
+        gradeLevel,
+        subject: lesson?.subject,
+      });
+
+      // Format content - PPTs use heuristic formatting (slides have structure)
+      formattedContent = documentFormatter.format(extractedText, {
+        ageGroup,
+        chapters: analysis.chapters,
+        vocabulary: analysis.vocabulary,
+        exercises: analysis.exercises?.map(ex => ({
+          id: ex.id,
+          type: ex.type,
+          questionText: ex.questionText,
+          expectedAnswer: ex.expectedAnswer,
+          acceptableAnswers: ex.acceptableAnswers,
+          hint1: ex.hint1,
+          hint2: ex.hint2,
+          explanation: ex.explanation,
+          difficulty: ex.difficulty,
+          locationInContent: ex.locationInContent,
+        })),
+        // No contentBlocks for non-PDF - use heuristic formatting
+      });
+
+      logger.info(`Content formatted successfully`, {
+        rawLength: extractedText.length,
+        formattedLength: formattedContent.length,
+        sourceType,
+        hasChapters: !!analysis.chapters?.length,
+        hasVocabulary: !!analysis.vocabulary?.length,
+        hasExercises: !!analysis.exercises?.length,
+      });
+    }
 
     // 5. Update lesson with analysis metadata and formatted content
     logger.info(`Updating lesson ${lessonId} with analysis results`, {
