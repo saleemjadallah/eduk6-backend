@@ -447,6 +447,117 @@ export class DocumentFormatter {
   }
 
   // ============================================================================
+  // PARAGRAPH SPLITTING (for readability)
+  // ============================================================================
+
+  /**
+   * Split long paragraphs into smaller chunks for better readability.
+   * Target: 4-5 sentences per chunk.
+   */
+  private splitLongParagraph(text: string, maxSentences: number = 4): string[] {
+    if (!text || text.trim().length === 0) {
+      return [text];
+    }
+
+    const sentences = this.splitIntoSentences(text);
+
+    // If already short enough, return as-is
+    if (sentences.length <= maxSentences) {
+      return [text.trim()];
+    }
+
+    // Split into chunks of maxSentences
+    const chunks: string[] = [];
+    for (let i = 0; i < sentences.length; i += maxSentences) {
+      const chunk = sentences.slice(i, i + maxSentences).join(' ').trim();
+      if (chunk) {
+        chunks.push(chunk);
+      }
+    }
+
+    return chunks;
+  }
+
+  /**
+   * Split text into sentences using smart boundary detection.
+   * Handles abbreviations, decimals, and other edge cases.
+   */
+  private splitIntoSentences(text: string): string[] {
+    if (!text) return [];
+
+    // Common abbreviations that shouldn't end sentences
+    const abbreviations = [
+      'Mr', 'Mrs', 'Ms', 'Dr', 'Prof', 'Sr', 'Jr',
+      'vs', 'etc', 'i.e', 'e.g', 'al', 'Inc', 'Ltd', 'Co',
+      'Jan', 'Feb', 'Mar', 'Apr', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'St', 'Ave', 'Blvd', 'Rd', 'Mt', 'ft', 'in', 'cm', 'mm', 'km', 'kg', 'lb',
+      'No', 'Vol', 'Ch', 'Sec', 'Fig', 'pg', 'pp'
+    ];
+
+    // Protect abbreviations by temporarily replacing periods
+    let processed = text;
+
+    abbreviations.forEach((abbr, idx) => {
+      const marker = `__ABBR${idx}__`;
+      const regex = new RegExp(`\\b${abbr}\\.`, 'gi');
+      processed = processed.replace(regex, (match) => {
+        return marker;
+      });
+    });
+
+    // Protect decimal numbers (e.g., 3.14, $4.99)
+    processed = processed.replace(/(\d+)\.(\d+)/g, '$1__DECIMAL__$2');
+
+    // Protect ellipses
+    processed = processed.replace(/\.{3}/g, '__ELLIPSIS__');
+
+    // Split on sentence-ending punctuation followed by space and capital letter
+    // or end of string
+    const sentencePattern = /([.!?])\s+(?=[A-Z])|([.!?])$/g;
+
+    const sentences: string[] = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = sentencePattern.exec(processed)) !== null) {
+      const sentence = processed.slice(lastIndex, match.index + 1).trim();
+      if (sentence) {
+        sentences.push(sentence);
+      }
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Don't forget the last part if no ending punctuation
+    if (lastIndex < processed.length) {
+      const remaining = processed.slice(lastIndex).trim();
+      if (remaining) {
+        sentences.push(remaining);
+      }
+    }
+
+    // Restore protected patterns
+    return sentences.map(sentence => {
+      let restored = sentence;
+
+      // Restore abbreviations
+      abbreviations.forEach((abbr, idx) => {
+        const marker = `__ABBR${idx}__`;
+        if (restored.includes(marker)) {
+          restored = restored.replace(new RegExp(marker, 'g'), `${abbr}.`);
+        }
+      });
+
+      // Restore decimals
+      restored = restored.replace(/__DECIMAL__/g, '.');
+
+      // Restore ellipses
+      restored = restored.replace(/__ELLIPSIS__/g, '...');
+
+      return restored.trim();
+    }).filter(s => s.length > 0);
+  }
+
+  // ============================================================================
   // LINE BREAK RESTORATION
   // ============================================================================
 
@@ -841,7 +952,11 @@ export class DocumentFormatter {
       if (currentParagraph.length > 0) {
         const paragraphText = currentParagraph.join(' ').trim();
         if (paragraphText) {
-          result.push(`<p>${this.formatInlineText(paragraphText)}</p>`);
+          // Split long paragraphs into digestible chunks (max 4 sentences each)
+          const chunks = this.splitLongParagraph(paragraphText);
+          for (const chunk of chunks) {
+            result.push(`<p>${this.formatInlineText(chunk)}</p>`);
+          }
         }
         currentParagraph = [];
       }
