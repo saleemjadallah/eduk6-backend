@@ -507,9 +507,9 @@ ${renderedBlocks.join('\n')}
     </div>`;
     }).join('\n    ');
 
-    return `<div class="step-by-step-block">
+    return `<div class="steps-block">
   <div class="steps-header">${icon}<span class="steps-title">${this.escapeHtml(title)}</span></div>
-  <div class="steps-container">
+  <div class="steps-list">
     ${steps}
   </div>
 </div>`;
@@ -548,7 +548,8 @@ ${renderedBlocks.join('\n')}
     }
 
     return `<div class="question-block">
-  <div class="question-content">${icon}<p class="question-text">${this.formatText(block.text)}</p></div>
+  <div class="question-header">${icon}<span class="question-label">Question</span></div>
+  <p class="question-text">${this.formatText(block.text)}</p>
   ${hint}
 </div>`;
   }
@@ -562,7 +563,8 @@ ${renderedBlocks.join('\n')}
     }
 
     return `<div class="answer-block">
-  <div class="answer-content">${icon}<p class="answer-text">${this.formatText(block.text)}</p></div>
+  <div class="answer-header">${icon}<span class="answer-label">Answer</span></div>
+  <p class="answer-text">${this.formatText(block.text)}</p>
   ${explanation}
 </div>`;
   }
@@ -596,8 +598,8 @@ ${renderedBlocks.join('\n')}
     }).join('\n    ');
 
     return `<div class="vocabulary-block">
-  <div class="vocab-header">${icon}<span class="vocab-title">Vocabulary</span></div>
-  <div class="vocab-list">
+  <div class="vocabulary-header">${icon}<span class="vocabulary-title">Vocabulary</span></div>
+  <div class="vocabulary-list">
     ${terms}
   </div>
 </div>`;

@@ -184,11 +184,11 @@ router.post(
         : undefined;
       const finalSubject = (subject as Subject | undefined) || detectedSubject;
 
-      // Format content using deterministic DocumentFormatter (100% reliable)
-      // Use enhanced heuristic formatting which:
-      // 1. Preserves ALL original content (no AI summarization)
-      // 2. Applies smart semantic styling (tips, notes, warnings, definitions, etc.)
-      // 3. Uses the same styled HTML as StructuredRenderer
+      // Format content using DocumentFormatter with AI-extracted contentBlocks
+      // ContentBlocks enable beautiful structured rendering with:
+      // - Question blocks, answer blocks, tables, word problems
+      // - Step-by-step guides, vocabulary sections, highlights
+      // - All the rich block styles we've created
       const formattedContent = documentFormatter.format(content, {
         ageGroup: child.ageGroup,
         chapters: analysis.chapters,
@@ -205,15 +205,15 @@ router.post(
           difficulty: ex.difficulty,
           locationInContent: ex.locationInContent,
         })),
-        // Don't pass contentBlocks - use heuristic formatting to preserve full text
-        // ContentBlocks from AI tend to summarize/condense content instead of preserving it
-        // contentBlocks: analysis.contentBlocks,
+        // Use AI-extracted contentBlocks for rich structured rendering
+        contentBlocks: analysis.contentBlocks,
       });
 
       logger.info('Content formatted successfully', {
         rawLength: content.length,
         formattedLength: formattedContent.length,
-        usingHeuristicFormatter: true,
+        hasContentBlocks: !!analysis.contentBlocks?.length,
+        blockCount: analysis.contentBlocks?.length || 0,
       });
 
       // Create lesson record with analyzed content
