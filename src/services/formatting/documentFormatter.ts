@@ -754,6 +754,16 @@ export class DocumentFormatter {
   }
 
   /**
+   * Render a question block with indigo/purple styling
+   */
+  private renderQuestionBlock(text: string): string {
+    return `<div class="question-block">
+  <div class="question-header"><span class="icon">❓</span><span class="question-label">Question</span></div>
+  <p class="question-text">${this.formatInlineText(text)}</p>
+</div>`;
+  }
+
+  /**
    * Render a formula block with yellow dashed border
    */
   private renderFormulaBlock(formula: string): string {
@@ -785,15 +795,36 @@ export class DocumentFormatter {
 
   /**
    * Format inline text (bold, math)
+   * Handles both markdown formatting AND stray HTML tags from AI
    */
   private formatInlineText(text: string): string {
-    let formatted = this.escapeHtml(text);
+    let formatted = text;
 
-    // Bold text
+    // STEP 1: Convert any HTML tags to markdown BEFORE escaping
+    // This handles cases where Gemini returns HTML instead of markdown
+    formatted = formatted.replace(/<b>([^<]*)<\/b>/gi, '**$1**');
+    formatted = formatted.replace(/<strong>([^<]*)<\/strong>/gi, '**$1**');
+    formatted = formatted.replace(/<i>([^<]*)<\/i>/gi, '_$1_');
+    formatted = formatted.replace(/<em>([^<]*)<\/em>/gi, '_$1_');
+
+    // Strip paragraph tags (they shouldn't be inline)
+    formatted = formatted.replace(/<\/?p>/gi, ' ');
+
+    // Strip any other stray HTML tags
+    formatted = formatted.replace(/<[^>]+>/g, '');
+
+    // STEP 2: Escape remaining HTML special characters
+    formatted = this.escapeHtml(formatted);
+
+    // STEP 3: Apply markdown formatting
+    // Bold text (double asterisks)
     formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    // Bold text (single asterisks - treat as bold for educational content)
     formatted = formatted.replace(/\*([^*]+)\*/g, '<strong>$1</strong>');
+    // Italic text (underscores)
+    formatted = formatted.replace(/_([^_]+)_/g, '<em>$1</em>');
 
-    // Key term definitions
+    // Key term definitions (auto-bold terms being defined)
     formatted = formatted.replace(
       /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(means?|is defined as|refers to|is when)/g,
       '<strong>$1</strong> $2'
@@ -801,6 +832,9 @@ export class DocumentFormatter {
 
     // Math expressions
     formatted = this.mathFormatter.formatMathExpressions(formatted);
+
+    // Clean up extra whitespace
+    formatted = formatted.replace(/\s+/g, ' ').trim();
 
     return formatted;
   }
@@ -1033,10 +1067,10 @@ export class DocumentFormatter {
         flushList();
       }
 
-      // Questions
+      // Questions - render as distinctive question blocks
       if (PATTERNS.questionPattern.test(trimmed)) {
         flushParagraph();
-        result.push(`<p class="question"><strong>${this.formatInlineText(trimmed)}</strong></p>`);
+        result.push(this.renderQuestionBlock(trimmed));
         continue;
       }
 

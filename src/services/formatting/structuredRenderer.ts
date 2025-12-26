@@ -661,19 +661,41 @@ ${renderedBlocks.join('\n')}
 
   /**
    * Format text with math expressions and basic formatting
+   * Handles both markdown formatting AND stray HTML tags from AI
    */
   private formatText(text: string): string {
-    let formatted = this.escapeHtml(text);
+    let formatted = text;
 
-    // Apply math formatting
+    // STEP 1: Convert any HTML tags to markdown BEFORE escaping
+    // This handles cases where Gemini returns HTML instead of markdown
+    formatted = formatted.replace(/<b>([^<]*)<\/b>/gi, '**$1**');
+    formatted = formatted.replace(/<strong>([^<]*)<\/strong>/gi, '**$1**');
+    formatted = formatted.replace(/<i>([^<]*)<\/i>/gi, '_$1_');
+    formatted = formatted.replace(/<em>([^<]*)<\/em>/gi, '_$1_');
+
+    // Strip paragraph tags (they shouldn't be inline)
+    formatted = formatted.replace(/<\/?p>/gi, ' ');
+
+    // Strip any other stray HTML tags
+    formatted = formatted.replace(/<[^>]+>/g, '');
+
+    // STEP 2: Escape remaining HTML special characters
+    formatted = this.escapeHtml(formatted);
+
+    // STEP 3: Apply markdown formatting
+    // Apply math formatting first
     formatted = this.mathFormatter.formatMathExpressions(formatted);
 
-    // Bold text
+    // Bold text (double asterisks)
     formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    // Bold text (single asterisks)
     formatted = formatted.replace(/\*([^*]+)\*/g, '<strong>$1</strong>');
 
-    // Italic text
+    // Italic text (underscores)
     formatted = formatted.replace(/_([^_]+)_/g, '<em>$1</em>');
+
+    // Clean up extra whitespace
+    formatted = formatted.replace(/\s+/g, ' ').trim();
 
     return formatted;
   }
