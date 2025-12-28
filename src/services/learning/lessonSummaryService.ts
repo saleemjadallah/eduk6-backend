@@ -7,7 +7,7 @@ import { LessonAudioStatus, AgeGroup } from '@prisma/client';
 import { logger } from '../../utils/logger.js';
 import { uploadFile } from '../storage/storageService.js';
 import { v4 as uuidv4 } from 'uuid';
-import textToSpeech from '@google-cloud/text-to-speech';
+import { getTTSClient } from '../../config/tts.js';
 
 // ============================================
 // CONSTANTS
@@ -185,7 +185,7 @@ Script:`;
     script: string,
     ageGroup: AgeGroup
   ): Promise<{ audioBuffer: Buffer; duration: number }> {
-    const ttsClient = new textToSpeech.TextToSpeechClient();
+    const ttsClient = getTTSClient();
     const speakingRate = SPEAKING_RATES[ageGroup];
 
     const [response] = await ttsClient.synthesizeSpeech({

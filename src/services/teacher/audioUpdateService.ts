@@ -8,7 +8,7 @@ import { quotaService } from './quotaService.js';
 import { logger } from '../../utils/logger.js';
 import { uploadFile } from '../storage/storageService.js';
 import { v4 as uuidv4 } from 'uuid';
-import textToSpeech from '@google-cloud/text-to-speech';
+import { getTTSClient } from '../../config/tts.js';
 
 // ============================================
 // TYPES
@@ -210,7 +210,7 @@ ${content?.sections ? `Key Sections: ${content.sections.map(s => s.title).join('
 
     try {
       // Initialize TTS client
-      const ttsClient = new textToSpeech.TextToSpeechClient();
+      const ttsClient = getTTSClient();
 
       const language = input.language || 'en';
       const voiceId = input.voiceId || VOICE_OPTIONS[language]?.[0]?.voiceId || 'en-US-Studio-O';
