@@ -13,7 +13,8 @@ import { logger } from '../utils/logger.js';
 import { sanitizeForPostgres, sanitizeObjectForPostgres } from '../utils/sanitize.js';
 import { genAI } from '../config/gemini.js';
 import { config } from '../config/index.js';
-import { AgeGroup, Subject, SourceType, CurriculumType } from '@prisma/client';
+import { AgeGroup, Subject, SourceType, CurriculumType, LessonAudioStatus } from '@prisma/client';
+import { lessonSummaryService } from '../services/learning/lessonSummaryService.js';
 
 const router = Router();
 
@@ -1215,6 +1216,126 @@ router.post(
       logger.error('PPT analysis failed', {
         error: error instanceof Error ? error.message : 'Unknown error',
       });
+      next(error);
+    }
+  }
+);
+
+// ============================================
+// AUDIO SUMMARY ROUTES (Ollie's Voice)
+// ============================================
+
+const audioSummarySchema = z.object({
+  ageGroup: z.enum(['YOUNG', 'OLDER']).optional().default('OLDER'),
+});
+
+/**
+ * POST /api/lessons/:lessonId/audio-summary
+ * Generate audio summary for a lesson using Ollie's voice
+ */
+router.post(
+  '/:lessonId/audio-summary',
+  authenticate,
+  validateInput(audioSummarySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { lessonId } = req.params;
+      const { ageGroup } = req.body;
+
+      // Get child ID from session
+      let childId: string;
+      if (req.child) {
+        childId = req.child.id;
+      } else if (req.parent) {
+        // Parent can generate for their children - get from lesson
+        const lesson = await lessonService.getById(lessonId);
+        if (!lesson) {
+          res.status(404).json({ success: false, error: 'Lesson not found' });
+          return;
+        }
+        // Verify parent owns this child
+        const child = await prisma.child.findUnique({
+          where: { id: lesson.childId },
+          select: { parentId: true },
+        });
+        if (!child || child.parentId !== req.parent.id) {
+          res.status(403).json({ success: false, error: 'Access denied' });
+          return;
+        }
+        childId = lesson.childId;
+      } else {
+        res.status(401).json({ success: false, error: 'Authentication required' });
+        return;
+      }
+
+      const result = await lessonSummaryService.generateLessonSummary({
+        lessonId,
+        childId,
+        ageGroup: ageGroup as AgeGroup,
+      });
+
+      res.json({
+        success: true,
+        data: {
+          audioUrl: result.audioUrl,
+          duration: result.duration,
+          status: 'READY' as LessonAudioStatus,
+        },
+      });
+    } catch (error) {
+      logger.error('Audio summary generation failed', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        lessonId: req.params.lessonId,
+      });
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /api/lessons/:lessonId/audio-summary
+ * Get audio summary status for a lesson
+ */
+router.get(
+  '/:lessonId/audio-summary',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { lessonId } = req.params;
+
+      // Get child ID from session
+      let childId: string;
+      if (req.child) {
+        childId = req.child.id;
+      } else if (req.parent) {
+        // Parent can check for their children - get from lesson
+        const lesson = await lessonService.getById(lessonId);
+        if (!lesson) {
+          res.status(404).json({ success: false, error: 'Lesson not found' });
+          return;
+        }
+        // Verify parent owns this child
+        const child = await prisma.child.findUnique({
+          where: { id: lesson.childId },
+          select: { parentId: true },
+        });
+        if (!child || child.parentId !== req.parent.id) {
+          res.status(403).json({ success: false, error: 'Access denied' });
+          return;
+        }
+        childId = lesson.childId;
+      } else {
+        res.status(401).json({ success: false, error: 'Authentication required' });
+        return;
+      }
+
+      const result = await lessonSummaryService.getAudioSummaryStatus(lessonId, childId);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
       next(error);
     }
   }

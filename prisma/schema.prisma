@@ -219,6 +219,11 @@ model Lesson {
   safetyReviewed   Boolean  @default(false)
   safetyFlags      String[] // Any flagged content
 
+  // Audio summary (Ollie's voice)
+  audioSummaryUrl      String?              // R2 URL for audio file
+  audioSummaryDuration Int?                 // Duration in seconds
+  audioSummaryStatus   LessonAudioStatus @default(NONE)
+
   // Relationships
   chatMessages     ChatMessage[]
   flashcardDecks   FlashcardDeck[]
@@ -1641,4 +1646,11 @@ enum AudioStatus {
   GENERATING  // Audio generation in progress
   READY       // Audio ready for review
   PUBLISHED   // Published and available to parents
+}
+
+enum LessonAudioStatus {
+  NONE        // No audio summary yet
+  GENERATING  // Audio generation in progress
+  READY       // Audio ready for playback
+  FAILED      // Generation failed
 }
