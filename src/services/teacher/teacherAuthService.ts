@@ -72,8 +72,14 @@ function hashRefreshToken(token: string): string {
 export const teacherAuthService = {
   /**
    * Create a new teacher account
+   * Returns tokens immediately so teachers can start using FREE tier
+   * Email verification is handled later via link (not blocking signup)
    */
-  async signup(params: TeacherSignupParams): Promise<{ teacherId: string }> {
+  async signup(
+    params: TeacherSignupParams,
+    deviceInfo?: string,
+    ipAddress?: string
+  ): Promise<TeacherLoginResult> {
     const { email, password, firstName, lastName, organizationId } = params;
 
     // Check if email already exists (for teachers)
@@ -119,6 +125,21 @@ export const teacherAuthService = {
       },
     });
 
+    // Generate tokens immediately (low-friction signup)
+    const accessToken = generateTeacherAccessToken(teacher);
+    const { token: refreshToken, jti, fid } = generateTeacherRefreshToken(teacher.id);
+
+    // Create session with hashed token
+    await sessionService.createSession({
+      userId: teacher.id,
+      type: 'teacher',
+      refreshTokenId: jti,
+      refreshTokenHash: hashRefreshToken(refreshToken),
+      tokenFamilyId: fid,
+      deviceInfo,
+      ipAddress,
+    });
+
     // Send welcome email (async, don't block signup) - using teacher-specific green theme
     emailService.sendTeacherWelcomeEmail(
       teacher.email,
@@ -127,14 +148,39 @@ export const teacherAuthService = {
       logger.error('Failed to send teacher welcome email', { error: err, teacherId: teacher.id });
     });
 
-    // Send email verification OTP - using teacher-specific green theme
-    otpService.createAndSendForTeacher(teacher.email, 'verify_email').catch(err => {
-      logger.error('Failed to send teacher verification OTP', { error: err, teacherId: teacher.id });
+    // Send email verification link (not OTP - lower friction)
+    this.sendVerificationLink(teacher.email, teacher.id).catch(err => {
+      logger.error('Failed to send teacher verification link', { error: err, teacherId: teacher.id });
     });
 
-    logger.info(`Teacher account created: ${teacher.email}`);
+    logger.info(`Teacher account created and logged in: ${teacher.email}`);
 
-    return { teacherId: teacher.id };
+    // Calculate quota info (same as login)
+    const monthlyLimit = teacher.monthlyTokenQuota;
+    const used = teacher.currentMonthUsage;
+    const resetDate = teacher.quotaResetDate;
+
+    return {
+      accessToken,
+      refreshToken,
+      teacher: {
+        id: teacher.id,
+        email: teacher.email,
+        firstName: teacher.firstName,
+        lastName: teacher.lastName,
+        emailVerified: teacher.emailVerified,
+        role: teacher.role,
+        subscriptionTier: teacher.subscriptionTier,
+        organizationId: teacher.organizationId,
+        organizationName: null, // New account, no org name
+      },
+      quota: {
+        monthlyLimit,
+        used,
+        remaining: monthlyLimit - used,
+        resetDate,
+      },
+    };
   },
 
   /**
@@ -596,6 +642,149 @@ export const teacherAuthService = {
         organizationName: teacher.organization?.name || null,
       },
     };
+  },
+
+  /**
+   * Generate and send a verification link via email
+   * This is lower friction than OTP - just click the link
+   */
+  async sendVerificationLink(email: string, teacherId?: string): Promise<{ success: boolean; error?: string }> {
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Get teacher if not provided
+    let teacher;
+    if (teacherId) {
+      teacher = await prisma.teacher.findUnique({ where: { id: teacherId } });
+    } else {
+      teacher = await prisma.teacher.findUnique({ where: { email: normalizedEmail } });
+    }
+
+    if (!teacher) {
+      // Don't reveal if email exists
+      return { success: true };
+    }
+
+    if (teacher.emailVerified) {
+      return { success: false, error: 'Email is already verified' };
+    }
+
+    // Generate a signed verification token (expires in 24 hours)
+    const jwt = await import('jsonwebtoken');
+    const verificationToken = jwt.default.sign(
+      {
+        sub: teacher.id,
+        email: teacher.email,
+        purpose: 'verify_email',
+        type: 'teacher',
+      },
+      process.env.JWT_SECRET || 'fallback-secret',
+      { expiresIn: '24h' }
+    );
+
+    // Build the verification URL
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const verificationUrl = `${frontendUrl}/teacher/verify-email-link?token=${verificationToken}`;
+
+    // Send the verification email with link
+    const sent = await emailService.sendTeacherVerificationLinkEmail(
+      teacher.email,
+      teacher.firstName || 'Teacher',
+      verificationUrl
+    );
+
+    if (!sent) {
+      // Fall back to OTP if link email fails
+      logger.warn(`Verification link email failed, falling back to OTP for ${normalizedEmail}`);
+      return otpService.createAndSendForTeacher(normalizedEmail, 'verify_email');
+    }
+
+    logger.info(`Verification link sent to teacher: ${normalizedEmail}`);
+    return { success: true };
+  },
+
+  /**
+   * Verify email using a signed token from verification link
+   * No OTP needed - just validates the JWT
+   */
+  async verifyEmailLink(token: string): Promise<{
+    success: boolean;
+    error?: string;
+    teacher?: {
+      id: string;
+      email: string;
+      firstName: string | null;
+      lastName: string | null;
+      emailVerified: boolean;
+    };
+  }> {
+    try {
+      const jwt = await import('jsonwebtoken');
+      const payload = jwt.default.verify(token, process.env.JWT_SECRET || 'fallback-secret') as {
+        sub: string;
+        email: string;
+        purpose: string;
+        type: string;
+      };
+
+      // Validate token purpose and type
+      if (payload.purpose !== 'verify_email' || payload.type !== 'teacher') {
+        return { success: false, error: 'Invalid verification token' };
+      }
+
+      // Find and update teacher
+      const teacher = await prisma.teacher.findUnique({
+        where: { id: payload.sub },
+      });
+
+      if (!teacher) {
+        return { success: false, error: 'Account not found' };
+      }
+
+      if (teacher.emailVerified) {
+        // Already verified - that's fine, just return success
+        return {
+          success: true,
+          teacher: {
+            id: teacher.id,
+            email: teacher.email,
+            firstName: teacher.firstName,
+            lastName: teacher.lastName,
+            emailVerified: true,
+          },
+        };
+      }
+
+      // Mark as verified
+      const updatedTeacher = await prisma.teacher.update({
+        where: { id: teacher.id },
+        data: {
+          emailVerified: true,
+          emailVerifiedAt: new Date(),
+        },
+      });
+
+      logger.info(`Teacher email verified via link: ${teacher.email}`);
+
+      return {
+        success: true,
+        teacher: {
+          id: updatedTeacher.id,
+          email: updatedTeacher.email,
+          firstName: updatedTeacher.firstName,
+          lastName: updatedTeacher.lastName,
+          emailVerified: updatedTeacher.emailVerified,
+        },
+      };
+    } catch (error: any) {
+      if (error.name === 'TokenExpiredError') {
+        return { success: false, error: 'Verification link has expired. Please request a new one.' };
+      }
+      if (error.name === 'JsonWebTokenError') {
+        return { success: false, error: 'Invalid verification link' };
+      }
+      logger.error('Email link verification failed', { error });
+      return { success: false, error: 'Verification failed. Please try again.' };
+    }
   },
 
   /**

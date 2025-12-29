@@ -666,6 +666,101 @@ If you didn't request this ${action}, please ignore this email or contact suppor
   },
 
   /**
+   * Teacher verification link email (click-to-verify, lower friction than OTP)
+   */
+  teacherVerificationLink: (teacherName: string, verificationUrl: string) => ({
+    subject: 'Verify Your Email - Orbit Learn for Educators',
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify Your Email</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    <!-- Header with Logo - Green Theme -->
+    <tr>
+      <td style="background: linear-gradient(135deg, #059669 0%, #10B981 50%, #34D399 100%); border-radius: 24px 24px 0 0; padding: 30px; text-align: center;">
+        <img src="${config.frontendUrl}/assets/orbit-learn-logo.png" alt="Orbit Learn" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">Verify Your Email</h1>
+      </td>
+    </tr>
+    <tr>
+      <td style="background-color: #ffffff; padding: 40px; border-radius: 0 0 24px 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+        <h2 style="color: #1e1b4b; margin-top: 0; font-size: 22px;">Hi ${teacherName}!</h2>
+
+        <p style="color: #4b5563; line-height: 1.7; font-size: 16px;">
+          You're almost ready to start creating amazing educational content with Orbit Learn!
+          Just click the button below to verify your email address.
+        </p>
+
+        <!-- Verify Button - Green Theme -->
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${verificationUrl}" style="display: inline-block; background: linear-gradient(135deg, #059669 0%, #10B981 100%); color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; padding: 16px 40px; border-radius: 12px; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);">
+            Verify My Email
+          </a>
+        </div>
+
+        <p style="color: #6b7280; font-size: 14px; text-align: center;">
+          This link expires in <strong>24 hours</strong>.
+        </p>
+
+        <!-- Alternative Link -->
+        <div style="background-color: #f9fafb; border-radius: 12px; padding: 16px 20px; margin-top: 24px;">
+          <p style="color: #6b7280; margin: 0 0 8px 0; font-size: 13px;">
+            If the button doesn't work, copy and paste this link into your browser:
+          </p>
+          <p style="color: #059669; margin: 0; font-size: 12px; word-break: break-all;">
+            ${verificationUrl}
+          </p>
+        </div>
+
+        <!-- What's Next Info -->
+        <div style="background-color: #ECFDF5; border-radius: 12px; padding: 20px; margin-top: 24px;">
+          <p style="color: #065F46; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;">
+            Why verify your email?
+          </p>
+          <ul style="color: #047857; margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.8;">
+            <li>Unlock subscription upgrades</li>
+            <li>Purchase credit packs</li>
+            <li>Secure your account</li>
+          </ul>
+        </div>
+
+        <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 28px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+          If you didn't create an account, please ignore this email.<br><br>
+          <span style="color: #10B981;">- The Orbit Learn Team</span>
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `,
+    text: `
+Hi ${teacherName}!
+
+You're almost ready to start creating amazing educational content with Orbit Learn!
+Click the link below to verify your email address:
+
+${verificationUrl}
+
+This link expires in 24 hours.
+
+Why verify your email?
+- Unlock subscription upgrades
+- Purchase credit packs
+- Secure your account
+
+If you didn't create an account, please ignore this email.
+
+- The Orbit Learn Team
+    `,
+  }),
+
+  /**
    * Usage warning email (70% and 90% thresholds)
    */
   usageWarning: (
@@ -1474,6 +1569,43 @@ export const emailService = {
       return true;
     } catch (error) {
       logger.error('Error sending teacher OTP email', { error, email });
+      return false;
+    }
+  },
+
+  /**
+   * Send verification link email to teacher (click-to-verify, lower friction than OTP)
+   */
+  async sendTeacherVerificationLinkEmail(
+    email: string,
+    teacherName: string,
+    verificationUrl: string
+  ): Promise<boolean> {
+    if (config.email.skipEmails || !resend) {
+      logger.info(`[Email] Skipped teacher verification link email to ${email}, url: ${verificationUrl}`);
+      return true;
+    }
+
+    try {
+      const template = templates.teacherVerificationLink(teacherName, verificationUrl);
+
+      const { error } = await resend.emails.send({
+        from: `Orbit Learn <${config.email.fromEmail}>`,
+        to: email,
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
+      });
+
+      if (error) {
+        logger.error('Failed to send teacher verification link email', { error, email });
+        return false;
+      }
+
+      logger.info(`Teacher verification link email sent to ${email}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending teacher verification link email', { error, email });
       return false;
     }
   },

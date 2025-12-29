@@ -64,6 +64,8 @@ const deleteAccountSchema = z.object({
 /**
  * POST /api/teacher/auth/signup
  * Teacher signup with email/password
+ * Returns tokens immediately - no email verification blocking signup
+ * Email verification link is sent for later verification (required for subscriptions)
  */
 router.post(
   '/signup',
@@ -71,7 +73,10 @@ router.post(
   validateInput(teacherSignupSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const result = await teacherAuthService.signup(req.body);
+      const deviceInfo = req.headers['user-agent'];
+      const ipAddress = req.ip;
+
+      const result = await teacherAuthService.signup(req.body, deviceInfo, ipAddress);
 
       // Add contact to Brevo for email marketing (fire-and-forget)
       // Teachers go to the Subscribers-Teacher list (ID: 9)
@@ -86,8 +91,18 @@ router.post(
 
       res.status(201).json({
         success: true,
-        data: result,
-        message: 'Account created. Please verify your email.',
+        data: {
+          token: result.accessToken,
+          refreshToken: result.refreshToken,
+          teacher: result.teacher,
+          quota: {
+            monthlyLimit: result.quota.monthlyLimit.toString(),
+            used: result.quota.used.toString(),
+            remaining: result.quota.remaining.toString(),
+            resetDate: result.quota.resetDate,
+          },
+        },
+        message: 'Account created. A verification link has been sent to your email.',
       });
     } catch (error) {
       next(error);
@@ -327,6 +342,86 @@ router.post(
       res.json({
         success: true,
         message: 'Verification code sent',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /api/teacher/auth/verify-email-link
+ * Verify email via signed JWT token (from email link)
+ * Lower friction than OTP - just click the link
+ */
+router.post(
+  '/verify-email-link',
+  authRateLimit,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { token } = req.body;
+
+      if (!token) {
+        res.status(400).json({
+          success: false,
+          error: 'Verification token is required',
+        });
+        return;
+      }
+
+      const result = await teacherAuthService.verifyEmailLink(token);
+
+      if (!result.success) {
+        res.status(400).json({
+          success: false,
+          error: result.error,
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        message: 'Email verified successfully',
+        teacher: result.teacher,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /api/teacher/auth/resend-verification-link
+ * Resend email verification link (not OTP)
+ */
+router.post(
+  '/resend-verification-link',
+  emailRateLimit,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        res.status(400).json({
+          success: false,
+          error: 'Email is required',
+        });
+        return;
+      }
+
+      const result = await teacherAuthService.sendVerificationLink(email);
+
+      if (!result.success) {
+        res.status(400).json({
+          success: false,
+          error: result.error,
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        message: 'Verification link sent to your email',
       });
     } catch (error) {
       next(error);

@@ -12,7 +12,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { subscriptionService } from '../../services/stripe/subscriptionService.js';
 import { quotaService } from '../../services/teacher/quotaService.js';
-import { authenticateTeacher, requireTeacher } from '../../middleware/teacherAuth.js';
+import { authenticateTeacher, requireTeacher, requireVerifiedEmail } from '../../middleware/teacherAuth.js';
 import { TeacherSubscriptionTier } from '@prisma/client';
 import { validateStripeConfig } from '../../config/stripeProducts.js';
 
@@ -100,11 +100,13 @@ router.get(
 /**
  * POST /api/teacher/subscription/checkout
  * Create a checkout session for subscription
+ * Requires verified email to prevent fraud
  */
 router.post(
   '/checkout',
   authenticateTeacher,
   requireTeacher,
+  requireVerifiedEmail,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { tier, isAnnual = false, successUrl, cancelUrl } = req.body;
@@ -154,11 +156,13 @@ router.post(
 /**
  * POST /api/teacher/subscription/credit-pack/checkout
  * Create a checkout session for credit pack purchase
+ * Requires verified email to prevent fraud
  */
 router.post(
   '/credit-pack/checkout',
   authenticateTeacher,
   requireTeacher,
+  requireVerifiedEmail,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { packId, successUrl, cancelUrl } = req.body;
