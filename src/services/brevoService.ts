@@ -7,7 +7,14 @@ import { logger } from '../utils/logger.js';
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const BREVO_LIST_ID = parseInt(process.env.BREVO_LIST_ID || '3', 10);
+const BREVO_TEACHER_LIST_ID = parseInt(process.env.BREVO_TEACHER_LIST_ID || '9', 10); // Subscribers-Teacher list
 const BREVO_API_URL = 'https://api.brevo.com/v3/contacts';
+
+// Export list IDs for use in routes
+export const BREVO_LISTS = {
+  subscribers: BREVO_LIST_ID,           // General subscribers (parents)
+  subscribersTeacher: BREVO_TEACHER_LIST_ID, // Teacher subscribers (ID: 9)
+} as const;
 
 export type UserType = 'PARENT' | 'TEACHER';
 export type GradeRange = 'K-2' | '3-6' | '7-8';

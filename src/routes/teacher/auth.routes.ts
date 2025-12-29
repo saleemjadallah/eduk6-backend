@@ -4,7 +4,7 @@ import { teacherAuthService } from '../../services/teacher/index.js';
 import { authenticateTeacher, requireTeacher } from '../../middleware/teacherAuth.js';
 import { validateInput } from '../../middleware/validateInput.js';
 import { authRateLimit, emailRateLimit } from '../../middleware/rateLimit.js';
-import { addContactToBrevo } from '../../services/brevoService.js';
+import { addContactToBrevo, BREVO_LISTS } from '../../services/brevoService.js';
 import { z } from 'zod';
 
 const router = Router();
@@ -74,12 +74,14 @@ router.post(
       const result = await teacherAuthService.signup(req.body);
 
       // Add contact to Brevo for email marketing (fire-and-forget)
+      // Teachers go to the Subscribers-Teacher list (ID: 9)
       addContactToBrevo({
         email: req.body.email,
         firstName: req.body.firstName,
         lastName: req.body.lastName,
         userType: 'TEACHER',
         subscriptionTier: 'FREE',
+        listId: BREVO_LISTS.subscribersTeacher,
       }).catch(() => {}); // Silently ignore errors - don't block signup
 
       res.status(201).json({
@@ -149,6 +151,7 @@ router.post(
       const result = await teacherAuthService.googleSignIn(idToken, deviceInfo, ipAddress);
 
       // Add new Google sign-in users to Brevo for email marketing (fire-and-forget)
+      // Teachers go to the Subscribers-Teacher list (ID: 9)
       if (result.isNewUser) {
         addContactToBrevo({
           email: result.teacher.email,
@@ -156,6 +159,7 @@ router.post(
           lastName: result.teacher.lastName || undefined,
           userType: 'TEACHER',
           subscriptionTier: result.teacher.subscriptionTier,
+          listId: BREVO_LISTS.subscribersTeacher,
         }).catch(() => {}); // Silently ignore errors - don't block sign-in
       }
 
