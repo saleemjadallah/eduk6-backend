@@ -420,7 +420,9 @@ const generateStudyGuideSchema = z.object({
 });
 
 const analyzeContentSchema = z.object({
-  content: z.string().min(50, 'Content must be at least 50 characters'),
+  content: z.string()
+    .min(50, 'Content must be at least 50 characters')
+    .max(50000, 'Content must be at most 50,000 characters'),
   detectSubject: z.boolean().optional(),
   detectGradeLevel: z.boolean().optional(),
   extractKeyTerms: z.boolean().optional(),
