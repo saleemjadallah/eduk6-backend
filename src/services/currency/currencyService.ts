@@ -105,6 +105,33 @@ const DEFAULT_CURRENCY: CurrencyInfo = {
   euVATrate: null,
 };
 
+// Reliable currency symbols mapping (ipwhois.app symbols can be inconsistent)
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: '$', EUR: '€', GBP: '£', JPY: '¥', CNY: '¥', INR: '₹',
+  AUD: 'A$', CAD: 'C$', CHF: 'CHF', HKD: 'HK$', SGD: 'S$',
+  AED: 'د.إ', SAR: '﷼', BRL: 'R$', MXN: '$', ZAR: 'R',
+  KRW: '₩', THB: '฿', MYR: 'RM', IDR: 'Rp', PHP: '₱',
+  VND: '₫', TRY: '₺', RUB: '₽', PLN: 'zł', SEK: 'kr',
+  NOK: 'kr', DKK: 'kr', NZD: 'NZ$', ILS: '₪', EGP: 'E£',
+  PKR: '₨', BDT: '৳', NGN: '₦', KES: 'KSh', GHS: 'GH₵',
+  QAR: '﷼', KWD: 'د.ك', BHD: 'د.ب', OMR: '﷼',
+};
+
+/**
+ * Get reliable currency symbol from mapping, fallback to API response
+ */
+function getCurrencySymbol(currencyCode: string, apiSymbol?: string): string {
+  if (CURRENCY_SYMBOLS[currencyCode]) {
+    return CURRENCY_SYMBOLS[currencyCode];
+  }
+  // Clean up API symbol (remove dots, extra text)
+  if (apiSymbol) {
+    const cleaned = apiSymbol.split(' ')[0].replace(/^\./, '');
+    return cleaned || currencyCode;
+  }
+  return currencyCode;
+}
+
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
@@ -226,9 +253,10 @@ async function getCurrencyInfoByIP(
 
     // Parse response into our format
     // ipwhois.app provides exchange rate from USD directly
+    const detectedCurrencyCode = data.currency_code || 'USD';
     const currencyInfo: CurrencyInfo = {
-      currencyCode: data.currency_code || 'USD',
-      currencySymbol: data.currency_symbol?.split(' ')[0] || '$', // Take first symbol if multiple
+      currencyCode: detectedCurrencyCode,
+      currencySymbol: getCurrencySymbol(detectedCurrencyCode, data.currency_symbol),
       exchangeRate: data.currency_rates || 1,
       countryCode: data.country_code || 'US',
       countryName: data.country || 'United States',
@@ -327,42 +355,32 @@ async function clearCache(ipAddress?: string): Promise<void> {
   }
 }
 
+// Currency names for supported currencies list
+const CURRENCY_NAMES: Record<string, string> = {
+  USD: 'US Dollar', EUR: 'Euro', GBP: 'British Pound', JPY: 'Japanese Yen',
+  CNY: 'Chinese Yuan', INR: 'Indian Rupee', AUD: 'Australian Dollar',
+  CAD: 'Canadian Dollar', CHF: 'Swiss Franc', HKD: 'Hong Kong Dollar',
+  SGD: 'Singapore Dollar', AED: 'UAE Dirham', SAR: 'Saudi Riyal',
+  BRL: 'Brazilian Real', MXN: 'Mexican Peso', ZAR: 'South African Rand',
+  KRW: 'South Korean Won', THB: 'Thai Baht', MYR: 'Malaysian Ringgit',
+  IDR: 'Indonesian Rupiah', PHP: 'Philippine Peso', VND: 'Vietnamese Dong',
+  TRY: 'Turkish Lira', RUB: 'Russian Ruble', PLN: 'Polish Zloty',
+  SEK: 'Swedish Krona', NOK: 'Norwegian Krone', DKK: 'Danish Krone',
+  NZD: 'New Zealand Dollar', ILS: 'Israeli Shekel', EGP: 'Egyptian Pound',
+  PKR: 'Pakistani Rupee', BDT: 'Bangladeshi Taka', NGN: 'Nigerian Naira',
+  KES: 'Kenyan Shilling', GHS: 'Ghanaian Cedi', QAR: 'Qatari Riyal',
+  KWD: 'Kuwaiti Dinar', BHD: 'Bahraini Dinar', OMR: 'Omani Rial',
+};
+
 /**
  * Get supported currencies list (for UI dropdowns)
  */
 function getSupportedCurrencies(): { code: string; symbol: string; name: string }[] {
-  return [
-    { code: 'USD', symbol: '$', name: 'US Dollar' },
-    { code: 'EUR', symbol: '€', name: 'Euro' },
-    { code: 'GBP', symbol: '£', name: 'British Pound' },
-    { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar' },
-    { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
-    { code: 'JPY', symbol: '¥', name: 'Japanese Yen' },
-    { code: 'CNY', symbol: '¥', name: 'Chinese Yuan' },
-    { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
-    { code: 'BRL', symbol: 'R$', name: 'Brazilian Real' },
-    { code: 'MXN', symbol: '$', name: 'Mexican Peso' },
-    { code: 'CHF', symbol: 'CHF', name: 'Swiss Franc' },
-    { code: 'SEK', symbol: 'kr', name: 'Swedish Krona' },
-    { code: 'NOK', symbol: 'kr', name: 'Norwegian Krone' },
-    { code: 'DKK', symbol: 'kr', name: 'Danish Krone' },
-    { code: 'PLN', symbol: 'zł', name: 'Polish Zloty' },
-    { code: 'ZAR', symbol: 'R', name: 'South African Rand' },
-    { code: 'AED', symbol: 'د.إ', name: 'UAE Dirham' },
-    { code: 'SAR', symbol: '﷼', name: 'Saudi Riyal' },
-    { code: 'SGD', symbol: 'S$', name: 'Singapore Dollar' },
-    { code: 'HKD', symbol: 'HK$', name: 'Hong Kong Dollar' },
-    { code: 'NZD', symbol: 'NZ$', name: 'New Zealand Dollar' },
-    { code: 'KRW', symbol: '₩', name: 'South Korean Won' },
-    { code: 'TRY', symbol: '₺', name: 'Turkish Lira' },
-    { code: 'RUB', symbol: '₽', name: 'Russian Ruble' },
-    { code: 'ILS', symbol: '₪', name: 'Israeli Shekel' },
-    { code: 'THB', symbol: '฿', name: 'Thai Baht' },
-    { code: 'MYR', symbol: 'RM', name: 'Malaysian Ringgit' },
-    { code: 'IDR', symbol: 'Rp', name: 'Indonesian Rupiah' },
-    { code: 'PHP', symbol: '₱', name: 'Philippine Peso' },
-    { code: 'VND', symbol: '₫', name: 'Vietnamese Dong' },
-  ];
+  return Object.entries(CURRENCY_SYMBOLS).map(([code, symbol]) => ({
+    code,
+    symbol,
+    name: CURRENCY_NAMES[code] || code,
+  }));
 }
 
 // =============================================================================
