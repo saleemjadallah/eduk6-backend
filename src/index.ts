@@ -42,6 +42,8 @@ import contactRoutes from './routes/contact.routes.js';
 import gamificationRoutes from './routes/gamification.routes.js';
 import currencyRoutes from './routes/currency.routes.js';
 import leadsRoutes from './routes/leads.routes.js';
+import referralRoutes from './routes/referral.routes.js';
+import shareRoutes from './routes/share.routes.js';
 
 // Services initialization
 import { initializeContentProcessor, shutdownContentProcessor } from './services/learning/contentProcessor.js';
@@ -171,6 +173,12 @@ app.use('/api/currency', currencyRoutes);
 
 // Lead capture routes (public - for exit-intent popups)
 app.use('/api/leads', leadsRoutes);
+
+// Referral routes (viral sharing system)
+app.use('/api/referrals', referralRoutes);
+
+// Share routes (shareable content)
+app.use('/api/share', shareRoutes);
 
 // ============================================
 // ERROR HANDLING

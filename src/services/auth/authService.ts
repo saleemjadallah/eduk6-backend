@@ -64,6 +64,7 @@ export interface SignupParams {
   firstName?: string;
   lastName?: string;
   country?: string;
+  referralCode?: string;
 }
 
 export interface LoginResult {
@@ -89,8 +90,8 @@ export const authService = {
   /**
    * Create a new parent account
    */
-  async signup(params: SignupParams): Promise<{ parentId: string }> {
-    const { email, password, firstName, lastName, country } = params;
+  async signup(params: SignupParams): Promise<{ parentId: string; referralApplied?: boolean }> {
+    const { email, password, firstName, lastName, country, referralCode } = params;
 
     // Check if email already exists
     const existing = await prisma.parent.findUnique({
@@ -109,6 +110,19 @@ export const authService = {
     // Hash password
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
+    // Validate referral code if provided
+    let validReferralCode: { id: string; parentId: string | null; teacherId: string | null } | null = null;
+    if (referralCode) {
+      validReferralCode = await prisma.referralCode.findUnique({
+        where: { code: referralCode.toUpperCase(), isActive: true },
+        select: { id: true, parentId: true, teacherId: true },
+      });
+      if (!validReferralCode) {
+        logger.warn('Invalid referral code used during signup', { referralCode, email });
+        // Don't block signup for invalid referral code, just ignore it
+      }
+    }
+
     // Create parent account
     const parent = await prisma.parent.create({
       data: {
@@ -119,6 +133,42 @@ export const authService = {
         country: country || 'AE',
       },
     });
+
+    // Create referral record if valid code was used
+    let referralApplied = false;
+    if (validReferralCode) {
+      try {
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 30); // 30-day attribution window
+
+        await prisma.referral.create({
+          data: {
+            referralCodeId: validReferralCode.id,
+            referredParentId: parent.id,
+            channel: 'COPY_LINK', // Default, can be overridden if tracking channel in URL
+            status: 'SIGNED_UP',
+            signedUpAt: new Date(),
+            expiresAt,
+          },
+        });
+
+        // Increment total referrals count
+        await prisma.referralCode.update({
+          where: { id: validReferralCode.id },
+          data: { totalReferrals: { increment: 1 } },
+        });
+
+        referralApplied = true;
+        logger.info('Referral tracked for new signup', {
+          parentId: parent.id,
+          referralCodeId: validReferralCode.id,
+          referrerType: validReferralCode.parentId ? 'parent' : 'teacher',
+        });
+      } catch (err) {
+        logger.error('Failed to create referral record', { error: err, parentId: parent.id });
+        // Don't fail signup if referral tracking fails
+      }
+    }
 
     // Send welcome email (async, don't block signup)
     emailService.sendWelcomeEmail(
@@ -133,7 +183,7 @@ export const authService = {
       logger.error('Failed to send verification OTP', { error: err, parentId: parent.id });
     });
 
-    return { parentId: parent.id };
+    return { parentId: parent.id, referralApplied };
   },
 
   /**

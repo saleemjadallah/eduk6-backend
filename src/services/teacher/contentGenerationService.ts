@@ -1,5 +1,5 @@
 // Teacher Content Generation Service - AI-powered content creation
-import { genAI } from '../../config/gemini.js';
+import { genAI, TEACHER_CONTENT_SAFETY_SETTINGS } from '../../config/gemini.js';
 import { config } from '../../config/index.js';
 import { prisma } from '../../config/database.js';
 import { Subject, TeacherContentType, TokenOperation } from '@prisma/client';
@@ -8,6 +8,88 @@ import { contentService } from './contentService.js';
 import { logger } from '../../utils/logger.js';
 import { uploadFile } from '../storage/storageService.js';
 import { v4 as uuidv4 } from 'uuid';
+
+// ============================================
+// HELPER: Check for blocked/empty Gemini responses
+// ============================================
+
+interface GeminiResponseCheck {
+  isBlocked: boolean;
+  isEmpty: boolean;
+  blockReason?: string;
+  finishReason?: string;
+  responseText: string;
+}
+
+function checkGeminiResponse(result: any): GeminiResponseCheck {
+  const response = result.response;
+
+  // Check for prompt-level blocking
+  const promptFeedback = response.promptFeedback;
+  if (promptFeedback?.blockReason) {
+    return {
+      isBlocked: true,
+      isEmpty: true,
+      blockReason: promptFeedback.blockReason,
+      responseText: '',
+    };
+  }
+
+  // Check candidates
+  const candidate = response.candidates?.[0];
+  if (!candidate) {
+    return {
+      isBlocked: true,
+      isEmpty: true,
+      blockReason: 'NO_CANDIDATES',
+      responseText: '',
+    };
+  }
+
+  // Check finish reason
+  const finishReason = candidate.finishReason;
+  if (finishReason === 'SAFETY' || finishReason === 'BLOCKED') {
+    return {
+      isBlocked: true,
+      isEmpty: true,
+      blockReason: 'SAFETY_BLOCKED',
+      finishReason,
+      responseText: '',
+    };
+  }
+
+  // Try to get response text
+  let responseText = '';
+  try {
+    responseText = response.text();
+  } catch (e) {
+    // text() might throw if response is blocked
+    return {
+      isBlocked: true,
+      isEmpty: true,
+      blockReason: 'TEXT_EXTRACTION_FAILED',
+      finishReason,
+      responseText: '',
+    };
+  }
+
+  // Check for empty response
+  if (!responseText || responseText.trim() === '') {
+    return {
+      isBlocked: false,
+      isEmpty: true,
+      finishReason,
+      responseText: '',
+    };
+  }
+
+  return {
+    isBlocked: false,
+    isEmpty: false,
+    finishReason,
+    responseText,
+  };
+}
 
 // ============================================
 // TYPES
@@ -184,6 +266,9 @@ export const contentGenerationService = {
    * Generate a lesson plan from a topic
    * Uses Gemini 3 Pro for richer, higher-quality content generation
    * lessonType: 'guide' = teacher guide (~2-4K tokens), 'full' = comprehensive lesson (~8-12K tokens)
+   *
+   * SUPPORTS: Religious education (Islamic studies, Quran, Bible, etc.),
+   * historical content, and all legitimate educational topics
    */
   async generateLesson(
     teacherId: string,
@@ -200,6 +285,7 @@ export const contentGenerationService = {
 
     // Use Gemini 3 Pro for lesson generation - better reasoning and content quality
     // Full lessons require much higher token limits for comprehensive content
+    // Use TEACHER_CONTENT_SAFETY_SETTINGS to allow religious/educational content
     const model = genAI.getGenerativeModel({
       model: config.gemini.models.pro,
       generationConfig: {
@@ -207,10 +293,39 @@ export const contentGenerationService = {
         maxOutputTokens: isFullLesson ? 65536 : 16000, // Max tokens for full lessons to prevent truncation
         responseMimeType: 'application/json',
       },
+      safetySettings: TEACHER_CONTENT_SAFETY_SETTINGS,
     });
 
     const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
+
+    // Check for blocked or empty responses
+    const responseCheck = checkGeminiResponse(result);
+
+    if (responseCheck.isBlocked) {
+      logger.warn('Gemini response was blocked', {
+        teacherId,
+        topic: input.topic,
+        blockReason: responseCheck.blockReason,
+        finishReason: responseCheck.finishReason,
+      });
+      throw new Error(
+        'Unable to generate content for this topic. This may be a temporary issue - please try again. ' +
+        'If the problem persists, try rephrasing your topic or breaking it into smaller sections.'
+      );
+    }
+
+    if (responseCheck.isEmpty) {
+      logger.warn('Gemini returned empty response', {
+        teacherId,
+        topic: input.topic,
+        finishReason: responseCheck.finishReason,
+      });
+      throw new Error(
+        'No content was generated. Please try again or rephrase your topic.'
+      );
+    }
+
+    const responseText = responseCheck.responseText;
     const tokensUsed = result.response.usageMetadata?.totalTokenCount || estimatedTokens;
 
     try {
@@ -250,12 +365,13 @@ export const contentGenerationService = {
           'Try reducing the complexity of your request or generating a simpler lesson first.'
         );
       }
-      throw new Error('Failed to generate lesson content');
+      throw new Error('Failed to generate lesson content. Please try again.');
     }
   },
 
   /**
    * Generate quiz from content
+   * Supports religious/educational content (Islamic studies, Quran, etc.)
    */
   async generateQuiz(
     teacherId: string,
@@ -277,10 +393,24 @@ export const contentGenerationService = {
         maxOutputTokens: 4000,
         responseMimeType: 'application/json',
       },
+      safetySettings: TEACHER_CONTENT_SAFETY_SETTINGS,
     });
 
     const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
+
+    // Check for blocked or empty responses
+    const responseCheck = checkGeminiResponse(result);
+    if (responseCheck.isBlocked || responseCheck.isEmpty) {
+      logger.warn('Quiz generation blocked or empty', {
+        teacherId,
+        contentId,
+        blockReason: responseCheck.blockReason,
+        finishReason: responseCheck.finishReason,
+      });
+      throw new Error('Unable to generate quiz. Please try again or rephrase the content.');
+    }
+
+    const responseText = responseCheck.responseText;
     const tokensUsed = result.response.usageMetadata?.totalTokenCount || estimatedTokens;
 
     try {
@@ -313,13 +443,14 @@ export const contentGenerationService = {
         error: error instanceof Error ? error.message : 'Unknown error',
         responseText: responseText.substring(0, 500),
       });
-      throw new Error('Failed to generate quiz');
+      throw new Error('Failed to generate quiz. Please try again.');
     }
   },
 
   /**
    * Generate flashcards from content
    * Uses Gemini 3 Pro for higher-quality flashcard content
+   * Supports religious/educational content (Islamic studies, Quran, etc.)
    */
   async generateFlashcards(
     teacherId: string,
@@ -342,10 +473,24 @@ export const contentGenerationService = {
         maxOutputTokens: 3000,
         responseMimeType: 'application/json',
       },
+      safetySettings: TEACHER_CONTENT_SAFETY_SETTINGS,
     });
 
     const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
+
+    // Check for blocked or empty responses
+    const responseCheck = checkGeminiResponse(result);
+    if (responseCheck.isBlocked || responseCheck.isEmpty) {
+      logger.warn('Flashcard generation blocked or empty', {
+        teacherId,
+        contentId,
+        blockReason: responseCheck.blockReason,
+        finishReason: responseCheck.finishReason,
+      });
+      throw new Error('Unable to generate flashcards. Please try again or rephrase the content.');
+    }
+
+    const responseText = responseCheck.responseText;
     const tokensUsed = result.response.usageMetadata?.totalTokenCount || estimatedTokens;
 
     try {
@@ -378,12 +523,13 @@ export const contentGenerationService = {
         error: error instanceof Error ? error.message : 'Unknown error',
         responseText: responseText.substring(0, 500),
       });
-      throw new Error('Failed to generate flashcards');
+      throw new Error('Failed to generate flashcards. Please try again.');
     }
   },
 
   /**
    * Generate study guide from content
+   * Supports religious/educational content (Islamic studies, Quran, etc.)
    */
   async generateStudyGuide(
     teacherId: string,
@@ -405,10 +551,24 @@ export const contentGenerationService = {
         maxOutputTokens: 5000,
         responseMimeType: 'application/json',
       },
+      safetySettings: TEACHER_CONTENT_SAFETY_SETTINGS,
     });
 
     const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
+
+    // Check for blocked or empty responses
+    const responseCheck = checkGeminiResponse(result);
+    if (responseCheck.isBlocked || responseCheck.isEmpty) {
+      logger.warn('Study guide generation blocked or empty', {
+        teacherId,
+        contentId,
+        blockReason: responseCheck.blockReason,
+        finishReason: responseCheck.finishReason,
+      });
+      throw new Error('Unable to generate study guide. Please try again or rephrase the content.');
+    }
+
+    const responseText = responseCheck.responseText;
     const tokensUsed = result.response.usageMetadata?.totalTokenCount || estimatedTokens;
 
     try {
@@ -430,12 +590,13 @@ export const contentGenerationService = {
         error: error instanceof Error ? error.message : 'Unknown error',
         responseText: responseText.substring(0, 500),
       });
-      throw new Error('Failed to generate study guide');
+      throw new Error('Failed to generate study guide. Please try again.');
     }
   },
 
   /**
    * Analyze uploaded content and extract text
+   * Supports religious/educational content (Islamic studies, Quran, etc.)
    */
   async analyzeContent(
     teacherId: string,
@@ -468,10 +629,24 @@ export const contentGenerationService = {
         maxOutputTokens: 2000,
         responseMimeType: 'application/json',
       },
+      safetySettings: TEACHER_CONTENT_SAFETY_SETTINGS,
     });
 
     const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
+
+    // Check for blocked or empty responses
+    const responseCheck = checkGeminiResponse(result);
+    if (responseCheck.isBlocked || responseCheck.isEmpty) {
+      logger.warn('Content analysis blocked or empty', {
+        teacherId,
+        contentLength: content.length,
+        blockReason: responseCheck.blockReason,
+        finishReason: responseCheck.finishReason,
+      });
+      throw new Error('Unable to analyze content. Please try again or rephrase the content.');
+    }
+
+    const responseText = responseCheck.responseText;
     const tokensUsed = result.response.usageMetadata?.totalTokenCount || estimatedTokens;
 
     try {
@@ -492,7 +667,7 @@ export const contentGenerationService = {
         error: error instanceof Error ? error.message : 'Unknown error',
         responseText: responseText.substring(0, 500),
       });
-      throw new Error('Failed to analyze content');
+      throw new Error('Failed to analyze content. Please try again.');
     }
   },
 

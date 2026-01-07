@@ -23,6 +23,7 @@ import {
   CREDIT_PACKS,
 } from '../../config/stripeProducts.js';
 import { quotaService, creditsToTokens } from '../teacher/quotaService.js';
+import { referralService } from '../sharing/index.js';
 
 // Initialize Stripe client
 const stripe = config.stripe.secretKey
@@ -176,6 +177,16 @@ export const subscriptionService = {
 
     const customerId = await this.getOrCreateCustomer(teacherId);
 
+    // Check if this teacher was referred and has a valid referral
+    const referral = await prisma.referral.findFirst({
+      where: {
+        referredTeacherId: teacherId,
+        status: { in: ['SIGNED_UP', 'TRIALING'] },
+        expiresAt: { gte: new Date() }, // Within attribution window
+      },
+      select: { id: true, referralCodeId: true },
+    });
+
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       customer: customerId,
       mode: 'subscription',
@@ -191,14 +202,31 @@ export const subscriptionService = {
         teacherId,
         tier,
         isAnnual: isAnnual.toString(),
+        type: 'teacher',
+        ...(referral && { referralId: referral.id, referralCodeId: referral.referralCodeId }),
       },
       subscription_data: {
         metadata: {
           teacherId,
           tier,
+          type: 'teacher',
+          ...(referral && { referralId: referral.id }),
         },
       },
     };
+
+    // Apply referral discount if applicable
+    if (referral) {
+      const refereeCouponId = process.env.STRIPE_COUPON_REFEREE_TEACHER;
+      if (refereeCouponId) {
+        sessionParams.discounts = [{ coupon: refereeCouponId }];
+        logger.info('Applying referral discount to teacher checkout', {
+          teacherId,
+          referralId: referral.id,
+          couponId: refereeCouponId,
+        });
+      }
+    }
 
     // Add trial period if configured
     if (product.trialDays > 0) {
@@ -617,6 +645,27 @@ export const subscriptionService = {
       tier,
       status: subscription.status,
     });
+
+    // Handle referral conversion and reward fulfillment
+    // Only reward on active subscriptions (not trials)
+    if (subscription.status === 'active' && subscription.metadata.referralId) {
+      try {
+        await referralService.markAsConverted(teacherId, 'teacher');
+        logger.info('Teacher referral marked as converted and reward created', {
+          teacherId,
+          subscriptionId: subscription.id,
+          referralId: subscription.metadata.referralId,
+        });
+      } catch (referralError) {
+        // Log but don't fail the subscription update
+        logger.error('Failed to process teacher referral reward', {
+          teacherId,
+          subscriptionId: subscription.id,
+          referralId: subscription.metadata.referralId,
+          error: referralError instanceof Error ? referralError.message : referralError,
+        });
+      }
+    }
   },
 
   /**

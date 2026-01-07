@@ -283,4 +283,234 @@ router.patch('/children/:childId/pin', authenticate, requireParent, async (req, 
   }
 });
 
+// ============================================
+// SHARING PREFERENCES
+// ============================================
+
+/**
+ * GET /api/parent/settings/sharing
+ * Get sharing preferences (global + per-child settings)
+ */
+router.get('/sharing', authenticate, requireParent, async (req, res, next) => {
+  try {
+    const parentId = req.parent!.id;
+
+    // Get sharing preferences
+    let preferences = await prisma.parentSharingPreferences.findUnique({
+      where: { parentId },
+    });
+
+    // If no preferences exist, create default ones
+    if (!preferences) {
+      preferences = await prisma.parentSharingPreferences.create({
+        data: {
+          parentId,
+          enableSharing: true,
+          childSettings: {},
+        },
+      });
+    }
+
+    // Get children for the UI
+    const children = await prisma.child.findMany({
+      where: { parentId },
+      select: {
+        id: true,
+        displayName: true,
+        avatarUrl: true,
+      },
+    });
+
+    // Parse childSettings JSON and ensure all children have settings
+    const childSettings = (preferences.childSettings as Record<string, any>) || {};
+    const mergedChildSettings: Record<string, any> = {};
+
+    children.forEach(child => {
+      mergedChildSettings[child.id] = {
+        showName: childSettings[child.id]?.showName ?? true,
+        showAvatar: childSettings[child.id]?.showAvatar ?? true,
+        enablePrompts: childSettings[child.id]?.enablePrompts ?? true,
+      };
+    });
+
+    res.json({
+      success: true,
+      data: {
+        enableSharing: preferences.enableSharing,
+        childSettings: mergedChildSettings,
+        children: children.map(c => ({
+          id: c.id,
+          displayName: c.displayName,
+          avatarUrl: c.avatarUrl,
+        })),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PATCH /api/parent/settings/sharing
+ * Update sharing preferences
+ */
+router.patch('/sharing', authenticate, requireParent, async (req, res, next) => {
+  try {
+    const parentId = req.parent!.id;
+    const { enableSharing, childSettings } = req.body;
+
+    // Validate input
+    if (enableSharing !== undefined && typeof enableSharing !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        error: 'enableSharing must be a boolean',
+      });
+    }
+
+    // Validate childSettings if provided
+    if (childSettings !== undefined) {
+      if (typeof childSettings !== 'object' || childSettings === null) {
+        return res.status(400).json({
+          success: false,
+          error: 'childSettings must be an object',
+        });
+      }
+
+      // Verify all childIds belong to this parent
+      const childIds = Object.keys(childSettings);
+      if (childIds.length > 0) {
+        const validChildren = await prisma.child.findMany({
+          where: {
+            id: { in: childIds },
+            parentId,
+          },
+          select: { id: true },
+        });
+
+        const validIds = new Set(validChildren.map(c => c.id));
+        const invalidIds = childIds.filter(id => !validIds.has(id));
+
+        if (invalidIds.length > 0) {
+          return res.status(400).json({
+            success: false,
+            error: `Invalid child IDs: ${invalidIds.join(', ')}`,
+          });
+        }
+      }
+    }
+
+    // Get existing preferences or create
+    let preferences = await prisma.parentSharingPreferences.findUnique({
+      where: { parentId },
+    });
+
+    if (!preferences) {
+      preferences = await prisma.parentSharingPreferences.create({
+        data: {
+          parentId,
+          enableSharing: enableSharing ?? true,
+          childSettings: childSettings ?? {},
+        },
+      });
+    } else {
+      // Merge with existing settings
+      const existingChildSettings = (preferences.childSettings as Record<string, any>) || {};
+      const mergedChildSettings = childSettings
+        ? { ...existingChildSettings, ...childSettings }
+        : existingChildSettings;
+
+      preferences = await prisma.parentSharingPreferences.update({
+        where: { parentId },
+        data: {
+          ...(enableSharing !== undefined && { enableSharing }),
+          ...(childSettings !== undefined && { childSettings: mergedChildSettings }),
+        },
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        enableSharing: preferences.enableSharing,
+        childSettings: preferences.childSettings,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PATCH /api/parent/settings/sharing/child/:childId
+ * Update sharing settings for a specific child
+ */
+router.patch('/sharing/child/:childId', authenticate, requireParent, async (req, res, next) => {
+  try {
+    const parentId = req.parent!.id;
+    const { childId } = req.params;
+    const { showName, showAvatar, enablePrompts } = req.body;
+
+    // Verify child belongs to parent
+    const child = await prisma.child.findFirst({
+      where: { id: childId, parentId },
+    });
+
+    if (!child) {
+      return res.status(404).json({
+        success: false,
+        error: 'Child not found',
+      });
+    }
+
+    // Get or create preferences
+    let preferences = await prisma.parentSharingPreferences.findUnique({
+      where: { parentId },
+    });
+
+    if (!preferences) {
+      preferences = await prisma.parentSharingPreferences.create({
+        data: {
+          parentId,
+          enableSharing: true,
+          childSettings: {
+            [childId]: {
+              showName: showName ?? true,
+              showAvatar: showAvatar ?? true,
+              enablePrompts: enablePrompts ?? true,
+            },
+          },
+        },
+      });
+    } else {
+      // Update specific child's settings
+      const existingSettings = (preferences.childSettings as Record<string, any>) || {};
+      const existingChildSettings = existingSettings[childId] || {};
+
+      const updatedChildSettings = {
+        ...existingSettings,
+        [childId]: {
+          showName: showName ?? existingChildSettings.showName ?? true,
+          showAvatar: showAvatar ?? existingChildSettings.showAvatar ?? true,
+          enablePrompts: enablePrompts ?? existingChildSettings.enablePrompts ?? true,
+        },
+      };
+
+      preferences = await prisma.parentSharingPreferences.update({
+        where: { parentId },
+        data: { childSettings: updatedChildSettings },
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        childId,
+        settings: (preferences.childSettings as Record<string, any>)[childId],
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

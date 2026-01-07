@@ -23,6 +23,7 @@ import {
   getLessonLimitForTier,
   FAMILY_SUBSCRIPTION_PRODUCTS,
 } from '../../config/stripeProductsFamily.js';
+import { referralService } from '../sharing/index.js';
 
 // Initialize Stripe client
 const stripe = config.stripe.secretKey
@@ -152,6 +153,16 @@ export const familySubscriptionService = {
 
     const customerId = await this.getOrCreateCustomer(parentId);
 
+    // Check if this parent was referred and has a valid referral
+    const referral = await prisma.referral.findFirst({
+      where: {
+        referredParentId: parentId,
+        status: { in: ['SIGNED_UP', 'TRIALING'] },
+        expiresAt: { gte: new Date() }, // Within attribution window
+      },
+      select: { id: true, referralCodeId: true },
+    });
+
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       customer: customerId,
       mode: 'subscription',
@@ -168,17 +179,32 @@ export const familySubscriptionService = {
         tier: effectiveTier,
         isAnnual: effectiveAnnual.toString(),
         type: 'family',
+        ...(referral && { referralId: referral.id, referralCodeId: referral.referralCodeId }),
       },
       subscription_data: {
         metadata: {
           parentId,
           tier: effectiveTier,
           type: 'family',
+          ...(referral && { referralId: referral.id }),
         },
       },
     };
 
-    // Add trial period if configured
+    // Apply referral discount if applicable
+    if (referral) {
+      const refereeCouponId = process.env.STRIPE_COUPON_REFEREE_PARENT;
+      if (refereeCouponId) {
+        sessionParams.discounts = [{ coupon: refereeCouponId }];
+        logger.info('Applying referral discount to checkout', {
+          parentId,
+          referralId: referral.id,
+          couponId: refereeCouponId,
+        });
+      }
+    }
+
+    // Add trial period if configured (only if no referral discount, or always add if desired)
     if (product.trialDays > 0) {
       sessionParams.subscription_data!.trial_period_days = product.trialDays;
     }
@@ -419,6 +445,27 @@ export const familySubscriptionService = {
         tier,
         status: subscription.status,
       });
+
+      // Handle referral conversion and reward fulfillment
+      // Only reward on active subscriptions (not trials)
+      if (subscription.status === 'active' && subscription.metadata.referralId) {
+        try {
+          await referralService.markAsConverted(parentId, 'parent');
+          logger.info('Referral marked as converted and reward created', {
+            parentId,
+            subscriptionId: subscription.id,
+            referralId: subscription.metadata.referralId,
+          });
+        } catch (referralError) {
+          // Log but don't fail the subscription update
+          logger.error('Failed to process referral reward', {
+            parentId,
+            subscriptionId: subscription.id,
+            referralId: subscription.metadata.referralId,
+            error: referralError instanceof Error ? referralError.message : referralError,
+          });
+        }
+      }
     } catch (error) {
       logger.error('Failed to update parent subscription', {
         parentId,

@@ -7,6 +7,7 @@ export const signupSchema = z.object({
   firstName: z.string().min(1).max(50).optional(),
   lastName: z.string().min(1).max(50).optional(),
   country: z.string().length(2).optional(),
+  referralCode: z.string().min(1).max(20).optional(), // Referral code from share link
 });
 
 export const loginSchema = z.object({

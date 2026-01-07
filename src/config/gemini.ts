@@ -26,6 +26,29 @@ export const CHILD_SAFETY_SETTINGS = [
   },
 ];
 
+// Teacher content generation safety settings - MORE PERMISSIVE
+// Teachers are professionals creating educational content for students
+// This allows religious education (Islamic studies, Quran, Bible, etc.),
+// historical content, and other legitimate educational topics
+export const TEACHER_CONTENT_SAFETY_SETTINGS = [
+  {
+    category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+    threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+    threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+    threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH
+  },
+];
+
 // Thinking levels for Gemini 3 Pro
 // Controls reasoning depth and latency tradeoffs
 export type ThinkingLevel = 'LOW' | 'HIGH';

@@ -14,6 +14,7 @@ import {
 import { UnauthorizedError, ConflictError, ValidationError, NotFoundError } from '../../middleware/errorHandler.js';
 import { TeacherRole, TeacherSubscriptionTier } from '@prisma/client';
 import { logger } from '../../utils/logger.js';
+import { referralService } from '../sharing/index.js';
 
 const SALT_ROUNDS = 12;
 
@@ -38,6 +39,7 @@ export interface TeacherSignupParams {
   firstName?: string;
   lastName?: string;
   organizationId?: string; // Optional - for joining an existing org
+  referralCode?: string; // Optional - referral code from share link
 }
 
 export interface TeacherLoginResult {
@@ -80,7 +82,7 @@ export const teacherAuthService = {
     deviceInfo?: string,
     ipAddress?: string
   ): Promise<TeacherLoginResult> {
-    const { email, password, firstName, lastName, organizationId } = params;
+    const { email, password, firstName, lastName, organizationId, referralCode } = params;
 
     // Check if email already exists (for teachers)
     const existingTeacher = await prisma.teacher.findUnique({
@@ -153,7 +155,36 @@ export const teacherAuthService = {
       logger.error('Failed to send teacher verification link', { error: err, teacherId: teacher.id });
     });
 
-    logger.info(`Teacher account created and logged in: ${teacher.email}`);
+    // Track referral if code was provided
+    let referralApplied = false;
+    if (referralCode) {
+      try {
+        const validation = await referralService.validateCode(referralCode);
+        if (validation.isValid && validation.referralCodeId) {
+          await referralService.createReferral(
+            validation.referralCodeId,
+            teacher.id,
+            'teacher',
+            'OTHER' // Default channel - could be enhanced via URL params
+          );
+          referralApplied = true;
+          logger.info('Teacher referral tracked successfully', {
+            teacherId: teacher.id,
+            referralCode,
+            referralCodeId: validation.referralCodeId,
+          });
+        }
+      } catch (referralError) {
+        // Don't fail signup if referral tracking fails
+        logger.error('Failed to track teacher referral', {
+          teacherId: teacher.id,
+          referralCode,
+          error: referralError instanceof Error ? referralError.message : referralError,
+        });
+      }
+    }
+
+    logger.info(`Teacher account created and logged in: ${teacher.email}${referralApplied ? ' (with referral)' : ''}`);
 
     // Calculate quota info (same as login)
     const monthlyLimit = teacher.monthlyTokenQuota;

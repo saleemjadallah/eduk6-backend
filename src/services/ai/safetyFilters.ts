@@ -56,12 +56,14 @@ const BLOCKED_PATTERNS = {
 };
 
 // Topics that should trigger gentle redirection
+// NOTE: Religious education (Islamic studies, Quran, Bible, etc.) is fully supported
+// and should NOT be redirected - it's legitimate educational content
 const REDIRECT_TOPICS = [
   /\b(boyfriend|girlfriend|dating|kiss)\b/i,
   /\b(fight|fighting|bully)\b/i,
   /\b(scary|nightmare|monster)\b/i,
   /\b(politics|president|election)\b/i,
-  /\b(religion|god|pray|church|mosque|temple)\b/i,
+  // Religion removed - religious education is valid for all ages
 ];
 
 export class SafetyFilters {

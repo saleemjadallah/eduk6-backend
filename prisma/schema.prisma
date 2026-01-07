@@ -52,6 +52,13 @@ model Parent {
   privacyPreferences ParentPrivacyPreferences?
   lessonUsage      ParentLessonUsage[]
 
+  // Referral & Sharing
+  referralCode       ReferralCode?
+  referredBy         Referral?           @relation("ReferredParent")
+  referralRewards    ReferralReward[]
+  shareableContents  ShareableContent[]
+  sharingPreferences ParentSharingPreferences?
+
   // Timestamps
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -787,6 +794,12 @@ model Teacher {
   substitutePlans  SubstitutePlan[]
   iepGoalSessions  IEPGoalSession[]
 
+  // Referral & Sharing
+  referralCode       ReferralCode?
+  referredBy         Referral?           @relation("ReferredTeacher")
+  referralRewards    ReferralReward[]
+  shareableContents  ShareableContent[]
+
   // Timestamps
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -1360,6 +1373,203 @@ model CohortRetentionSnapshot {
 }
 
 // ============================================
+// VIRAL SHARING & REFERRAL SYSTEM
+// ============================================
+
+// Referral codes for parents and teachers
+model ReferralCode {
+  id                  String   @id @default(uuid())
+  code                String   @unique          // e.g., "SARAH-AB12" - readable, opaque
+
+  // Owner (one of these will be set)
+  parentId            String?  @unique
+  parent              Parent?  @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  teacherId           String?  @unique
+  teacher             Teacher? @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  // Stats
+  totalReferrals      Int      @default(0)      // Total signups using this code
+  successfulReferrals Int      @default(0)      // Conversions (trial -> paid)
+
+  // Status
+  isActive            Boolean  @default(true)
+
+  // Timestamps
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relations
+  referrals           Referral[]
+  shareableContents   ShareableContent[]
+
+  @@index([code])
+}
+
+// Individual referral tracking
+model Referral {
+  id               String   @id @default(uuid())
+  referralCodeId   String
+  referralCode     ReferralCode @relation(fields: [referralCodeId], references: [id], onDelete: Cascade)
+
+  // Who was referred (one of these will be set after signup)
+  referredParentId   String?  @unique
+  referredParent     Parent?  @relation("ReferredParent", fields: [referredParentId], references: [id], onDelete: SetNull)
+  referredTeacherId  String?  @unique
+  referredTeacher    Teacher? @relation("ReferredTeacher", fields: [referredTeacherId], references: [id], onDelete: SetNull)
+
+  // Tracking
+  channel          ShareChannel                 // WhatsApp, Email, Instagram, Link, etc.
+  status           ReferralStatus @default(PENDING)
+
+  // Attribution
+  attributedAt     DateTime @default(now())     // When the referral code was used
+  signedUpAt       DateTime?                    // When they created an account
+  subscribedAt     DateTime?                    // When they became paid subscriber
+
+  // Rewards
+  referrerRewardId   String?                    // Stripe coupon ID or subscription credit ID
+  refereeDiscountId  String?                    // Stripe coupon ID applied to referee
+  referrerRewarded   Boolean  @default(false)
+  refereeRewarded    Boolean  @default(false)
+
+  // Timestamps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  expiresAt        DateTime                     // 30-day attribution window
+
+  // Relations
+  rewards          ReferralReward[]
+
+  @@index([referralCodeId])
+  @@index([status])
+  @@index([channel])
+  @@index([createdAt])
+}
+
+// Shareable content snapshots (privacy-safe, immutable)
+model ShareableContent {
+  id               String   @id @default(uuid())
+  token            String   @unique             // Opaque share token in URL
+
+  // Owner (parent creates, teacher can create for audio updates)
+  parentId         String?
+  parent           Parent?  @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  teacherId        String?
+  teacher          Teacher? @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  // Content type
+  contentType      ShareableContentType
+
+  // Privacy-safe snapshot data (no child IDs, names, or PII)
+  snapshotData     Json                         // Pre-rendered, privacy-safe content
+
+  // Metadata (for OG tags)
+  title            String
+  description      String?
+  imageUrl         String?                      // Pre-generated OG image stored in R2
+
+  // Optional referral code embedding
+  referralCodeId   String?
+  referralCode     ReferralCode? @relation(fields: [referralCodeId], references: [id])
+
+  // Stats
+  viewCount        Int      @default(0)
+  shareCount       Int      @default(0)
+
+  // Status
+  isActive         Boolean  @default(true)
+  expiresAt        DateTime?                    // Optional expiry for time-sensitive content
+
+  // Timestamps
+  createdAt        DateTime @default(now())
+
+  // Relations
+  shareEvents      ShareEvent[]
+
+  @@index([token])
+  @@index([parentId])
+  @@index([teacherId])
+  @@index([contentType])
+}
+
+// Share tracking for analytics
+model ShareEvent {
+  id                 String   @id @default(uuid())
+  shareableContentId String?
+  shareableContent   ShareableContent? @relation(fields: [shareableContentId], references: [id], onDelete: SetNull)
+
+  // Who shared
+  parentId           String?
+  teacherId          String?
+
+  // Where
+  channel            ShareChannel
+  platform           String?                    // iOS, Android, Web
+
+  // Result
+  wasOpened          Boolean  @default(false)
+  openedAt           DateTime?
+  convertedToSignup  Boolean  @default(false)
+
+  // Timestamps
+  createdAt          DateTime @default(now())
+
+  @@index([channel])
+  @@index([createdAt])
+  @@index([parentId])
+  @@index([teacherId])
+}
+
+// Referral rewards ledger
+model ReferralReward {
+  id               String   @id @default(uuid())
+  referralId       String
+  referral         Referral @relation(fields: [referralId], references: [id], onDelete: Cascade)
+
+  // Recipient
+  parentId         String?
+  parent           Parent?  @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  teacherId        String?
+  teacher          Teacher? @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  // Reward details
+  rewardType       RewardType
+  amount           Decimal? @db.Decimal(10, 2)  // For credits or monetary value
+  stripeCouponId   String?                      // Stripe coupon if applicable
+  description      String
+
+  // Status
+  status           RewardStatus @default(PENDING)
+  appliedAt        DateTime?
+  expiresAt        DateTime?
+
+  // Timestamps
+  createdAt        DateTime @default(now())
+
+  @@index([parentId])
+  @@index([teacherId])
+  @@index([status])
+}
+
+// Parent sharing preferences (per-child controls)
+model ParentSharingPreferences {
+  id               String   @id @default(uuid())
+  parentId         String   @unique
+  parent           Parent   @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  // Global settings
+  enableSharing    Boolean  @default(true)      // Master toggle
+
+  // Per-child settings stored as JSON
+  // Format: { [childId]: { showName: true, showAvatar: true, enablePrompts: true } }
+  childSettings    Json     @default("{}")
+
+  // Timestamps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// ============================================
 // ENUMS
 // ============================================
 
@@ -1653,4 +1863,52 @@ enum LessonAudioStatus {
   GENERATING  // Audio generation in progress
   READY       // Audio ready for playback
   FAILED      // Generation failed
+}
+
+// ============================================
+// VIRAL SHARING & REFERRAL ENUMS
+// ============================================
+
+enum ShareChannel {
+  WHATSAPP
+  EMAIL
+  INSTAGRAM
+  FACEBOOK
+  TWITTER
+  SMS
+  COPY_LINK
+  QR_CODE
+  OTHER
+}
+
+enum ReferralStatus {
+  PENDING           // Code used but no signup yet
+  SIGNED_UP         // Account created
+  TRIALING          // In trial period
+  CONVERTED         // Became paid subscriber
+  EXPIRED           // Attribution window passed
+  CANCELLED         // Subscription cancelled
+}
+
+enum ShareableContentType {
+  BADGE             // Child earned a badge
+  STREAK_MILESTONE  // 7-day, 30-day, 100-day streaks
+  QUIZ_RESULT       // Quiz performance
+  PROGRESS_REPORT   // Weekly/monthly summary
+  LEVEL_UP          // Reached a new level
+  TEACHER_AUDIO     // Teacher audio update (for classroom parents)
+}
+
+enum RewardType {
+  FREE_MONTH            // One month free subscription
+  SUBSCRIPTION_CREDIT   // Credit toward subscription
+  TEACHER_CREDITS       // Teacher AI credits
+  DISCOUNT_COUPON       // Percentage off
+}
+
+enum RewardStatus {
+  PENDING          // Waiting for conversion
+  AVAILABLE        // Ready to redeem
+  APPLIED          // Applied to account
+  EXPIRED          // Not redeemed in time
 }
