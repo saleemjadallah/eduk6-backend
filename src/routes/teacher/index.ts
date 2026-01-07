@@ -8,6 +8,7 @@ import subscriptionRoutes from './subscription.routes.js';
 import audioUpdateRoutes from './audioUpdate.routes.js';
 import subPlanRoutes from './subPlan.routes.js';
 import iepGoalRoutes from './iepGoal.routes.js';
+import referralRoutes from './referral.routes.js';
 
 const router = Router();
 
@@ -20,6 +21,7 @@ router.use('/subscription', subscriptionRoutes);
 router.use('/audio-updates', audioUpdateRoutes);
 router.use('/sub-plans', subPlanRoutes);
 router.use('/iep-goals', iepGoalRoutes);
+router.use('/referrals', referralRoutes);
 
 // Future routes will be added here:
 // router.use('/rubrics', rubricRoutes);
